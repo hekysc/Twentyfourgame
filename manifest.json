@@ -1,0 +1,22 @@
+{
+  "name": "twentyfourgame-uniapp",
+  "appid": "__UNI__TEMPLATE",
+  "description": "24点小游戏（Uni-App 版）",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "vueVersion": "3",
+  "transformPx": true,
+  "app-plus": {
+    "orientation": ["portrait-primary"],
+    "splashscreen": { "alwaysShowBeforeRender": true, "autoclose": true },
+    "distribute": {
+      "android": { "permissions": ["INTERNET"] },
+      "ios": {}
+    }
+  },
+  "mp-weixin": {},
+  "mp-alipay": {},
+  "h5": {
+    "devServer": {}
+  }
+}
