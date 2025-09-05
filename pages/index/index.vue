@@ -1,10 +1,9 @@
 <template>
-  <view class="page col" style="padding: 24rpx; gap: 24rpx; position: relative;">
-    <text style="font-size: 40rpx; font-weight: 700; text-align: center;">24 点小游戏</text>
+  <view class="page col" style="padding: 24rpx; padding-bottom: 200rpx; gap: 24rpx; position: relative;">
 
     <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
     <view class="col" style="gap: 12rpx;">
-      <text style="font-size: 28rpx; font-weight: 600;">将四张牌拖到表达式区域（每张最多用一次）</text>
+      <text style="font-size: 28rpx; font-weight: 600;">将四张牌拖到表达式区域</text>
       <view class="cards-row">
         <view v-for="(card, idx) in cards" :key="idx"
               class="card-num"
@@ -26,10 +25,12 @@
               @touchmove.stop.prevent="onDrag($event)"
               @touchend.stop.prevent="endDrag()">{{ op }}</view>
       </view>
-      <view class="row" style="align-items:center; gap: 12rpx; margin-top: 8rpx;">
-        <text style="font-size: 26rpx; color:#333;">J/Q/K 按 11/12/13 计算</text>
-        <switch :checked="faceUseHigh" @change="onToggleFaceMode"></switch>
-      </view>
+    </view>
+ 
+    <view class="actions-row" style="align-items:center; gap: 12rpx; margin-top: 8rpx;">
+      <button class="btn outlined mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+      <button class="btn outlined" @click="refresh">换题</button>
+      <button class="btn outlined" @click="clearAll">重写</button>
     </view>
 
     <!-- 表达式拖拽接收区（横向显示，必要时换行）；token 卡片可拖动重排；拖出该区域即撤销 -->
@@ -53,17 +54,19 @@
     </view>
 
     <!-- 操作按钮（单行展示） -->
-    <view class="actions-row">
-      <button class="btn" @click="check">提交</button>
-      <button class="btn outlined" @click="refresh">换题</button>
-      <button class="btn outlined" @click="showSolution">答案</button>
-      <button class="btn outlined" @click="clearAll">清空</button>
-    </view>
 
     <text style="font-size: 28rpx; color: #333;">{{ feedback }}</text>
 
     <!-- 拖拽中的浮层 -->
     <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
+
+    <!-- 底部固定提交/答案按钮 -->
+    <view class="bottom-bar">
+      <view class="bottom-bar-inner">
+        <button class="btn primary" @click="check">提交</button>
+        <button class="btn outlined light" @click="showSolution">答案</button>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -137,10 +140,8 @@ function check() {
 
 function showSolution() { feedback.value = solution.value ? ('提示：' + solution.value) : '暂无提示' }
 
-function onToggleFaceMode(e) {
-  const val = e && e.detail ? e.detail.value : false
-  faceUseHigh.value = !!val
-  refresh()
+function toggleFaceMode() {
+  faceUseHigh.value = !faceUseHigh.value
 }
 
 // 拖拽相关
@@ -306,7 +307,8 @@ function cardImage(card) {
   const faceMap = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
   const suitName = suitMap[card.suit] || 'Spade'
   const rankName = faceMap[card.rank] || String(card.rank)
-  return `../../res/cards/${suitName}${rankName}.png`
+  // Use /static path so HBuilderX packs assets into APK
+  return `/static/cards/${suitName}${rankName}.png`
 }
 function randomSuit() { return ['S','H','D','C'][Math.floor(Math.random()*4)] }
 function generateSolvableWithMode() {
@@ -320,7 +322,7 @@ function generateSolvableWithMode() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; }
+.page { min-height: 100vh; background: linear-gradient(180deg,#4f8bff 0%, #1f5bd8 100%); display:flex; flex-direction: column; }
 .cards-row { display:flex; justify-content: space-between; align-items: stretch; }
 .card-num { width: 24%; background:#fff; border:2rpx solid #ddd; border-radius: 16rpx; padding: 16rpx; display:flex; flex-direction:column; align-items:center; color:#222; }
 .card-num.used { background:#3a7afe; border-color:#3a7afe; color:#fff; }
@@ -330,20 +332,27 @@ function generateSolvableWithMode() {
 .ops-row { display:flex; justify-content: space-between; align-items:center; }
 .ops-row .op-chip { width: 15%; text-align:center; }
 .op-chip { background:#fff; border:2rpx solid #ddd; border-radius: 10rpx; padding: 16rpx 24rpx; font-size: 32rpx; }
-.expr-zone { background:#fff; border:2rpx dashed #bbb; border-radius: 12rpx; padding: 24rpx; min-height: 160rpx; }
+.expr-zone { background:#fff; border:2rpx dashed #bbb; border-radius: 12rpx; padding: 24rpx; min-height: 160rpx; flex: 1; overflow: auto; }
 .expr-zone-active { border-color:#3a7afe; }
 .expr-row { display:flex; flex-wrap: wrap; gap: 12rpx; }
 .tok { background:#f2f6ff; color:#1f3a93; border:2rpx solid #3a7afe22; border-radius: 10rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
-.tok.num { padding: 16rpx 22rpx; font-size: 34rpx; font-weight: 700; }
+.tok.num { padding: 32rpx 44rpx; font-size: 68rpx; font-weight: 700; }
 .tok.op { padding: 8rpx 14rpx; font-size: 26rpx; }
 .tok.dragging { opacity: .6; box-shadow: 0 6rpx 24rpx rgba(0,0,0,.18); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
 .insert-placeholder { border-radius: 10rpx; border:2rpx dashed #3a7afe; background: #eaf1ff; opacity: .9; position: relative; overflow: hidden; }
-.insert-placeholder.num { min-width: 80rpx; min-height: 56rpx; margin: 2rpx; }
+.insert-placeholder.num { min-width: 160rpx; min-height: 112rpx; margin: 2rpx; }
 .insert-placeholder.op { min-width: 60rpx; min-height: 42rpx; margin: 2rpx; }
 .insert-placeholder::before { content:''; position:absolute; inset:0; background: repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 .actions-row { display:flex; gap: 16rpx; justify-content: space-between; align-items:center; flex-wrap: nowrap; }
 .drag-ghost { position: fixed; z-index: 9999; background:#3a7afe; color:#fff; padding: 16rpx 22rpx; border-radius: 10rpx; font-size: 32rpx; pointer-events:none; }
+
+/* 底部固定条 */
+.bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12rpx 24rpx calc(12rpx + constant(safe-area-inset-bottom)); padding-bottom: calc(12rpx + env(safe-area-inset-bottom)); background: rgba(255,255,255,0.96); box-shadow: 0 -6rpx 20rpx rgba(0,0,0,.08); }
+.bottom-bar-inner { display:flex; gap: 16rpx; justify-content: space-between; align-items:center; }
+.btn.primary { background:#1f5bd8; color:#fff; border-color:#1f5bd8; }
+.btn.outlined.light { background: transparent; color:#1f5bd8; border-color:#1f5bd8; }
+.mode-btn { min-width: 260rpx; text-align: center; white-space: nowrap; }
 
 @keyframes pop-in { from { transform: scale(0.85); opacity: .2; } to { transform: scale(1); opacity: 1; } }
 @keyframes shimmer { from { background-position-x: 0%; } to { background-position-x: 200%; } }
