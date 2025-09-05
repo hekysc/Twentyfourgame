@@ -6,14 +6,13 @@
     <view class="col" style="gap: 12rpx;">
       <text style="font-size: 28rpx; font-weight: 600;">将四张牌拖到表达式区域（每张最多用一次）</text>
       <view class="cards-row">
-        <view v-for="(n, idx) in cards" :key="idx"
+        <view v-for="(card, idx) in cards" :key="idx"
               class="card-num"
               :class="{ used: (usedByCard[idx]||0) > 0 }"
-              @touchstart.stop.prevent="startDrag({ type: 'num', value: String(n), cardIndex: idx }, $event)"
+              @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
               @touchmove.stop.prevent="onDrag($event)"
               @touchend.stop.prevent="endDrag()">
-          <text class="card-num-text">{{ n }}</text>
-          <text v-if="(usedByCard[idx]||0) > 0" class="card-num-used">已用 {{ usedByCard[idx] }}</text>
+          <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
         </view>
       </view>
     </view>
@@ -27,6 +26,10 @@
               @touchmove.stop.prevent="onDrag($event)"
               @touchend.stop.prevent="endDrag()">{{ op }}</view>
       </view>
+      <view class="row" style="align-items:center; gap: 12rpx; margin-top: 8rpx;">
+        <text style="font-size: 26rpx; color:#333;">J/Q/K 按 11/12/13 计算</text>
+        <switch :checked="faceUseHigh" @change="onToggleFaceMode"></switch>
+      </view>
     </view>
 
     <!-- 表达式拖拽接收区（横向显示，必要时换行）；token 卡片可拖动重排；拖出该区域即撤销 -->
@@ -38,7 +41,7 @@
           <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
                 @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
                 @touchmove.stop.prevent="onDrag($event)"
-                @touchend.stop.prevent="endDrag()">{{ t.value }}</view>
+                @touchend.stop.prevent="endDrag()">{{ t.type === 'num' ? labelFor(t.rank || +t.value) : t.value }}</view>
         </block>
         <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
       </view>
@@ -51,29 +54,30 @@
 
     <!-- 操作按钮（单行展示） -->
     <view class="actions-row">
-      <button class="btn" @click="check">判定是否=24</button>
-      <button class="btn outlined" @click="refresh">换一题（必有解）</button>
-      <button class="btn outlined" @click="showSolution">查看提示/答案</button>
+      <button class="btn" @click="check">提交</button>
+      <button class="btn outlined" @click="refresh">换题</button>
+      <button class="btn outlined" @click="showSolution">答案</button>
       <button class="btn outlined" @click="clearAll">清空</button>
     </view>
 
     <text style="font-size: 28rpx; color: #333;">{{ feedback }}</text>
 
     <!-- 拖拽中的浮层 -->
-    <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ drag.token?.value }}</view>
+    <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
   </view>
 </template>
 
 <script setup>
 import { ref, onMounted, getCurrentInstance, computed } from 'vue'
-import { generateSolvable, validateUsesAllCards, evaluateExprToFraction } from '../../utils/solver.js'
+import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 
-const cards = ref([1, 5, 5, 5])
+const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
 const feedback = ref('')
 const usedByCard = ref([0,0,0,0])
-const tokens = ref([]) // [{type:'num'|'op', value:string, cardIndex?:number}]
+const tokens = ref([])
 const ops = ['+','-','×','÷','(',')']
+const faceUseHigh = ref(false)
 
 const drag = ref({ active: false, token: null, x: 0, y: 0, startX: 0, startY: 0, moved: false })
 const exprBox = ref({ left: 0, top: 0, right: 0, bottom: 0 })
@@ -82,8 +86,15 @@ const dragInsertIndex = ref(-1)
 const lastInsertedIndex = ref(-1)
 const { proxy } = getCurrentInstance()
 
-const expr = computed(() => tokens.value.map(x => x.value).join(''))
+const expr = computed(() => tokens.value.map(x => x.type==='num' ? String(evalRank(x.rank)) : x.value).join(''))
 const ghostStyle = computed(() => `left:${drag.value.x}px; top:${drag.value.y}px;`)
+const ghostText = computed(() => {
+  const t = drag.value.token
+  if (!t) return ''
+  if (t.type === 'num') return labelFor(t.rank || +t.value)
+  if (t.type === 'tok') return isNumToken(t.value) ? labelFor(+t.value) : t.value
+  return t.value || ''
+})
 const isNumToken = (t) => /^(10|11|12|13|[1-9])$/.test(t)
 const placeholderSizeClass = computed(() => {
   const dt = drag.value.token
@@ -102,8 +113,10 @@ const currentText = computed(() => {
 })
 
 function refresh() {
-  const { nums, sol } = generateSolvable()
-  cards.value = nums
+  // generate solvable set according to current face mode
+  const { nums, sol } = generateSolvableWithMode()
+  // assign random suits for visual variety
+  cards.value = nums.map(n => ({ rank: n, suit: randomSuit() }))
   solution.value = sol
   tokens.value = []
   feedback.value = '出题完成：请用四张牌 + - × ÷ ( ) 算出 24'
@@ -115,14 +128,20 @@ onMounted(() => { refresh() })
 function clearAll() { tokens.value = []; usedByCard.value = [0,0,0,0] }
 
 function check() {
+  const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
+  if (usedCount !== 4) { feedback.value = '表达式未正确使用四张牌（每张各一次）'; return }
   const s = expr.value
-  const okUse = validateUsesAllCards(s, cards.value)
-  if (!okUse) { feedback.value = '表达式未正确使用四张牌（每张各一次）或包含不允许的内容'; return }
   const v = evaluateExprToFraction(s)
   feedback.value = (v && v.equalsInt && v.equalsInt(24)) ? '正确！恭喜你算出 24' : '结果不是 24，请再试试～'
 }
 
 function showSolution() { feedback.value = solution.value ? ('提示：' + solution.value) : '暂无提示' }
+
+function onToggleFaceMode(e) {
+  const val = e && e.detail ? e.detail.value : false
+  faceUseHigh.value = !!val
+  refresh()
+}
 
 // 拖拽相关
 function startDrag(token, e) {
@@ -204,7 +223,7 @@ function tryInsertTokenAt(token, to) {
     if (ci == null) { feedback.value = '该卡片信息缺失'; return }
     if ((usedByCard.value[ci] || 0) >= 1) { feedback.value = '该卡片已用过'; return }
     const arr = tokens.value.slice()
-    arr.splice(clamped, 0, { type: 'num', value: token.value, cardIndex: ci })
+    arr.splice(clamped, 0, { type: 'num', value: token.value, rank: token.rank, suit: token.suit, cardIndex: ci })
     tokens.value = arr
     const u = usedByCard.value.slice(); u[ci] = 1; usedByCard.value = u
   } else if (token.type === 'op') {
@@ -240,6 +259,8 @@ function pointFromEvent(e) {
   return { x: t.clientX ?? t.x ?? 0, y: t.clientY ?? t.y ?? 0 }
 }
 
+// removed duplicate labelFor (kept single definition below)
+
 function calcInsertIndex(x, y) {
   const rects = tokRects.value || []
   if (!rects.length) return tokens.value.length
@@ -267,15 +288,45 @@ function moveToken(from, to) {
   arr.splice(clamped, 0, t)
   tokens.value = arr
 }
+
+function evalRank(rank) {
+  if (rank === 1) return 1
+  if (rank === 11 || rank === 12 || rank === 13) return faceUseHigh.value ? rank : 1
+  return rank
+}
+function labelFor(n) {
+  if (n === 1) return 'A'
+  if (n === 11) return 'J'
+  if (n === 12) return 'Q'
+  if (n === 13) return 'K'
+  return String(n)
+}
+function cardImage(card) {
+  const suitMap = { 'S': 'Spade', 'H': 'Heart', 'D': 'Diamond', 'C': 'Club' }
+  const faceMap = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
+  const suitName = suitMap[card.suit] || 'Spade'
+  const rankName = faceMap[card.rank] || String(card.rank)
+  return `../../res/cards/${suitName}${rankName}.png`
+}
+function randomSuit() { return ['S','H','D','C'][Math.floor(Math.random()*4)] }
+function generateSolvableWithMode() {
+  while (true) {
+    const raw = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 13))
+    const mapped = raw.map(r => evalRank(r))
+    const sol = solve24(mapped)
+    if (sol) return { nums: raw, sol }
+  }
+}
 </script>
 
 <style scoped>
 .page { min-height: 100vh; }
 .cards-row { display:flex; justify-content: space-between; align-items: stretch; }
-.card-num { width: 24%; background:#fff; border:2rpx solid #ddd; border-radius: 16rpx; padding: 24rpx 0; display:flex; flex-direction:column; align-items:center; }
-.card-num.used { border-color:#3a7afe; }
+.card-num { width: 24%; background:#fff; border:2rpx solid #ddd; border-radius: 16rpx; padding: 16rpx; display:flex; flex-direction:column; align-items:center; color:#222; }
+.card-num.used { background:#3a7afe; border-color:#3a7afe; color:#fff; }
+.card-num.used .card-img { filter: invert(1) hue-rotate(180deg); }
+.card-img { width: 100%; height: auto; border-radius: 12rpx; }
 .card-num-text { font-size: 40rpx; font-weight: 700; }
-.card-num-used { font-size: 22rpx; color:#3a7afe; }
 .ops-row { display:flex; justify-content: space-between; align-items:center; }
 .ops-row .op-chip { width: 15%; text-align:center; }
 .op-chip { background:#fff; border:2rpx solid #ddd; border-radius: 10rpx; padding: 16rpx 24rpx; font-size: 32rpx; }
