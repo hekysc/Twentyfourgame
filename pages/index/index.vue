@@ -65,9 +65,15 @@
 
     <!-- 底部固定提交/答案按钮 -->
     <view id="bottomBar" class="bottom-bar">
-      <view class="bottom-bar-inner">
-        <button class="btn btn-secondary full" @click="showSolution">答案</button>
-        <button class="btn btn-primary full" @click="refresh">换题</button>
+      <view class="bottom-bar-inner bottom-nav">
+        <view class="bottom-item" @click="showSolution">
+          <text class="bottom-icon">💡</text>
+          <text class="bottom-label">答案</text>
+        </view>
+        <view class="bottom-item" @click="refresh">
+          <text class="bottom-icon">▶️</text>
+          <text class="bottom-label">换题</text>
+        </view>
       </view>
     </view>
   </view>
@@ -503,6 +509,11 @@ function generateSolvableWithMode() {
   .bottom-bar { padding-bottom: calc(12rpx + constant(safe-area-inset-bottom)); }
 }
 .bottom-bar-inner { display:flex; gap:16rpx; justify-content:space-between; align-items:center; }
+.bottom-nav { justify-content: space-around; gap: 0; }
+.bottom-item { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8rpx 12rpx; color:#6b7280; }
+.bottom-item:active { transform: scale(0.98); }
+.bottom-icon { font-size:44rpx; line-height:1; color:#6b7280; }
+.bottom-label { font-size:24rpx; color:#6b7280; margin-top:6rpx; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
