@@ -2,44 +2,34 @@
   <view class="page col" style="padding: 24rpx; padding-top: 50rpx; gap: 24rpx; position: relative;">
 
     <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-    <view class="col" style="gap: 12rpx;">
-      <view class="cards-row">
-        <view v-for="(card, idx) in cards" :key="idx"
-              class="card-num"
-              :class="{ used: (usedByCard[idx]||0) > 0 }"
-              @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-              @touchmove.stop.prevent="onDrag($event)"
-              @touchend.stop.prevent="endDrag()">
-          <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
-        </view>
+    <view class="card-grid">
+      <view v-for="(card, idx) in cards" :key="idx"
+            class="card"
+            :class="{ used: (usedByCard[idx]||0) > 0 }"
+            @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
+            @touchmove.stop.prevent="onDrag($event)"
+            @touchend.stop.prevent="endDrag()">
+        <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
       </view>
     </view>
 
     <!-- 运算符区：两行，第一行4个，第二行2个，占满整行 -->
-    <view class="col" style="gap: 12rpx;">
-      <view class="ops-row row-1" style="padding-bottom: 12rpx">
-        <view v-for="op in ops.slice(0,4)" :key="`r1-`+op" class="op-chip"
+    <view class="operator-grid">
+      <button v-for="op in ops" :key="op" class="btn btn-operator"
               @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
               @touchmove.stop.prevent="onDrag($event)"
-              @touchend.stop.prevent="endDrag()">{{ op }}</view>
-      </view>
-      <view class="ops-row row-2">
-        <view v-for="op in ops.slice(4)" :key="`r2-`+op" class="op-chip"
-              @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
-              @touchmove.stop.prevent="onDrag($event)"
-              @touchend.stop.prevent="endDrag()">{{ op }}</view>
-      </view>
+              @touchend.stop.prevent="endDrag()">{{ op }}</button>
     </view>
- 
-    <view class="actions-row" style="align-items:center; gap: 12rpx; margin-top: 8rpx;">
-      <button class="btn outlined mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
-      <button class="btn outlined" @click="refresh">换题</button>
-      <button class="btn outlined" @click="clearAll">重写</button>
+
+    <view class="action-row">
+      <button class="btn btn-primary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+      <button class="btn btn-secondary" @click="refresh">换题</button>
+      <button class="btn btn-secondary" @click="clearAll">重写</button>
     </view>
 
     <!-- 表达式拖拽接收区（横向显示，必要时换行）；token 卡片可拖动重排；拖出该区域即撤销 -->
     <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }">
-      <text v-if="tokens.length === 0" style="color:#999;">将卡牌和运算符拖到这里组成表达式</text>
+      <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里组成表达式</view>
       <view id="exprRow" class="row expr-row" :style="{ transform: `scale(${exprScale})`, transformOrigin: 'left center' }">
         <block v-for="(t, i) in tokens" :key="i">
           <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
@@ -67,8 +57,8 @@
     <!-- 底部固定提交/答案按钮 -->
     <view class="bottom-bar">
       <view class="bottom-bar-inner">
-        <button class="btn primary" @click="check">提交</button>
-        <button class="btn outlined light" @click="showSolution">答案</button>
+        <button class="btn btn-primary" @click="check">提交</button>
+        <button class="btn btn-secondary" @click="showSolution">答案</button>
       </view>
     </view>
   </view>
@@ -356,39 +346,34 @@ function generateSolvableWithMode() {
 
 <style scoped>
 .page { min-height: 100vh; background: linear-gradient(180deg,#ffffff 0%, #1f5bd8 100%); display:flex; flex-direction: column; }
-.cards-row { display:flex; justify-content: space-between; align-items: stretch; }
-.card-num { width: 24%; background:#fff; border:2rpx solid #ddd; border-radius: 16rpx; padding: 0rpx; display:flex; flex-direction:column; align-items:center; color:#222; }
-.card-num.used { background:#3a7afe; border-color:#3a7afe; color:#fff; }
-.card-num.used .card-img { filter: invert(1) hue-rotate(180deg); }
-.card-img { width: 100%; height: auto; border-radius: 12rpx; }
-.card-num-text { font-size: 40rpx; font-weight: 700; }
-.ops-row { display:flex; justify-content: space-between; align-items:center; gap: 12rpx; }
-.ops-row .op-chip { text-align:center; }
-.ops-row.row-1 .op-chip { width: 24%; }
-.ops-row.row-2 .op-chip { width: 49%; }
-.op-chip { background:#fff; border:2rpx solid #ddd; border-radius: 10rpx; padding: 16rpx 24rpx; font-size: 32rpx; }
-.expr-zone { background:#fff; border:2rpx dashed #bbb; border-radius: 12rpx; padding: 24rpx; height: 33vh; max-height: 33vh; overflow: hidden; }
+.card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
+.card { background:#fff; border:2rpx solid #ddd; border-radius:16rpx; overflow:hidden; }
+.card.used { background:#3a7afe; border-color:#3a7afe; }
+.card.used .card-img { filter: invert(1) hue-rotate(180deg); }
+.card-img { width:100%; height:auto; display:block; }
+.operator-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
+.btn-operator { background:#fff; color:#222; border:2rpx solid #ddd; border-radius:10rpx; padding:16rpx 0; font-size:32rpx; }
+.action-row { display:flex; gap:12rpx; margin-top:8rpx; align-items:center; }
+.expr-zone { background:#fff; border:2rpx dashed #bbb; border-radius:12rpx; padding:24rpx; height:33vh; max-height:33vh; overflow:hidden; }
 .expr-zone-active { border-color:#3a7afe; }
-.expr-row { display: inline-flex; flex-wrap: nowrap; white-space: nowrap; gap: 12rpx; align-items: center; }
-.tok { background:#f2f6ff; color:#1f3a93; border:2rpx solid #3a7afe22; border-radius: 10rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
-.tok.num { padding: 32rpx 44rpx; font-size: 68rpx; font-weight: 700; }
-.tok.op { padding: 8rpx 14rpx; font-size: 26rpx; }
-.tok.dragging { opacity: .6; box-shadow: 0 6rpx 24rpx rgba(0,0,0,.18); }
+.expr-placeholder { color:#999; }
+.expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
+.tok { background:#f2f6ff; color:#1f3a93; border:2rpx solid #3a7afe22; border-radius:10rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
+.tok.num { padding:32rpx 44rpx; font-size:68rpx; font-weight:700; }
+.tok.op { padding:8rpx 14rpx; font-size:26rpx; }
+.tok.dragging { opacity:.6; box-shadow:0 6rpx 24rpx rgba(0,0,0,.18); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
-.insert-placeholder { border-radius: 10rpx; border:2rpx dashed #3a7afe; background: #eaf1ff; opacity: .9; position: relative; overflow: hidden; }
-.insert-placeholder.num { min-width: 160rpx; min-height: 112rpx; margin: 2rpx; }
-.insert-placeholder.op { min-width: 60rpx; min-height: 42rpx; margin: 2rpx; }
-.insert-placeholder::before { content:''; position:absolute; inset:0; background: repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
-.actions-row { display:flex; gap: 16rpx; justify-content: space-between; align-items:center; flex-wrap: nowrap; }
-.drag-ghost { position: fixed; z-index: 9999; background:#3a7afe; color:#fff; padding: 16rpx 22rpx; border-radius: 10rpx; font-size: 32rpx; pointer-events:none; }
+.insert-placeholder { border-radius:10rpx; border:2rpx dashed #3a7afe; background:#eaf1ff; opacity:.9; position:relative; overflow:hidden; }
+.insert-placeholder.num { min-width:160rpx; min-height:112rpx; margin:2rpx; }
+.insert-placeholder.op { min-width:60rpx; min-height:42rpx; margin:2rpx; }
+.insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
+.drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
 
 /* 底部固定条 */
-.bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12rpx 24rpx calc(12rpx + constant(safe-area-inset-bottom)); padding-bottom: calc(12rpx + env(safe-area-inset-bottom)); background: rgba(255,255,255,0.96); box-shadow: 0 -6rpx 20rpx rgba(0,0,0,.08); }
-.bottom-bar-inner { display:flex; gap: 16rpx; justify-content: space-between; align-items:center; }
-.btn.primary { background:#1f5bd8; color:#fff; border-color:#1f5bd8; }
-.btn.outlined.light { background: transparent; color:#1f5bd8; border-color:#1f5bd8; }
-.mode-btn { min-width: 260rpx; text-align: center; white-space: nowrap; }
+.bottom-bar { position:fixed; left:0; right:0; bottom:0; padding:12rpx 24rpx calc(12rpx + constant(safe-area-inset-bottom)); padding-bottom:calc(12rpx + env(safe-area-inset-bottom)); background:rgba(255,255,255,0.96); box-shadow:0 -6rpx 20rpx rgba(0,0,0,.08); }
+.bottom-bar-inner { display:flex; gap:16rpx; justify-content:space-between; align-items:center; }
+.mode-btn { min-width:260rpx; text-align:center; white-space:nowrap; }
 
-@keyframes pop-in { from { transform: scale(0.85); opacity: .2; } to { transform: scale(1); opacity: 1; } }
-@keyframes shimmer { from { background-position-x: 0%; } to { background-position-x: 200%; } }
+@keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
+@keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
 </style>
