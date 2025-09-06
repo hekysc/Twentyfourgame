@@ -1,9 +1,8 @@
 <template>
-  <view class="page col" style="padding: 24rpx; padding-bottom: 200rpx; gap: 24rpx; position: relative;">
+  <view class="page col" style="padding: 24rpx; padding-top: 50rpx; gap: 24rpx; position: relative;">
 
     <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
     <view class="col" style="gap: 12rpx;">
-      <text style="font-size: 28rpx; font-weight: 600;">将四张牌拖到表达式区域</text>
       <view class="cards-row">
         <view v-for="(card, idx) in cards" :key="idx"
               class="card-num"
@@ -16,11 +15,16 @@
       </view>
     </view>
 
-    <!-- 运算符区：六个运算符单行平铺等宽 -->
+    <!-- 运算符区：两行，第一行4个，第二行2个，占满整行 -->
     <view class="col" style="gap: 12rpx;">
-      <text style="font-size: 28rpx; font-weight: 600;">拖拽运算符</text>
-      <view class="ops-row">
-        <view v-for="op in ops" :key="op" class="op-chip"
+      <view class="ops-row row-1" style="padding-bottom: 12rpx">
+        <view v-for="op in ops.slice(0,4)" :key="`r1-`+op" class="op-chip"
+              @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+              @touchmove.stop.prevent="onDrag($event)"
+              @touchend.stop.prevent="endDrag()">{{ op }}</view>
+      </view>
+      <view class="ops-row row-2">
+        <view v-for="op in ops.slice(4)" :key="`r2-`+op" class="op-chip"
               @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
               @touchmove.stop.prevent="onDrag($event)"
               @touchend.stop.prevent="endDrag()">{{ op }}</view>
@@ -36,7 +40,7 @@
     <!-- 表达式拖拽接收区（横向显示，必要时换行）；token 卡片可拖动重排；拖出该区域即撤销 -->
     <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }">
       <text v-if="tokens.length === 0" style="color:#999;">将卡牌和运算符拖到这里组成表达式</text>
-      <view class="row expr-row">
+      <view id="exprRow" class="row expr-row" :style="{ transform: `scale(${exprScale})`, transformOrigin: 'left center' }">
         <block v-for="(t, i) in tokens" :key="i">
           <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
           <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
@@ -71,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, getCurrentInstance, computed } from 'vue'
+import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
@@ -91,6 +95,7 @@ const { proxy } = getCurrentInstance()
 
 const expr = computed(() => tokens.value.map(x => x.type==='num' ? String(evalRank(x.rank)) : x.value).join(''))
 const ghostStyle = computed(() => `left:${drag.value.x}px; top:${drag.value.y}px;`)
+const exprScale = ref(1)
 const ghostText = computed(() => {
   const t = drag.value.token
   if (!t) return ''
@@ -260,6 +265,34 @@ function pointFromEvent(e) {
   return { x: t.clientX ?? t.x ?? 0, y: t.clientY ?? t.y ?? 0 }
 }
 
+function updateExprScale() {
+  exprScale.value = 1
+  nextTick(() => {
+    const q = uni.createSelectorQuery().in(proxy)
+    q.select('#exprZone').boundingClientRect()
+     .select('#exprRow').boundingClientRect()
+     .exec(res => {
+       const [zone, row] = res || []
+       if (!zone || !row) return
+       const avail = zone.width - 24
+       const need = row.width || 0
+       if (avail > 0 && need > 0) {
+         const s = Math.min(1, avail / need)
+         exprScale.value = (isFinite(s) && s > 0) ? s : 1
+       } else {
+         exprScale.value = 1
+       }
+     })
+  })
+}
+
+onMounted(() => {
+  updateExprScale()
+  if (uni.onWindowResize) uni.onWindowResize(() => updateExprScale())
+})
+
+watch(tokens, () => updateExprScale())
+
 // removed duplicate labelFor (kept single definition below)
 
 function calcInsertIndex(x, y) {
@@ -322,19 +355,21 @@ function generateSolvableWithMode() {
 </script>
 
 <style scoped>
-.page { min-height: 100vh; background: linear-gradient(180deg,#4f8bff 0%, #1f5bd8 100%); display:flex; flex-direction: column; }
+.page { min-height: 100vh; background: linear-gradient(180deg,#ffffff 0%, #1f5bd8 100%); display:flex; flex-direction: column; }
 .cards-row { display:flex; justify-content: space-between; align-items: stretch; }
-.card-num { width: 24%; background:#fff; border:2rpx solid #ddd; border-radius: 16rpx; padding: 16rpx; display:flex; flex-direction:column; align-items:center; color:#222; }
+.card-num { width: 24%; background:#fff; border:2rpx solid #ddd; border-radius: 16rpx; padding: 0rpx; display:flex; flex-direction:column; align-items:center; color:#222; }
 .card-num.used { background:#3a7afe; border-color:#3a7afe; color:#fff; }
 .card-num.used .card-img { filter: invert(1) hue-rotate(180deg); }
 .card-img { width: 100%; height: auto; border-radius: 12rpx; }
 .card-num-text { font-size: 40rpx; font-weight: 700; }
-.ops-row { display:flex; justify-content: space-between; align-items:center; }
-.ops-row .op-chip { width: 15%; text-align:center; }
+.ops-row { display:flex; justify-content: space-between; align-items:center; gap: 12rpx; }
+.ops-row .op-chip { text-align:center; }
+.ops-row.row-1 .op-chip { width: 24%; }
+.ops-row.row-2 .op-chip { width: 49%; }
 .op-chip { background:#fff; border:2rpx solid #ddd; border-radius: 10rpx; padding: 16rpx 24rpx; font-size: 32rpx; }
-.expr-zone { background:#fff; border:2rpx dashed #bbb; border-radius: 12rpx; padding: 24rpx; min-height: 160rpx; flex: 1; overflow: auto; }
+.expr-zone { background:#fff; border:2rpx dashed #bbb; border-radius: 12rpx; padding: 24rpx; height: 33vh; max-height: 33vh; overflow: hidden; }
 .expr-zone-active { border-color:#3a7afe; }
-.expr-row { display:flex; flex-wrap: wrap; gap: 12rpx; }
+.expr-row { display: inline-flex; flex-wrap: nowrap; white-space: nowrap; gap: 12rpx; align-items: center; }
 .tok { background:#f2f6ff; color:#1f3a93; border:2rpx solid #3a7afe22; border-radius: 10rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
 .tok.num { padding: 32rpx 44rpx; font-size: 68rpx; font-weight: 700; }
 .tok.op { padding: 8rpx 14rpx; font-size: 26rpx; }
