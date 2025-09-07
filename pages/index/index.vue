@@ -59,8 +59,8 @@
 
     <!-- 提交 与 重写：各占一半宽度 -->
     <view id="submitRow" class="pair-grid">
-      <button class="btn btn-primary" @click="check">提交</button>
-      <button class="btn btn-secondary" @click="clearAll">重写</button>
+      <button class="btn btn-primary" @click="check">提交答案</button>
+      <button class="btn btn-primary" @click="clearAll">清空表达式</button>
     </view>
 
     <!-- 底部固定提交/答案按钮 -->
@@ -441,7 +441,7 @@ function generateSolvableWithMode() {
 </script>
 
 <style scoped>
-.page { min-height: calc(var(--vh, 1vh) * 90); background: linear-gradient(180deg, #f7f9ff 0%, #076de9 100%); display:flex; flex-direction: column; }
+.page { min-height: calc(var(--vh, 1vh) * 90); background: linear-gradient(180deg, #f7f9ff 0%, #a7ceff 100%); display:flex; flex-direction: column; }
 .page { opacity: 0; }
 .page.booted { animation: page-fade-in .28s ease-out forwards; }
 .topbar { position: sticky; top: 0; z-index: 10; padding: 18rpx 0; background: rgba(255,255,255,0.88); backdrop-filter: blur(6rpx); border-bottom: 2rpx solid #e5e7eb; }
@@ -450,7 +450,7 @@ function generateSolvableWithMode() {
 /* 卡牌区域 */
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .card { background:#fff; border-radius:28rpx; overflow:hidden; box-shadow:0 12rpx 28rpx rgba(15,23,42,.08); }
-.card.used { filter: grayscale(1) saturate(.2); opacity:.8; }
+.card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
 .card-img { width:100%; height:auto; display:block; }
 
 /* 运算符与控制区 */
@@ -462,13 +462,23 @@ function generateSolvableWithMode() {
 .pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .span-2 { grid-column: span 2 / auto; }
 .placeholder-cell { height:0; }
-.mode-btn { width: 100%; white-space: nowrap; }
+.mode-btn { width: 100%; 
+  white-space: nowrap; 
+}
 
 /* 通用按钮 */
 .btn { border:none; border-radius:20rpx; padding:28rpx 0; font-size:34rpx; line-height:1; box-shadow:0 10rpx 24rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; }
-.btn-primary { background:#1677ff; color:#fff; }
-.btn-secondary { background:#eef2f7; color:#0f172a; }
+.btn-primary { background:#145751; color:#fff; }
+.btn-secondary { 
+  color:#0f172a; 
+  background: linear-gradient(to bottom, #f8fafc, #0961d3);
+  box-shadow: 
+  0 10px 12px rgba(0, 0, 0, 0.1),   /* 外阴影：按钮悬浮感 */
+  inset 0 1px 2px rgba(255, 255, 255, 0.6); /* 内阴影：高光 */
+  border-radius: 0.5rem;  
+  transition: all 0.2s ease-in-out;
+}
 .full { width:100%; }
 
 /* 运算符自适应密度（根据屏幕高度切换） */
@@ -481,19 +491,19 @@ function generateSolvableWithMode() {
 .expr-card { background:#fff; padding:24rpx; border-radius:28rpx; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
-.expr-zone { --tok-card-h: 112rpx; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; }
+.expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; }
 .expr-zone-active { border-color:#3a7afe; }
 .expr-placeholder { color:#9ca3af; text-align:center; margin-top: 8rpx; }
 .expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
 .tok { color:#1f3a93; border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
-.tok.num { padding:0; border:none; background:transparent; }
-.tok-card-img { height: var(--tok-card-h); width:auto; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(15,23,42,.08); }
-.tok.op { height: var(--tok-card-h); min-width: 60rpx; padding: 0 24rpx; font-size:48rpx; background:#fff; border:2rpx solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(15,23,42,.06); }
+.tok.num { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block; }
+.tok-card-img { width:100%; height:100%; object-fit: contain; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(15,23,42,.08); }
+.tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:#fff; border:2rpx solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(15,23,42,.06); box-sizing: border-box; }
 .tok.dragging { opacity:.6; box-shadow:0 6rpx 24rpx rgba(0,0,0,.18); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
 .insert-placeholder { border-radius:14rpx; border:2rpx dashed #3a7afe; background:#eaf1ff; opacity:.9; position:relative; overflow:hidden; }
-.insert-placeholder.num { min-width:160rpx; min-height:112rpx; margin:2rpx; }
-.insert-placeholder.op { min-width:60rpx; min-height:42rpx; margin:2rpx; }
+.insert-placeholder.num { min-width: calc(var(--tok-card-h) * var(--card-w-ratio)); min-height: var(--tok-card-h); margin:2rpx; }
+.insert-placeholder.op { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin:2rpx; }
 .insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
 .drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
 
