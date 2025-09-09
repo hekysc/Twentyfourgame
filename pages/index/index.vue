@@ -1,5 +1,11 @@
 <template>
-  <view class="page col" :class="{ booted }" style="padding: 24rpx; padding-top: 24rpx; gap: 24rpx; position: relative;">
+  <view class="page col" :class="{ booted }" style="padding: 24rpx; gap: 24rpx; position: relative;">
+
+    <!-- 顶部：当前用户与切换 -->
+    <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
+      <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
+      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
+    </view>
 
     <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
     <view id="cardGrid" class="card-grid" style="padding-top: 50rpx;">
@@ -13,21 +19,30 @@
       </view>
     </view>
 
-    <!-- 表达式卡片容器 -->
+    <!-- 本局统计：单行紧凑显示 -->
+    <view id="statsRow" class="stats-card stats-one-line">
+      <view class="stats-item"><text class="stat-label">剩余</text><text class="stat-value">{{ remainingCards }}</text></view>
+      <view class="stats-item"><text class="stat-label">次数</text><text class="stat-value">{{ handsPlayed }}</text></view>
+      <view class="stats-item"><text class="stat-label ok">成功</text><text class="stat-value ok">{{ successCount }}</text></view>
+      <view class="stats-item"><text class="stat-label fail">失败</text><text class="stat-value fail">{{ failCount }}</text></view>
+      <view class="stats-item"><text class="stat-label">胜率</text><text class="stat-value">{{ winRate }}%</text></view>
+    </view>
+
+    <!-- 表达式卡片容器（高度由脚本计算） -->
     <view class="expr-card">
       <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view>
       <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
         <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view>
-        <view id="exprRow" class="row expr-row" :style="{ transform: `scale(${exprScale})`, transformOrigin: 'left center' }">
+        <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center' }">
           <block v-for="(t, i) in tokens" :key="i">
             <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-          <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
-                @touchmove.stop.prevent="onDrag($event)"
-                @touchend.stop.prevent="endDrag()">
-            <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S' })" mode="heightFix"/>
-            <text v-else class="tok-op-text">{{ t.value }}</text>
-          </view>
+            <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
+                  @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                  @touchmove.stop.prevent="onDrag($event)"
+                  @touchend.stop.prevent="endDrag()">
+              <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S' })" mode="heightFix"/>
+              <text v-else class="tok-op-text">{{ t.value }}</text>
+            </view>
           </block>
           <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
         </view>
@@ -35,10 +50,10 @@
     </view>
 
     <!-- 轻提示文案 -->
-    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出 24' }}</text>
+    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出24' }}</text>
 
-        <!-- 运算符候选区：两行布局 -->
-        <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
+    <!-- 运算符候选区：两行布局 -->
+    <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
       <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
               @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
               @touchmove.stop.prevent="onDrag($event)"
@@ -57,39 +72,47 @@
     <!-- 拖拽中的浮层 -->
     <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
 
-    <!-- 提交 与 重写：各占一半宽度 -->
+    <!-- 提交 / 清空：各占一半宽度 -->
     <view id="submitRow" class="pair-grid">
       <button class="btn btn-primary" @click="check">提交答案</button>
       <button class="btn btn-primary" @click="clearAll">清空表达式</button>
     </view>
 
-    <!-- 底部固定提交/答案按钮 -->
-    <view id="bottomBar" class="bottom-bar">
-      <view class="bottom-bar-inner bottom-nav">
-        <view class="bottom-item" @click="showSolution">
-          <text class="bottom-icon">💡</text>
-          <text class="bottom-label">答案</text>
-        </view>
-        <view class="bottom-item" @click="refresh">
-          <text class="bottom-icon">▶️</text>
-          <text class="bottom-label">换题</text>
-        </view>
-      </view>
+    <!-- 答案 / 换题：位于提交区下方 -->
+    <view id="failRow" class="pair-grid">
+      <button class="btn btn-secondary" @click="showSolution">答案</button>
+      <button class="btn btn-secondary" @click="skipHand">换题</button>
     </view>
+
+    <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
   </view>
 </template>
 
 <script setup>
 import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
+import { ensureInit, getCurrentUser, pushRound } from '../../utils/store.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
 const feedback = ref('')
 const usedByCard = ref([0,0,0,0])
 const tokens = ref([])
-const ops = ['+','-','×','÷','(',')']
 const faceUseHigh = ref(false)
+const handRecorded = ref(false)
+const exprZoneHeight = ref(200)
+const currentUser = ref(null)
+const deck = ref([])
+const handsPlayed = ref(0)
+const successCount = ref(0)
+const failCount = ref(0)
+const sessionOver = ref(false)
+
+const remainingCards = computed(() => (deck.value || []).length)
+const winRate = computed(() => {
+  const t = successCount.value + failCount.value
+  return t ? Math.round(100 * successCount.value / t) : 0
+})
 
 const drag = ref({ active: false, token: null, x: 0, y: 0, startX: 0, startY: 0, moved: false })
 const exprBox = ref({ left: 0, top: 0, right: 0, bottom: 0 })
@@ -98,29 +121,26 @@ const dragInsertIndex = ref(-1)
 const lastInsertedIndex = ref(-1)
 const { proxy } = getCurrentInstance()
 
-// 启动动画
 const booted = ref(false)
 
-const expr = computed(() => tokens.value.map(x => x.type==='num' ? String(evalRank(x.rank)) : x.value).join(''))
+const expr = computed(() => tokens.value.map(x => x.type==='num' ? String(evalRank(x.rank ?? +x.value)) : x.value).join(''))
 const ghostStyle = computed(() => `left:${drag.value.x}px; top:${drag.value.y}px;`)
 const exprScale = ref(1)
-// const exprZoneHeight = ref(200)
 const opsDensity = ref('normal') // normal | compact | tight
 const opsDensityClass = computed(() => opsDensity.value === 'tight' ? 'ops-tight' : (opsDensity.value === 'compact' ? 'ops-compact' : ''))
 const ghostText = computed(() => {
   const t = drag.value.token
   if (!t) return ''
   if (t.type === 'num') return labelFor(t.rank || +t.value)
-  if (t.type === 'tok') return isNumToken(t.value) ? labelFor(+t.value) : t.value
+  if (t.type === 'tok') return /^(10|11|12|13|[1-9])$/.test(t.value) ? labelFor(+t.value) : t.value
   return t.value || ''
 })
-const isNumToken = (t) => /^(10|11|12|13|[1-9])$/.test(t)
 const placeholderSizeClass = computed(() => {
   const dt = drag.value.token
   if (!drag.value.active || !dt) return 'op'
   if (dt.type === 'num') return 'num'
   if (dt.type === 'op') return 'op'
-  if (dt.type === 'tok') return isNumToken(dt.value) ? 'num' : 'op'
+  if (dt.type === 'tok') return (/^(10|11|12|13|[1-9])$/).test(dt.value) ? 'num' : 'op'
   return 'op'
 })
 
@@ -131,43 +151,98 @@ const currentText = computed(() => {
   return v ? `${v.toString()}` : ''
 })
 
-function refresh() {
-  // generate solvable set according to current face mode
-  const { nums, sol } = generateSolvableWithMode()
-  // assign random suits for visual variety
-  cards.value = nums.map(n => ({ rank: n, suit: randomSuit() }))
-  solution.value = sol
+function refresh() { nextHand() }
+
+function initDeck() {
+  const suits = ['S','H','D','C']
+  const arr = []
+  for (const s of suits) { for (let r=1; r<=13; r++) arr.push({ rank:r, suit:s }) }
+  // shuffle
+  for (let i=arr.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]] }
+  deck.value = arr
+}
+
+function nextHand() {
+  if (!deck.value || deck.value.length < 4) { sessionOver.value = true; feedback.value = '牌库不足，已结束本局'; onSessionOver(); return }
+  const maxTry = Math.min(200, 1 + (deck.value.length * deck.value.length))
+  let pickIdx = null
+  for (let t=0; t<maxTry; t++) {
+    const idxs = new Set()
+    while (idxs.size < 4) idxs.add(Math.floor(Math.random() * deck.value.length))
+    const ids = Array.from(idxs)
+    const cs = ids.map(i => deck.value[i])
+    const mapped = cs.map(c => evalRank(c.rank))
+    const sol = solve24(mapped)
+    if (sol) { pickIdx = { ids, sol }; break }
+  }
+  if (!pickIdx) { sessionOver.value = true; feedback.value = '本副牌无可解手牌，已结束本局'; onSessionOver(); return }
+  const ids = pickIdx.ids.sort((a,b)=>b-a)
+  const cs = []
+  for (const i of ids) { cs.unshift(deck.value[i]); deck.value.splice(i,1) }
+  cards.value = cs
+  solution.value = pickIdx.sol
   tokens.value = []
-  feedback.value = '出题完成：请用四张牌 + - × ÷ ( ) 算出 24'
   usedByCard.value = [0,0,0,0]
+  handRecorded.value = false
+  feedback.value = '拖入 + - × ÷ ( ) 组成 24'
   nextTick(() => recomputeExprHeight())
 }
 
 onMounted(() => {
-  refresh()
-  // 启动动画触发
+  ensureInit()
+  currentUser.value = getCurrentUser() || null
+  initDeck()
+  nextHand()
   setTimeout(() => { booted.value = true }, 0)
-  // 初始计算表达式高度
-  nextTick(() => { updateVHVar(); recomputeExprHeight() })
+  nextTick(() => { updateVHVar(); recomputeExprHeight(); updateExprScale() })
+  if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
 })
 
 function clearAll() { tokens.value = []; usedByCard.value = [0,0,0,0] }
 
 function check() {
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
-  if (usedCount !== 4) { feedback.value = '表达式未正确使用四张牌（每张各一次）'; return }
+  if (usedCount !== 4) { feedback.value = '请先使用四张牌再提交'; return }
   const s = expr.value
   const v = evaluateExprToFraction(s)
-  feedback.value = (v && v.equalsInt && v.equalsInt(24)) ? '正确！恭喜你算出 24' : '结果不是 24，请再试试～'
+  const ok = (v && v.equalsInt && v.equalsInt(24))
+  feedback.value = ok ? '恭喜，得到 24！' : '未得到 24，再试试'
+  try { pushRound(!!ok) } catch (_) {}
+  if (ok && !handRecorded.value) {
+    handRecorded.value = true
+    handsPlayed.value += 1
+    successCount.value += 1
+    try { pushRound(true) } catch (_) {}
+  }
 }
 
-function showSolution() { feedback.value = solution.value ? ('提示：' + solution.value) : '暂无提示' }
-
-function toggleFaceMode() {
-  faceUseHigh.value = !faceUseHigh.value
+function showSolution() {
+  if (!handRecorded.value) {
+    handRecorded.value = true
+    handsPlayed.value += 1
+    failCount.value += 1
+    try { pushRound(false) } catch (_) {}
+  }
+  feedback.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
 }
 
-// 拖拽相关
+function toggleFaceMode() { faceUseHigh.value = !faceUseHigh.value }
+
+function skipHand() {
+  if (!handRecorded.value) {
+    handRecorded.value = true
+    handsPlayed.value += 1
+    failCount.value += 1
+    try { pushRound(false) } catch (_) {}
+  }
+  nextHand()
+}
+
+function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
+function goStats(){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} }
+function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(_){} }
+function goUser(){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} }
+
 function startDrag(token, e) {
   drag.value.active = true
   drag.value.token = token
@@ -187,7 +262,6 @@ function onDrag(e) {
   const dx = drag.value.x - drag.value.startX
   const dy = drag.value.y - drag.value.startY
   if (!drag.value.moved && (dx*dx + dy*dy) > 16) drag.value.moved = true
-  // 实时重排/占位
   const token = drag.value.token
   if (token && token.type === 'tok') {
     const x = drag.value.x, y = drag.value.y
@@ -223,12 +297,11 @@ function endDrag() {
   const x = drag.value.x, y = drag.value.y
   const token = drag.value.token
   const inExpr = inside(exprBox.value, x, y)
-  // 处理双击：候选区双击追加，表达式内双击移除
+  // 双击快捷操作
   if (token && !drag.value.moved) {
     const now = Date.now()
     const key = tapKeyFor(token)
     if (now - (lastTap.value.time || 0) < 300 && lastTap.value.key === key) {
-      // 双击生效
       if (token.type === 'tok') {
         removeTokenAt(token.index)
       } else if (token.type === 'num' || token.type === 'op') {
@@ -243,7 +316,6 @@ function endDrag() {
       return
     } else {
       lastTap.value = { time: now, key }
-      // 单击不做操作，直接收尾
       drag.value.active = false
       drag.value.token = null
       dragInsertIndex.value = -1
@@ -270,16 +342,14 @@ function endDrag() {
   dragInsertIndex.value = -1
 }
 
-function tryAppendToken(token) {
-  tryInsertTokenAt(token, tokens.value.length)
-}
+function tryAppendToken(token) { tryInsertTokenAt(token, tokens.value.length) }
 
 function tryInsertTokenAt(token, to) {
   const clamped = Math.max(0, Math.min(to, tokens.value.length))
   if (token.type === 'num') {
     const ci = token.cardIndex
-    if (ci == null) { feedback.value = '该卡片信息缺失'; return }
-    if ((usedByCard.value[ci] || 0) >= 1) { feedback.value = '该卡片已用过'; return }
+    if (ci == null) { feedback.value = '请选择一张牌'; return }
+    if ((usedByCard.value[ci] || 0) >= 1) { feedback.value = '该牌已使用'; return }
     const arr = tokens.value.slice()
     arr.splice(clamped, 0, { type: 'num', value: token.value, rank: token.rank, suit: token.suit, cardIndex: ci })
     tokens.value = arr
@@ -313,7 +383,7 @@ function measureDropZones() {
 
 function inside(box, x, y) { return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom }
 function pointFromEvent(e) {
-  const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e.detail || { x: 0, y: 0 }
+  const t = (e && e.touches && e.touches[0]) || (e && e.changedTouches && e.changedTouches[0]) || (e && e.detail) || { x: 0, y: 0 }
   return { x: t.clientX ?? t.x ?? 0, y: t.clientY ?? t.y ?? 0 }
 }
 
@@ -338,14 +408,7 @@ function updateExprScale() {
   })
 }
 
-onMounted(() => {
-  updateExprScale()
-  if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
-})
-
 watch(tokens, () => updateExprScale())
-
-// removed duplicate labelFor (kept single definition below)
 
 function calcInsertIndex(x, y) {
   const rects = tokRects.value || []
@@ -375,7 +438,6 @@ function moveToken(from, to) {
   tokens.value = arr
 }
 
-// 以 JS 方式设置 --vh，兼容不支持 dvh 的 Android/iOS WebView
 function updateVHVar() {
   try {
     const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
@@ -384,26 +446,32 @@ function updateVHVar() {
   } catch (e) { /* noop */ }
 }
 
-// 计算表达式区域可用高度，确保整页一屏显示
+// 表达式区域高度：页面高度扣除（提示、运算符两行、提交/清空、答案/换题）后的剩余；至少 120
 function recomputeExprHeight() {
   const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
   const winH = sys.windowHeight || sys.screenHeight || 0
-  // 根据屏幕高度自适应运算符尺寸（阈值可调）
   if (winH && winH < 640) opsDensity.value = 'tight'
   else if (winH && winH < 740) opsDensity.value = 'compact'
   else opsDensity.value = 'normal'
-  // 等待密度类应用后再测量
   nextTick(() => {
     const q = uni.createSelectorQuery().in(proxy)
     q.select('#exprZone').boundingClientRect()
-     .select('#bottomBar').boundingClientRect()
+     .select('#hintText').boundingClientRect()
+     .select('#opsRow1').boundingClientRect()
+     .select('#opsRow2').boundingClientRect()
+     .select('#submitRow').boundingClientRect()
+     .select('#failRow').boundingClientRect()
      .exec(res => {
-       const [exprRect, bottomRect] = res || []
+       const [exprRect, hintRect, ops1Rect, ops2Rect, submitRect, failRect] = res || []
        if (!exprRect) return
-       const bottomTop = bottomRect && bottomRect.top ? bottomRect.top : winH
-       let avail = bottomTop - exprRect.top - 16 // 留出底部空隙
+       const hHint = (hintRect && hintRect.height) || 0
+       const hOps1 = (ops1Rect && ops1Rect.height) || 0
+       const hOps2 = (ops2Rect && ops2Rect.height) || 0
+       const hSubmit = (submitRect && submitRect.height) || 0
+       const hFail = (failRect && failRect.height) || 0
+       // 适当留白 12px
+       let avail = winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12
        if (!isFinite(avail) || avail <= 0) avail = 120
-       // 限制下限，避免过小
        exprZoneHeight.value = Math.max(120, Math.floor(avail))
      })
   })
@@ -426,17 +494,32 @@ function cardImage(card) {
   const faceMap = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
   const suitName = suitMap[card.suit] || 'Spade'
   const rankName = faceMap[card.rank] || String(card.rank)
-  // Use /static path so HBuilderX packs assets into APK
   return `/static/cards/${suitName}${rankName}.png`
 }
 function randomSuit() { return ['S','H','D','C'][Math.floor(Math.random()*4)] }
-function generateSolvableWithMode() {
-  while (true) {
-    const raw = Array.from({ length: 4 }, () => 1 + Math.floor(Math.random() * 13))
-    const mapped = raw.map(r => evalRank(r))
-    const sol = solve24(mapped)
-    if (sol) return { nums: raw, sol }
-  }
+
+function onSessionOver() {
+  try {
+    uni.showModal({
+      title: '本局结束',
+      content: `次数：${handsPlayed.value}\n成功：${successCount.value}\n胜率：${winRate.value}%\n是否开始下一局？`,
+      confirmText: '下一局',
+      cancelText: '统计',
+      success: (res) => {
+        if (res.confirm) {
+          initDeck()
+          handsPlayed.value = 0
+          successCount.value = 0
+          failCount.value = 0
+          handRecorded.value = false
+          sessionOver.value = false
+          nextTick(() => nextHand())
+        } else {
+          try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {}
+        }
+      }
+    })
+  } catch (_) { /* noop */ }
 }
 </script>
 
@@ -447,47 +530,25 @@ function generateSolvableWithMode() {
 .topbar { position: sticky; top: 0; z-index: 10; padding: 18rpx 0; background: rgba(255,255,255,0.88); backdrop-filter: blur(6rpx); border-bottom: 2rpx solid #e5e7eb; }
 .topbar-title { font-size: 36rpx; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block; }
 
-/* 卡牌区域 */
+/* 牌区 */
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .card { background:#fff; border-radius:28rpx; overflow:hidden; box-shadow:0 12rpx 28rpx rgba(15,23,42,.08); }
 .card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
 .card-img { width:100%; height:auto; display:block; }
 
-/* 运算符与控制区 */
-.operator-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
+/* 运算符与按钮 */
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:18rpx; align-items:stretch; }
 .ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.controls-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.span-2 { grid-column: span 2 / auto; }
-.placeholder-cell { height:0; }
-.mode-btn { width: 100%; 
-  white-space: nowrap; 
-}
+.mode-btn { width: 100%; white-space: nowrap; }
 
-/* 通用按钮 */
 .btn { border:none; border-radius:20rpx; padding:28rpx 0; font-size:34rpx; line-height:1; box-shadow:0 10rpx 24rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; }
 .btn-primary { background:#145751; color:#fff; }
-.btn-secondary { 
-  color:#0f172a; 
-  background: linear-gradient(to bottom, #f8fafc, #0961d3);
-  box-shadow: 
-  0 10px 12px rgba(0, 0, 0, 0.1),   /* 外阴影：按钮悬浮感 */
-  inset 0 1px 2px rgba(255, 255, 255, 0.6); /* 内阴影：高光 */
-  border-radius: 0.5rem;  
-  transition: all 0.2s ease-in-out;
-}
-.full { width:100%; }
+.btn-secondary { color:#0f172a; background: linear-gradient(to bottom, #f8fafc, #0961d3); box-shadow: 0 10px 12px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.6); border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
 
-/* 运算符自适应密度（根据屏幕高度切换） */
-.ops-compact .btn-operator, .ops-compact .mode-btn { padding:22rpx 0; font-size:30rpx; }
-.ops-compact.ops-row-1, .ops-compact.ops-row-2, .ops-compact .ops-left { gap:14rpx; }
-.ops-tight .btn-operator, .ops-tight .mode-btn { padding:18rpx 0; font-size:26rpx; }
-.ops-tight.ops-row-1, .ops-tight.ops-row-2, .ops-tight .ops-left { gap:10rpx; }
-
-/* 表达式区域 */
+/* 表达式区 */
 .expr-card { background:#fff; padding:24rpx; border-radius:28rpx; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
@@ -507,29 +568,20 @@ function generateSolvableWithMode() {
 .insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
 .drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
 
-/* 轻提示 */
+/* 提示 */
 .hint-text { font-size: 28rpx; color:#6b7280; text-align:center; }
 
-/* 底部固定条 */
-.bottom-bar { position:fixed; left:0; right:0; bottom:0; padding:12rpx 24rpx 12rpx; background:rgba(255,255,255,0.96); box-shadow:0 -6rpx 20rpx rgba(0,0,0,.08); }
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .bottom-bar { padding-bottom: calc(12rpx + env(safe-area-inset-bottom)); }
-}
-@supports (padding-bottom: constant(safe-area-inset-bottom)) {
-  .bottom-bar { padding-bottom: calc(12rpx + constant(safe-area-inset-bottom)); }
-}
-.bottom-bar-inner { display:flex; gap:16rpx; justify-content:space-between; align-items:center; }
-.bottom-nav { justify-content: space-around; gap: 0; }
-.bottom-item { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8rpx 12rpx; color:#6b7280; }
-.bottom-item:active { transform: scale(0.98); }
-.bottom-icon { font-size:44rpx; line-height:1; color:#6b7280; }
-.bottom-label { font-size:24rpx; color:#6b7280; margin-top:6rpx; }
+/* 统计：单行紧凑 */
+.stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:20rpx; padding:16rpx; }
+.stats-one-line { display:flex; flex-wrap:nowrap; align-items:center; gap:12rpx; }
+.stats-one-line .stats-item { display:flex; align-items:center; gap:6rpx; padding:4rpx 8rpx; border-right:2rpx solid #e5e7eb; }
+.stats-one-line .stats-item:last-child { border-right:none; }
+.stat-label { color:#6b7280; font-size:26rpx; }
+.stat-label.ok, .stat-value.ok { color:#16a34a; font-weight:700 }
+.stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
+.stat-value { font-weight:700; color:#111827; font-size:28rpx; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
 @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
-/* 支持动态视口单位的浏览器使用 100dvh，更贴合 Android/iOS 可见高度 */
-/* @supports (min-height: 100dvh) { */
-  /* .page { min-height: 100dvh; } */
-/* } */
 </style>
