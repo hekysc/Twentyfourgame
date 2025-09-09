@@ -1,0 +1,26 @@
+<template>
+  <view class="page col" :class="{ booted }" style="padding: 24rpx; padding-top: 24rpx; gap: 24rpx; position: relative;">
+
+    <!-- 当前用户与切�?-->
+    <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
+      <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
+      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
+    </view>
+
+    <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数�?-->
+    <view id="cardGrid" class="card-grid" style="padding-top: 50rpx;">
+      <view v-for="(card, idx) in cards" :key="idx"
+            class="card"
+            :class="{ used: (usedByCard[idx]||0) > 0 }"
+            @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
+            @touchmove.stop.prevent="onDrag($event)"
+            @touchend.stop.prevent="endDrag()">
+        <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
+      </view>
+    </view>
+
+    <!-- 本局统计（牌�?+ 胜负�?-->
+    <view class="stats-card">
+      <view class="stats-row">
+        <text class="stat-label">剩余扑克</text>
+        <text class="stat-value">{{ remainingCards }}</text>

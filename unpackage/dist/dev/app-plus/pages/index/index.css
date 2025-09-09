@@ -1,0 +1,119 @@
+
+.page[data-v-1cf27b2a] { min-height: calc(var(--vh, 1vh) * 90); background: linear-gradient(180deg, #f7f9ff 0%, #a7ceff 100%); display:flex; flex-direction: column;
+}
+.page[data-v-1cf27b2a] { opacity: 0;
+}
+.page.booted[data-v-1cf27b2a] { animation: page-fade-in-1cf27b2a .28s ease-out forwards;
+}
+.topbar[data-v-1cf27b2a] { position: -webkit-sticky; position: sticky; top: 0; z-index: 10; padding: 0.5625rem 0; background: rgba(255,255,255,0.88); -webkit-backdrop-filter: blur(0.1875rem); backdrop-filter: blur(0.1875rem); border-bottom: 0.0625rem solid #e5e7eb;
+}
+.topbar-title[data-v-1cf27b2a] { font-size: 1.125rem; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block;
+}
+
+/* 牌区 */
+.card-grid[data-v-1cf27b2a] { display:grid; grid-template-columns:repeat(4,1fr); gap:0.5625rem;
+}
+.card[data-v-1cf27b2a] { background:#fff; border-radius:0.875rem; overflow:hidden; box-shadow:0 0.375rem 0.875rem rgba(15,23,42,.08);
+}
+.card.used[data-v-1cf27b2a] { filter: grayscale(1) saturate(.2); opacity:.5;
+}
+.card-img[data-v-1cf27b2a] { width:100%; height:auto; display:block;
+}
+
+/* 运算符与按钮 */
+.ops-row-1[data-v-1cf27b2a] { display:grid; grid-template-columns:repeat(4,1fr); gap:0.5625rem;
+}
+.ops-row-2[data-v-1cf27b2a] { display:grid; grid-template-columns:1fr 1fr; gap:0.5625rem; align-items:stretch;
+}
+.ops-left[data-v-1cf27b2a] { display:grid; grid-template-columns:repeat(2,1fr); gap:0.5625rem;
+}
+.pair-grid[data-v-1cf27b2a] { display:grid; grid-template-columns:repeat(2,1fr); gap:0.5625rem;
+}
+.mode-btn[data-v-1cf27b2a] { width: 100%; white-space: nowrap;
+}
+.btn[data-v-1cf27b2a] { border:none; border-radius:0.625rem; padding:0.875rem 0; font-size:1.0625rem; line-height:1; box-shadow:0 0.3125rem 0.75rem rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box;
+}
+.btn-operator[data-v-1cf27b2a] { background:#fff; color:#2563eb; border:0.0625rem solid #e5e7eb;
+}
+.btn-primary[data-v-1cf27b2a] { background:#145751; color:#fff;
+}
+.btn-secondary[data-v-1cf27b2a] { color:#0f172a; background: linear-gradient(to bottom, #f8fafc, #0961d3); box-shadow: 0 10px 12px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.6); border-radius: 0.5rem; transition: all 0.2s ease-in-out;
+}
+
+/* 表达式区 */
+.expr-card[data-v-1cf27b2a] { background:#fff; padding:0.75rem; border-radius:0.875rem; box-shadow:0 0.1875rem 0.625rem rgba(0,0,0,.06);
+}
+.expr-title[data-v-1cf27b2a] { margin-top: 0; color:#111827; font-size:0.9375rem; font-weight:600;
+}
+.status-text[data-v-1cf27b2a] { color:#1f2937; font-weight:700;
+}
+.expr-zone[data-v-1cf27b2a] { --tok-card-h: 3.5rem; --card-w-ratio: 0.714; margin-top: 0.25rem; background:#f5f7fb; border:0.0625rem dashed #d1d5db; border-radius:0.75rem; padding:0.875rem; overflow:hidden;
+}
+.expr-zone-active[data-v-1cf27b2a] { border-color:#3a7afe;
+}
+.expr-placeholder[data-v-1cf27b2a] { color:#9ca3af; text-align:center; margin-top: 0.25rem;
+}
+.expr-row[data-v-1cf27b2a] { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:0.375rem; align-items:center;
+}
+.tok[data-v-1cf27b2a] { color:#1f3a93; border-radius:0.4375rem; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+}
+.tok.num[data-v-1cf27b2a] { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block;
+}
+.tok-card-img[data-v-1cf27b2a] { width:100%; height:100%; object-fit: contain; display:block; border-radius:0.4375rem; box-shadow:0 0.1875rem 0.625rem rgba(15,23,42,.08);
+}
+.tok.op[data-v-1cf27b2a] { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:#fff; border:0.0625rem solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 0.1875rem 0.625rem rgba(15,23,42,.06); box-sizing: border-box;
+}
+.tok.dragging[data-v-1cf27b2a] { opacity:.6; box-shadow:0 0.1875rem 0.75rem rgba(0,0,0,.18);
+}
+.tok.just-inserted[data-v-1cf27b2a] { animation: pop-in-1cf27b2a 200ms ease-out;
+}
+.insert-placeholder[data-v-1cf27b2a] { border-radius:0.4375rem; border:0.0625rem dashed #3a7afe; background:#eaf1ff; opacity:.9; position:relative; overflow:hidden;
+}
+.insert-placeholder.num[data-v-1cf27b2a] { min-width: calc(var(--tok-card-h) * var(--card-w-ratio)); min-height: var(--tok-card-h); margin:0.0625rem;
+}
+.insert-placeholder.op[data-v-1cf27b2a] { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin:0.0625rem;
+}
+.insert-placeholder[data-v-1cf27b2a]::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 0.25rem, rgba(58,122,254,0.18) 0.25rem, rgba(58,122,254,0.18) 0.5rem); background-size:200% 100%; animation:shimmer-1cf27b2a 1.2s linear infinite;
+}
+.drag-ghost[data-v-1cf27b2a] { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:0.5rem 0.6875rem; border-radius:0.3125rem; font-size:1rem; pointer-events:none;
+}
+
+/* 提示 */
+.hint-text[data-v-1cf27b2a] { font-size: 0.875rem; color:#6b7280; text-align:center;
+}
+
+/* 统计：单行紧凑 */
+.stats-card[data-v-1cf27b2a] { background:#fff; border:0.0625rem solid #e5e7eb; border-radius:0.625rem; padding:0.5rem;
+}
+.stats-one-line[data-v-1cf27b2a] { display:flex; flex-wrap:nowrap; align-items:center; gap:0.375rem;
+}
+.stats-one-line .stats-item[data-v-1cf27b2a] { display:flex; align-items:center; gap:0.1875rem; padding:0.125rem 0.25rem; border-right:0.0625rem solid #e5e7eb;
+}
+.stats-one-line .stats-item[data-v-1cf27b2a]:last-child { border-right:none;
+}
+.stat-label[data-v-1cf27b2a] { color:#6b7280; font-size:0.8125rem;
+}
+.stat-label.ok[data-v-1cf27b2a], .stat-value.ok[data-v-1cf27b2a] { color:#16a34a; font-weight:700
+}
+.stat-label.fail[data-v-1cf27b2a], .stat-value.fail[data-v-1cf27b2a] { color:#dc2626; font-weight:700
+}
+.stat-value[data-v-1cf27b2a] { font-weight:700; color:#111827; font-size:0.875rem;
+}
+@keyframes pop-in-1cf27b2a {
+from { transform:scale(0.85); opacity:.2;
+}
+to { transform:scale(1); opacity:1;
+}
+}
+@keyframes shimmer-1cf27b2a {
+from { background-position-x:0%;
+}
+to { background-position-x:200%;
+}
+}
+@keyframes page-fade-in-1cf27b2a {
+from { opacity: 0;
+}
+to { opacity: 1;
+}
+}
