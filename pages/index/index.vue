@@ -239,9 +239,9 @@ function skipHand() {
 }
 
 function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
-function goStats(){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} }
-function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(_){} }
-function goUser(){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} }
+function goStats(){ try { uni.switchTab({ url:'/pages/stats/index' }) } catch(_){} }
+function goGame(){ try { uni.switchTab({ url:'/pages/index/index' }) } catch(_){} }
+function goUser(){ try { uni.switchTab({ url:'/pages/user/index' }) } catch(_){} }
 
 function startDrag(token, e) {
   drag.value.active = true
