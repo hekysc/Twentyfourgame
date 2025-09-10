@@ -462,7 +462,7 @@ if (uni.restoreGlobal) {
                         1
                         /* TEXT */
                       ),
-                      vue.createCommentVNode(" </text>\n            </text> ")
+                      vue.createCommentVNode(" </text>\r\n            </text> ")
                     ]),
                     vue.createElementVNode("text", { class: "chev" }, "›")
                   ], 8, ["onClick"]);

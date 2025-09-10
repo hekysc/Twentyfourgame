@@ -1,22 +1,64 @@
 
-.login-page[data-v-d08ef7d4]{ min-height:max(3.125rem,100dvh); background:#f1f5f9; display:flex; flex-direction:column; justify-content:space-between
+.login-page[data-v-d08ef7d4] {
+  height: 100dvh;  /* 固定为视口高度 */
+  max-height: 100dvh;  /* 防止超出 */
+  background: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;  /* 防止整体滚动 */
+}
+body[data-v-d08ef7d4] {
+  overflow: hidden;
+  height: 100vh;
 }
 .login-topbar[data-v-d08ef7d4]{ display:flex; align-items:center; padding:0.75rem; gap:0.375rem
 }
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
 .login-title[data-v-d08ef7d4]{ flex:1; text-align:center; font-weight:900; font-size:1.125rem; color:#0e141b; letter-spacing:-0.01563rem
 }
-.login-body[data-v-d08ef7d4]{ padding:0.625rem 0.15625rem 0 0.15625rem; display:flex; flex-direction:column; gap:0
+.login-body[data-v-d08ef7d4] {
+  flex: 1;  /* 占据剩余空间 */
+  padding: 0.3125rem 0.07813rem 0 0.07813rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;  /* 防止溢出 */
+  min-height: 0;  /* 允许收缩 */
+  height: 0;  /* 强制高度约束 */
 }
-.login-heading[data-v-d08ef7d4]{ text-align:center; margin:0 0 0.75rem 0
+.login-heading[data-v-d08ef7d4] { 
+  flex-shrink: 0;  /* 不收缩 */
+  text-align: center; 
+  margin: 0 0 0.75rem 0;
+  height: 2.5rem;  /* 固定高度 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .h1[data-v-d08ef7d4]{ font-size:1.75rem; font-weight:900; color:#0e141b
 }
-.user-list[data-v-d08ef7d4]{
-  display:flex; 
-  flex-direction:column; 
-  gap:0.625rem; 
-  margin:1.5625rem 3.125rem;   /* ← 原来是 100 100 */
+.user-list[data-v-d08ef7d4] {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0 3.125rem 0.625rem 3.125rem;  /* 改为padding，不用margin */
+  overflow-y: auto;
+  min-height: 0;
+  height: 0;  /* 强制高度约束 */
+}
+/* 滚动条样式优化 */
+.user-list[data-v-d08ef7d4]::-webkit-scrollbar {
+  width: 0.1875rem;
+}
+.user-list[data-v-d08ef7d4]::-webkit-scrollbar-track {
+  background: transparent;
+}
+.user-list[data-v-d08ef7d4]::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 0.09375rem;
+}
+.user-list[data-v-d08ef7d4]::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 .user-item[data-v-d08ef7d4]{ display:flex; align-items:center; padding:0.3125rem; height:3.125rem;width:100%; border-radius:0.375rem; border:0.0625rem solid #cfd8e3; background:#ffffff; box-shadow:0 0.0625rem 0.125rem rgba(15,23,42,0.02)
 }
@@ -30,7 +72,7 @@
   flex:1;
   display:grid;
   /* 方案A：定宽（最稳妥，确保“最近游戏”纵向齐） */
-  grid-template-columns: 6.25rem 1fr;  /* ← 原来是 auto 1fr */
+  grid-template-columns: minmax(0, 6.25rem) 1fr;  /* ← 原来是 auto 1fr */
   /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
      （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
   align-items:left;
@@ -46,6 +88,8 @@
   overflow:hidden;
   text-overflow:ellipsis;           /* ✅ 超长省略号 */
   text-align:left;                    /* ✅ 明确指定左对齐 */
+  width: 100%;      /* 关键修复 */
+  max-width: 100%;  /* 双重保险 */
 }
 .user-sub[data-v-d08ef7d4] {
   font-size:0.625rem;
@@ -65,7 +109,9 @@
 }
 .create-plus[data-v-d08ef7d4]{ font-size:1.125rem
 }
-.login-footer[data-v-d08ef7d4]{ padding:0 1rem 1rem 1rem
+.login-footer[data-v-d08ef7d4] {
+  flex-shrink: 0;  /* 不收缩 */
+  padding: 0 1rem 1rem 1rem;
 }
 .or-row[data-v-d08ef7d4]{ display:flex; align-items:center; gap:0.375rem; margin:1.125rem 0
 }
@@ -79,7 +125,20 @@ uni-button[data-v-d08ef7d4]{ -webkit-tap-highlight-color:rgba(0,0,0,0)
 }
 
 /* 空/错 视图 */
-.empty-card[data-v-d08ef7d4], .error-card[data-v-d08ef7d4]{ display:flex; flex-direction:column; align-items:center; gap:0.5rem; padding:1.25rem 0.75rem; border-radius:0.75rem; background:#fff; border:0.0625rem solid #e5e7eb
+.empty-card[data-v-d08ef7d4], .error-card[data-v-d08ef7d4] {
+  flex: 1;  /* 占据可用空间 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;  /* 垂直居中 */
+  gap: 0.5rem;
+  padding: 1.25rem 0.75rem;
+  margin: 1.5625rem 3.125rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  border: 0.0625rem solid #e5e7eb;
+  max-height: 100%;  /* 不超出容器 */
+  overflow-y: auto;  /* 如果内容过多也能滚动 */
 }
 .empty-ill[data-v-d08ef7d4]{ font-size:2.75rem
 }
