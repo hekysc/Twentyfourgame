@@ -170,18 +170,66 @@ function resetData(){
 </script>
 
 <style scoped>
-.login-page{ min-height:max(100rpx,100dvh); background:#f1f5f9; display:flex; flex-direction:column; justify-content:space-between }
+.login-page {
+  height: 100dvh;  /* 固定为视口高度 */
+  max-height: 100dvh;  /* 防止超出 */
+  background: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;  /* 防止整体滚动 */
+}
+body {
+  overflow: hidden;
+  height: 100vh;
+}
 .login-topbar{ display:flex; align-items:center; padding:24rpx; gap:12rpx }
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
 .login-title{ flex:1; text-align:center; font-weight:900; font-size:36rpx; color:#0e141b; letter-spacing:-0.5rpx }
-.login-body{ padding:20rpx 5rpx 0 5rpx; display:flex; flex-direction:column; gap:0rpx }
-.login-heading{ text-align:center; margin:0rpx 0 24rpx 0 }
+.login-body {
+  flex: 1;  /* 占据剩余空间 */
+  padding: 10rpx 2.5rpx 0 2.5rpx;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;  /* 防止溢出 */
+  min-height: 0;  /* 允许收缩 */
+  height: 0;  /* 强制高度约束 */
+}
+.login-heading { 
+  flex-shrink: 0;  /* 不收缩 */
+  text-align: center; 
+  margin: 0rpx 0 24rpx 0;
+  height: 80rpx;  /* 固定高度 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .h1{ font-size:56rpx; font-weight:900; color:#0e141b }
-.user-list{
-  display:flex; 
-  flex-direction:column; 
-  gap:20rpx; 
-  margin:50rpx 100rpx;   /* ← 原来是 100 100 */
+.user-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  padding: 0 100rpx 20rpx 100rpx;  /* 改为padding，不用margin */
+  overflow-y: auto;
+  min-height: 0;
+  height: 0;  /* 强制高度约束 */
+}
+/* 滚动条样式优化 */
+.user-list::-webkit-scrollbar {
+  width: 6rpx;
+}
+
+.user-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.user-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3rpx;
+}
+
+.user-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 .user-item{ display:flex; align-items:center; padding:10rpx; height:100rpx;width:100%; border-radius:12rpx; border:2rpx solid #cfd8e3; background:#ffffff; box-shadow:0 2rpx 4rpx rgba(15,23,42,0.02) }
 .user-item:active{ transform:scale(0.98) }
@@ -225,7 +273,10 @@ function resetData(){
 .create-btn{ margin-top:20rpx; height:100rpx; border-radius:24rpx; background:#e2e8f0; color:#0f172a; font-size:32rpx; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:12rpx }
 .create-btn.highlight{ background:#145751; color:#fff }
 .create-plus{ font-size:36rpx }
-.login-footer{ padding:0 32rpx 32rpx 32rpx }
+.login-footer {
+  flex-shrink: 0;  /* 不收缩 */
+  padding: 0 32rpx 32rpx 32rpx;
+}
 .or-row{ display:flex; align-items:center; gap:12rpx; margin:36rpx 0 }
 .line{ flex:1; height:2rpx; background:#cbd5e1 }
 .or{ color:#94a3b8; font-size:24rpx; font-weight:600 }
@@ -233,7 +284,21 @@ function resetData(){
 button{ -webkit-tap-highlight-color:rgba(0,0,0,0) }
 
 /* 空/错 视图 */
-.empty-card, .error-card{ display:flex; flex-direction:column; align-items:center; gap:16rpx; padding:40rpx 24rpx; border-radius:24rpx; background:#fff; border:2rpx solid #e5e7eb }
+.empty-card, .error-card {
+  flex: 1;  /* 占据可用空间 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;  /* 垂直居中 */
+  gap: 16rpx;
+  padding: 40rpx 24rpx;
+  margin: 50rpx 100rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  border: 2rpx solid #e5e7eb;
+  max-height: 100%;  /* 不超出容器 */
+  overflow-y: auto;  /* 如果内容过多也能滚动 */
+}
 .empty-ill{ font-size:88rpx }
 .empty-text{ color:#6b7280 }
 .err-title{ font-weight:800; color:#b91c1c }
