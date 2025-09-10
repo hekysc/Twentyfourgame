@@ -191,7 +191,7 @@ function resetData(){
   flex:1;
   display:grid;
   /* 方案A：定宽（最稳妥，确保“最近游戏”纵向齐） */
-  grid-template-columns: 200rpx 1fr;  /* ← 原来是 auto 1fr */
+  grid-template-columns: minmax(0, 200rpx) 1fr;  /* ← 原来是 auto 1fr */
   /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
      （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
   align-items:left;
@@ -207,6 +207,8 @@ function resetData(){
   overflow:hidden;
   text-overflow:ellipsis;           /* ✅ 超长省略号 */
   text-align:left;                    /* ✅ 明确指定左对齐 */
+  width: 100%;      /* 关键修复 */
+  max-width: 100%;  /* 双重保险 */
 }
 .user-sub {
   font-size:20rpx;
