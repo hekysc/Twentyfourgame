@@ -1,22 +1,10 @@
 <template>
-  <view class="page col" :class="{ booted }" style="padding: 24rpx; gap: 24rpx; position: relative;">
+  <view class="page col" :class="{ booted }" style="padding: 20rpx; gap: 16rpx; position: relative;">
 
     <!-- 顶部：当前用户与切换 -->
     <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
       <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
       <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
-    </view>
-
-    <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-    <view id="cardGrid" class="card-grid" style="padding-top: 50rpx;">
-      <view v-for="(card, idx) in cards" :key="idx"
-            class="card"
-            :class="{ used: (usedByCard[idx]||0) > 0 }"
-            @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-            @touchmove.stop.prevent="onDrag($event)"
-            @touchend.stop.prevent="endDrag()">
-        <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
-      </view>
     </view>
 
     <!-- 本局统计：单行紧凑显示 -->
@@ -28,29 +16,17 @@
       <view class="stats-item"><text class="stat-label">胜率</text><text class="stat-value">{{ winRate }}%</text></view>
     </view>
 
-    <!-- 表达式卡片容器（高度由脚本计算） -->
-    <view class="expr-card">
-      <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view>
-      <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
-        <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view>
-        <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center' }">
-          <block v-for="(t, i) in tokens" :key="i">
-            <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-            <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                  @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
-                  @touchmove.stop.prevent="onDrag($event)"
-                  @touchend.stop.prevent="endDrag()">
-              <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S' })" mode="heightFix"/>
-              <text v-else class="tok-op-text">{{ t.value }}</text>
-            </view>
-          </block>
-          <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
-        </view>
+    <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
+    <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
+      <view v-for="(card, idx) in cards" :key="idx"
+            class="card"
+            :class="{ used: (usedByCard[idx]||0) > 0 }"
+            @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
+            @touchmove.stop.prevent="onDrag($event)"
+            @touchend.stop.prevent="endDrag()">
+        <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
       </view>
     </view>
-
-    <!-- 轻提示文案 -->
-    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出24' }}</text>
 
     <!-- 运算符候选区：两行布局 -->
     <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
@@ -71,6 +47,30 @@
 
     <!-- 拖拽中的浮层 -->
     <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
+
+    <!-- 表达式卡片容器（高度由脚本计算） -->
+    <view class="expr-card">
+      <!-- <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view> -->
+      <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
+        <!-- <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view> -->
+        <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center' }">
+          <block v-for="(t, i) in tokens" :key="i">
+            <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
+            <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
+                  @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                  @touchmove.stop.prevent="onDrag($event)"
+                  @touchend.stop.prevent="endDrag()">
+              <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S' })" mode="heightFix"/>
+              <text v-else class="tok-op-text">{{ t.value }}</text>
+            </view>
+          </block>
+          <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 轻提示文案 -->
+    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出24' }}</text>
 
     <!-- 提交 / 清空：各占一半宽度 -->
     <view id="submitRow" class="pair-grid">
@@ -472,7 +472,8 @@ function recomputeExprHeight() {
        // 适当留白 12px
        let avail = winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12
        if (!isFinite(avail) || avail <= 0) avail = 120
-       exprZoneHeight.value = Math.max(120, Math.floor(avail))
+      //  exprZoneHeight.value = Math.max(120, Math.floor(avail))
+       exprZoneHeight.value = 70
      })
   })
 }
