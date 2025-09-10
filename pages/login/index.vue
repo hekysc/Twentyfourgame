@@ -3,7 +3,7 @@
     <!-- 顶部栏 -->
     <view class="login-topbar">
       <!-- <button class="icon-btn" @tap="goBack">←</button> -->
-      <text class="login-title">24 Point Game</text>
+      <text class="login-title">无敌24点</text>
       <!-- <view style="width:40rpx"></view> -->
     </view>
 
@@ -11,7 +11,6 @@
     <view class="login-body">
       <view class="login-heading">
         <text class="h1">选择玩家</text>
-        <text class="sub">点击玩家进入游戏</text>
       </view>
 
       <!-- 错误状态 -->
@@ -37,10 +36,10 @@
           <image v-if="u.avatar" class="avatar-img" :src="u.avatar" mode="aspectFill" />
           <view v-else class="avatar" :style="{ backgroundColor: u.color || colorFrom(u) }">{{ avatarText(u.name) }}</view>
           <view class="user-col">
-            <text class="user-name">{{ u.name }}
-              <text class="user-sub">最近游戏：{{ lastPlayedText(u.lastPlayedAt) }}
-              </text>
-            </text>
+            <view class="user-name">{{ u.name }}</view>
+            <view class="user-sub">最近游戏：{{ lastPlayedText(u.lastPlayedAt) }}</view>
+              <!-- </text>
+            </text> -->
           </view>
           <text class="chev">›</text>
         </button>
@@ -175,19 +174,52 @@ function resetData(){
 .login-topbar{ display:flex; align-items:center; padding:24rpx; gap:12rpx }
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
 .login-title{ flex:1; text-align:center; font-weight:900; font-size:36rpx; color:#0e141b; letter-spacing:-0.5rpx }
-.login-body{ padding:20rpx 0rpx 0 0rpx; display:flex; flex-direction:column; gap:0rpx }
+.login-body{ padding:20rpx 5rpx 0 5rpx; display:flex; flex-direction:column; gap:0rpx }
 .login-heading{ text-align:center; margin:0rpx 0 24rpx 0 }
 .h1{ font-size:56rpx; font-weight:900; color:#0e141b }
-.sub{ color:#94a3b8; margin-top:8rpx; display:block }
-.user-list{ display:flex; flex-direction:column; gap:0rpx; margin:0 0 }
-.user-item{ display:flex; align-items:center; padding:0rpx; border-radius:12rpx; border:2rpx solid #cfd8e3; background:#ffffff; box-shadow:0 2rpx 4rpx rgba(15,23,42,0.02) }
+.user-list{
+  display:flex; 
+  flex-direction:column; 
+  gap:20rpx; 
+  margin:50rpx 100rpx;   /* ← 原来是 100 100 */
+}
+.user-item{ display:flex; align-items:center; padding:10rpx; height:100rpx;width:100%; border-radius:12rpx; border:2rpx solid #cfd8e3; background:#ffffff; box-shadow:0 2rpx 4rpx rgba(15,23,42,0.02) }
 .user-item:active{ transform:scale(0.98) }
-.avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:16rpx }
-.avatar-img{ width:72rpx; height:72rpx; border-radius:50%; margin-right:16rpx; background:#e2e8f0 }
-.user-col{ flex:1; display:flex; flex-direction:column; gap:0rpx }
-.user-name{ font-size:34rpx; color:#0f172a; font-weight:700 }
-.user-sub{ font-size:24rpx; color:#64748b }
-.chev{ color:#94a3b8; font-size:40rpx; font-weight:800; margin-left:12rpx }
+.avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:20rpx }
+.avatar-img{ width:72rpx; height:72rpx; border-radius:50%; margin-right:20rpx; background:#e2e8f0 }
+.user-col{
+  flex:1;
+  display:grid;
+  /* 方案A：定宽（最稳妥，确保“最近游戏”纵向齐） */
+  grid-template-columns: 200rpx 1fr;  /* ← 原来是 auto 1fr */
+  /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
+     （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
+  align-items:left;
+  justify-items:start;                /* ✅ 内容在各列内靠左 */
+  column-gap:10rpx; 
+  min-width:0;
+}
+.user-name {
+  font-size:34rpx;
+  color:#0f172a;
+  font-weight:700;
+  white-space:nowrap;               /* ✅ 不换行 */
+  overflow:hidden;
+  text-overflow:ellipsis;           /* ✅ 超长省略号 */
+  text-align:left;                    /* ✅ 明确指定左对齐 */
+}
+.user-sub {
+  font-size:20rpx;
+  color:#64748b;
+  white-space:nowrap;
+  align-self:center;                     /* ✅ 单独确保这一列底对齐 */
+}
+.chev{
+  flex:0 0 auto;          /* 不要挤压中间列 */
+  width: 40rpx;           /* 可选：固定宽度，视觉更稳 */
+  text-align:right;
+  color:#94a3b8; font-size:40rpx; font-weight:800; margin-left:12rpx;
+}
 .create-btn{ margin-top:20rpx; height:100rpx; border-radius:24rpx; background:#e2e8f0; color:#0f172a; font-size:32rpx; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:12rpx }
 .create-btn.highlight{ background:#145751; color:#fff }
 .create-plus{ font-size:36rpx }

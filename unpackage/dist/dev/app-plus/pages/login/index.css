@@ -6,31 +6,58 @@
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
 .login-title[data-v-d08ef7d4]{ flex:1; text-align:center; font-weight:900; font-size:1.125rem; color:#0e141b; letter-spacing:-0.01563rem
 }
-.login-body[data-v-d08ef7d4]{ padding:0.625rem 0 0 0; display:flex; flex-direction:column; gap:0
+.login-body[data-v-d08ef7d4]{ padding:0.625rem 0.15625rem 0 0.15625rem; display:flex; flex-direction:column; gap:0
 }
 .login-heading[data-v-d08ef7d4]{ text-align:center; margin:0 0 0.75rem 0
 }
 .h1[data-v-d08ef7d4]{ font-size:1.75rem; font-weight:900; color:#0e141b
 }
-.sub[data-v-d08ef7d4]{ color:#94a3b8; margin-top:0.25rem; display:block
+.user-list[data-v-d08ef7d4]{
+  display:flex; 
+  flex-direction:column; 
+  gap:0.625rem; 
+  margin:1.5625rem 3.125rem;   /* ← 原来是 100 100 */
 }
-.user-list[data-v-d08ef7d4]{ display:flex; flex-direction:column; gap:0; margin:0 0
-}
-.user-item[data-v-d08ef7d4]{ display:flex; align-items:center; padding:0; border-radius:0.375rem; border:0.0625rem solid #cfd8e3; background:#ffffff; box-shadow:0 0.0625rem 0.125rem rgba(15,23,42,0.02)
+.user-item[data-v-d08ef7d4]{ display:flex; align-items:center; padding:0.3125rem; height:3.125rem;width:100%; border-radius:0.375rem; border:0.0625rem solid #cfd8e3; background:#ffffff; box-shadow:0 0.0625rem 0.125rem rgba(15,23,42,0.02)
 }
 .user-item[data-v-d08ef7d4]:active{ transform:scale(0.98)
 }
-.avatar[data-v-d08ef7d4]{ width:2.25rem; height:2.25rem; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:0.5rem
+.avatar[data-v-d08ef7d4]{ width:2.25rem; height:2.25rem; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:0.625rem
 }
-.avatar-img[data-v-d08ef7d4]{ width:2.25rem; height:2.25rem; border-radius:50%; margin-right:0.5rem; background:#e2e8f0
+.avatar-img[data-v-d08ef7d4]{ width:2.25rem; height:2.25rem; border-radius:50%; margin-right:0.625rem; background:#e2e8f0
 }
-.user-col[data-v-d08ef7d4]{ flex:1; display:flex; flex-direction:column; gap:0
+.user-col[data-v-d08ef7d4]{
+  flex:1;
+  display:grid;
+  /* 方案A：定宽（最稳妥，确保“最近游戏”纵向齐） */
+  grid-template-columns: 6.25rem 1fr;  /* ← 原来是 auto 1fr */
+  /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
+     （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
+  align-items:left;
+  justify-items:start;                /* ✅ 内容在各列内靠左 */
+  column-gap:0.3125rem; 
+  min-width:0;
 }
-.user-name[data-v-d08ef7d4]{ font-size:1.0625rem; color:#0f172a; font-weight:700
+.user-name[data-v-d08ef7d4] {
+  font-size:1.0625rem;
+  color:#0f172a;
+  font-weight:700;
+  white-space:nowrap;               /* ✅ 不换行 */
+  overflow:hidden;
+  text-overflow:ellipsis;           /* ✅ 超长省略号 */
+  text-align:left;                    /* ✅ 明确指定左对齐 */
 }
-.user-sub[data-v-d08ef7d4]{ font-size:0.75rem; color:#64748b
+.user-sub[data-v-d08ef7d4] {
+  font-size:0.625rem;
+  color:#64748b;
+  white-space:nowrap;
+  align-self:center;                     /* ✅ 单独确保这一列底对齐 */
 }
-.chev[data-v-d08ef7d4]{ color:#94a3b8; font-size:1.25rem; font-weight:800; margin-left:0.375rem
+.chev[data-v-d08ef7d4]{
+  flex:0 0 auto;          /* 不要挤压中间列 */
+  width: 1.25rem;           /* 可选：固定宽度，视觉更稳 */
+  text-align:right;
+  color:#94a3b8; font-size:1.25rem; font-weight:800; margin-left:0.375rem;
 }
 .create-btn[data-v-d08ef7d4]{ margin-top:0.625rem; height:3.125rem; border-radius:0.75rem; background:#e2e8f0; color:#0f172a; font-size:1rem; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:0.375rem
 }

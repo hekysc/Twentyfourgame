@@ -372,14 +372,13 @@ if (uni.restoreGlobal) {
       vue.createCommentVNode(" 顶部栏 "),
       vue.createElementVNode("view", { class: "login-topbar" }, [
         vue.createCommentVNode(' <button class="icon-btn" @tap="goBack">←</button> '),
-        vue.createElementVNode("text", { class: "login-title" }, "24 Point Game"),
+        vue.createElementVNode("text", { class: "login-title" }, "无敌24点"),
         vue.createCommentVNode(' <view style="width:40rpx"></view> ')
       ]),
       vue.createCommentVNode(" 主体 "),
       vue.createElementVNode("view", { class: "login-body" }, [
         vue.createElementVNode("view", { class: "login-heading" }, [
-          vue.createElementVNode("text", { class: "h1" }, "选择玩家"),
-          vue.createElementVNode("text", { class: "sub" }, "点击玩家进入游戏")
+          vue.createElementVNode("text", { class: "h1" }, "选择玩家")
         ]),
         vue.createCommentVNode(" 错误状态 "),
         $setup.errMsg ? (vue.openBlock(), vue.createElementBlock("view", {
@@ -449,20 +448,21 @@ if (uni.restoreGlobal) {
                       /* TEXT, STYLE */
                     )),
                     vue.createElementVNode("view", { class: "user-col" }, [
-                      vue.createElementVNode("text", { class: "user-name" }, [
-                        vue.createTextVNode(
-                          vue.toDisplayString(u.name) + " ",
-                          1
-                          /* TEXT */
-                        ),
-                        vue.createElementVNode(
-                          "text",
-                          { class: "user-sub" },
-                          "最近游戏：" + vue.toDisplayString($setup.lastPlayedText(u.lastPlayedAt)),
-                          1
-                          /* TEXT */
-                        )
-                      ])
+                      vue.createElementVNode(
+                        "view",
+                        { class: "user-name" },
+                        vue.toDisplayString(u.name),
+                        1
+                        /* TEXT */
+                      ),
+                      vue.createElementVNode(
+                        "view",
+                        { class: "user-sub" },
+                        "最近游戏：" + vue.toDisplayString($setup.lastPlayedText(u.lastPlayedAt)),
+                        1
+                        /* TEXT */
+                      ),
+                      vue.createCommentVNode(" </text>\n            </text> ")
                     ]),
                     vue.createElementVNode("text", { class: "chev" }, "›")
                   ], 8, ["onClick"]);
