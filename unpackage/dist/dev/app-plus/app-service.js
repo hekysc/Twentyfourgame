@@ -773,6 +773,7 @@ if (uni.restoreGlobal) {
       const handStartTs = vue.ref(Date.now());
       const hintWasUsed = vue.ref(false);
       const attemptCount = vue.ref(0);
+      const lastSuccessMs = vue.ref(null);
       const remainingCards = vue.computed(() => (deck.value || []).length);
       const winRate = vue.computed(() => {
         const t = successCount.value + failCount.value;
@@ -900,6 +901,7 @@ if (uni.restoreGlobal) {
             updateExprScale();
             recomputeExprHeight();
           });
+        updateLastSuccess();
       });
       function clearAll() {
         tokens.value = [];
@@ -926,6 +928,32 @@ if (uni.restoreGlobal) {
           }
         }
         return { exprLen: arr.length, maxDepth, ops };
+      }
+      function updateLastSuccess() {
+        try {
+          const cu = getCurrentUser && getCurrentUser();
+          if (!cu || !cu.id) {
+            lastSuccessMs.value = null;
+            return;
+          }
+          const ext = readStatsExtended && readStatsExtended(cu.id);
+          const r = (ext && Array.isArray(ext.rounds) ? ext.rounds.slice().reverse() : []).find((x) => x && x.success && Number.isFinite(x.timeMs));
+          lastSuccessMs.value = r ? r.timeMs : null;
+        } catch (_) {
+          lastSuccessMs.value = null;
+        }
+      }
+      function fmtMs(ms) {
+        if (!Number.isFinite(ms))
+          return "-";
+        if (ms < 1e3)
+          return ms + "ms";
+        const s = ms / 1e3;
+        if (s < 60)
+          return s.toFixed(1) + "s";
+        const m = Math.floor(s / 60);
+        const r = Math.round(s % 60);
+        return `${m}m${r}s`;
       }
       function check() {
         const usedCount = usedByCard.value.reduce((a, b) => a + (b ? 1 : 0), 0);
@@ -955,6 +983,7 @@ if (uni.restoreGlobal) {
               hand: { cards: (cards.value || []).map((c) => ({ rank: c.rank, suit: c.suit })) },
               expr: s
             });
+            updateLastSuccess();
           } catch (_) {
           }
         }
@@ -979,6 +1008,7 @@ if (uni.restoreGlobal) {
               hand: { cards: (cards.value || []).map((c) => ({ rank: c.rank, suit: c.suit })) },
               expr: expr.value
             });
+            updateLastSuccess();
           } catch (_) {
           }
         }
@@ -1006,6 +1036,7 @@ if (uni.restoreGlobal) {
               hand: { cards: (cards.value || []).map((c) => ({ rank: c.rank, suit: c.suit })) },
               expr: expr.value
             });
+            updateLastSuccess();
           } catch (_) {
           }
         }
@@ -1319,7 +1350,7 @@ if (uni.restoreGlobal) {
         try {
           uni.showModal({
             title: "本局结束",
-            content: `次数：${handsPlayed.value}
+            content: `局：${handsPlayed.value}
 成功：${successCount.value}
 胜率：${winRate.value}%
 是否开始下一局？`,
@@ -1345,7 +1376,7 @@ if (uni.restoreGlobal) {
         } catch (_) {
         }
       }
-      const __returned__ = { cards, solution, feedback, usedByCard, tokens, faceUseHigh, handRecorded, exprZoneHeight, currentUser, deck, handsPlayed, successCount, failCount, sessionOver, handStartTs, hintWasUsed, attemptCount, remainingCards, winRate, drag, exprBox, tokRects, dragInsertIndex, lastInsertedIndex, proxy, booted, expr, ghostStyle, exprScale, opsDensity, opsDensityClass, ghostText, placeholderSizeClass, currentText, refresh, initDeck, nextHand, clearAll, computeExprStats, check, showSolution, toggleFaceMode, skipHand, goLogin, goStats, goGame, goUser, startDrag, onDrag, lastTap, tapKeyFor, endDrag, tryAppendToken, tryInsertTokenAt, removeTokenAt, measureDropZones, inside, pointFromEvent, updateExprScale, calcInsertIndex, moveToken, updateVHVar, recomputeExprHeight, evalRank, labelFor, cardImage, randomSuit, onSessionOver, ref: vue.ref, onMounted: vue.onMounted, getCurrentInstance: vue.getCurrentInstance, computed: vue.computed, watch: vue.watch, nextTick: vue.nextTick, get evaluateExprToFraction() {
+      const __returned__ = { cards, solution, feedback, usedByCard, tokens, faceUseHigh, handRecorded, exprZoneHeight, currentUser, deck, handsPlayed, successCount, failCount, sessionOver, handStartTs, hintWasUsed, attemptCount, lastSuccessMs, remainingCards, winRate, drag, exprBox, tokRects, dragInsertIndex, lastInsertedIndex, proxy, booted, expr, ghostStyle, exprScale, opsDensity, opsDensityClass, ghostText, placeholderSizeClass, currentText, refresh, initDeck, nextHand, clearAll, computeExprStats, updateLastSuccess, fmtMs, check, showSolution, toggleFaceMode, skipHand, goLogin, goStats, goGame, goUser, startDrag, onDrag, lastTap, tapKeyFor, endDrag, tryAppendToken, tryInsertTokenAt, removeTokenAt, measureDropZones, inside, pointFromEvent, updateExprScale, calcInsertIndex, moveToken, updateVHVar, recomputeExprHeight, evalRank, labelFor, cardImage, randomSuit, onSessionOver, ref: vue.ref, onMounted: vue.onMounted, getCurrentInstance: vue.getCurrentInstance, computed: vue.computed, watch: vue.watch, nextTick: vue.nextTick, get evaluateExprToFraction() {
         return evaluateExprToFraction;
       }, get solve24() {
         return solve24;
@@ -1355,6 +1386,8 @@ if (uni.restoreGlobal) {
         return getCurrentUser;
       }, get pushRound() {
         return pushRound;
+      }, get readStatsExtended() {
+        return readStatsExtended;
       } };
       Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
       return __returned__;
@@ -1389,57 +1422,59 @@ if (uni.restoreGlobal) {
             onClick: $setup.goLogin
           }, "切换用户")
         ]),
-        vue.createCommentVNode(" 本局统计：单行紧凑显示 "),
+        vue.createCommentVNode(" 本局统计：紧凑表格（1行表头 + 1行数据） "),
         vue.createElementVNode("view", {
           id: "statsRow",
-          class: "stats-card stats-one-line"
+          class: "stats-card stats-compact-table"
         }, [
-          vue.createElementVNode("view", { class: "stats-item" }, [
-            vue.createElementVNode("text", { class: "stat-label" }, "剩余"),
+          vue.createElementVNode("view", { class: "thead" }, [
+            vue.createElementVNode("text", { class: "th" }, "剩余"),
+            vue.createElementVNode("text", { class: "th" }, "局数"),
+            vue.createElementVNode("text", { class: "th ok" }, "成功"),
+            vue.createElementVNode("text", { class: "th fail" }, "失败"),
+            vue.createElementVNode("text", { class: "th" }, "胜率"),
+            vue.createElementVNode("text", { class: "th" }, "上一局")
+          ]),
+          vue.createElementVNode("view", { class: "tbody" }, [
             vue.createElementVNode(
               "text",
-              { class: "stat-value" },
+              { class: "td" },
               vue.toDisplayString($setup.remainingCards),
               1
               /* TEXT */
-            )
-          ]),
-          vue.createElementVNode("view", { class: "stats-item" }, [
-            vue.createElementVNode("text", { class: "stat-label" }, "局数"),
+            ),
             vue.createElementVNode(
               "text",
-              { class: "stat-value" },
+              { class: "td" },
               vue.toDisplayString($setup.handsPlayed),
               1
               /* TEXT */
-            )
-          ]),
-          vue.createElementVNode("view", { class: "stats-item" }, [
-            vue.createElementVNode("text", { class: "stat-label ok" }, "成功"),
+            ),
             vue.createElementVNode(
               "text",
-              { class: "stat-value ok" },
+              { class: "td ok" },
               vue.toDisplayString($setup.successCount),
               1
               /* TEXT */
-            )
-          ]),
-          vue.createElementVNode("view", { class: "stats-item" }, [
-            vue.createElementVNode("text", { class: "stat-label fail" }, "失败"),
+            ),
             vue.createElementVNode(
               "text",
-              { class: "stat-value fail" },
+              { class: "td fail" },
               vue.toDisplayString($setup.failCount),
               1
               /* TEXT */
-            )
-          ]),
-          vue.createElementVNode("view", { class: "stats-item" }, [
-            vue.createElementVNode("text", { class: "stat-label" }, "胜率"),
+            ),
             vue.createElementVNode(
               "text",
-              { class: "stat-value" },
+              { class: "td" },
               vue.toDisplayString($setup.winRate) + "%",
+              1
+              /* TEXT */
+            ),
+            vue.createElementVNode(
+              "text",
+              { class: "td" },
+              vue.toDisplayString($setup.lastSuccessMs != null ? $setup.fmtMs($setup.lastSuccessMs) : "-"),
               1
               /* TEXT */
             )

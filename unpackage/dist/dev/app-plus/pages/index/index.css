@@ -85,7 +85,15 @@
 /* 统计：单行紧凑 */
 .stats-card[data-v-1cf27b2a] { background:#fff; border:0.0625rem solid #e5e7eb; border-radius:0.625rem; padding:0.5rem;
 }
-.stats-one-line[data-v-1cf27b2a] { display:flex; flex-wrap:nowrap; align-items:center; gap:0.375rem;
+.stats-compact-table[data-v-1cf27b2a] { display:grid; grid-template-rows:auto auto; row-gap:0.25rem;
+}
+.stats-compact-table .thead[data-v-1cf27b2a], .stats-compact-table .tbody[data-v-1cf27b2a] { display:grid; grid-template-columns: repeat(6, 1fr); align-items:center; column-gap:0.375rem;
+}
+.stats-compact-table .thead[data-v-1cf27b2a] { color:#6b7280; font-weight:700; font-size:0.8125rem; text-align: center;}
+.stats-compact-table .tbody[data-v-1cf27b2a] { font-size:0.875rem; text-align: center;}
+.stats-compact-table .ok[data-v-1cf27b2a] { color:#16a34a; font-weight:700
+}
+.stats-compact-table .fail[data-v-1cf27b2a] { color:#dc2626; font-weight:700
 }
 .stats-one-line .stats-item[data-v-1cf27b2a] { display:flex; align-items:center; gap:0.1875rem; padding:0.125rem 0.25rem; border-right:0.0625rem solid #e5e7eb;
 }

@@ -7,13 +7,24 @@
       <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
     </view>
 
-    <!-- 本局统计：单行紧凑显示 -->
-    <view id="statsRow" class="stats-card stats-one-line">
-      <view class="stats-item"><text class="stat-label">剩余</text><text class="stat-value">{{ remainingCards }}</text></view>
-      <view class="stats-item"><text class="stat-label">局数</text><text class="stat-value">{{ handsPlayed }}</text></view>
-      <view class="stats-item"><text class="stat-label ok">成功</text><text class="stat-value ok">{{ successCount }}</text></view>
-      <view class="stats-item"><text class="stat-label fail">失败</text><text class="stat-value fail">{{ failCount }}</text></view>
-      <view class="stats-item"><text class="stat-label">胜率</text><text class="stat-value">{{ winRate }}%</text></view>
+    <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
+    <view id="statsRow" class="stats-card stats-compact-table">
+      <view class="thead">
+        <text class="th">剩余</text>
+        <text class="th">局数</text>
+        <text class="th ok">成功</text>
+        <text class="th fail">失败</text>
+        <text class="th">胜率</text>
+        <text class="th">上一局</text>
+      </view>
+      <view class="tbody">
+        <text class="td">{{ remainingCards }}</text>
+        <text class="td">{{ handsPlayed }}</text>
+        <text class="td ok">{{ successCount }}</text>
+        <text class="td fail">{{ failCount }}</text>
+        <text class="td">{{ winRate }}%</text>
+        <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
+      </view>
     </view>
 
     <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
@@ -91,7 +102,7 @@
 <script setup>
 import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
-import { ensureInit, getCurrentUser, pushRound } from '../../utils/store.js'
+import { ensureInit, getCurrentUser, pushRound, readStatsExtended } from '../../utils/store.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
@@ -110,6 +121,7 @@ const sessionOver = ref(false)
 const handStartTs = ref(Date.now())
 const hintWasUsed = ref(false)
 const attemptCount = ref(0)
+const lastSuccessMs = ref(null)
 
 const remainingCards = computed(() => (deck.value || []).length)
 const winRate = computed(() => {
@@ -203,6 +215,7 @@ onMounted(() => {
   setTimeout(() => { booted.value = true }, 0)
   nextTick(() => { updateVHVar(); recomputeExprHeight(); updateExprScale() })
   if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
+  updateLastSuccess()
 })
 
 function clearAll() { tokens.value = []; usedByCard.value = [0,0,0,0] }
@@ -220,6 +233,18 @@ function computeExprStats() {
   }
   return { exprLen: arr.length, maxDepth, ops }
 }
+
+function updateLastSuccess() {
+  try {
+    const cu = getCurrentUser && getCurrentUser()
+    if (!cu || !cu.id) { lastSuccessMs.value = null; return }
+    const ext = readStatsExtended && readStatsExtended(cu.id)
+    const r = (ext && Array.isArray(ext.rounds) ? ext.rounds.slice().reverse() : []).find(x => x && x.success && Number.isFinite(x.timeMs))
+    lastSuccessMs.value = r ? r.timeMs : null
+  } catch (_) { lastSuccessMs.value = null }
+}
+
+function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
 
 function check() {
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
@@ -247,6 +272,7 @@ function check() {
         hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
         expr: s,
       })
+      updateLastSuccess()
     } catch (_) {}
   }
 }
@@ -271,6 +297,7 @@ function showSolution() {
         hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
         expr: expr.value,
       })
+      updateLastSuccess()
     } catch (_) {}
   }
   feedback.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
@@ -297,6 +324,7 @@ function skipHand() {
         hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
         expr: expr.value,
       })
+      updateLastSuccess()
     } catch (_) {}
   }
   nextHand()
@@ -567,7 +595,7 @@ function onSessionOver() {
   try {
     uni.showModal({
       title: '本局结束',
-      content: `次数：${handsPlayed.value}\n成功：${successCount.value}\n胜率：${winRate.value}%\n是否开始下一局？`,
+      content: `局：${handsPlayed.value}\n成功：${successCount.value}\n胜率：${winRate.value}%\n是否开始下一局？`,
       confirmText: '下一局',
       cancelText: '统计',
       success: (res) => {
@@ -638,7 +666,12 @@ function onSessionOver() {
 
 /* 统计：单行紧凑 */
 .stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:20rpx; padding:16rpx; }
-.stats-one-line { display:flex; flex-wrap:nowrap; align-items:center; gap:12rpx; }
+.stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
+.stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(6, 1fr); align-items:center; column-gap:12rpx; }
+.stats-compact-table .thead { color:#6b7280; font-weight:700; font-size:26rpx; text-align: center;}
+.stats-compact-table .tbody { font-size:28rpx; text-align: center;}
+.stats-compact-table .ok { color:#16a34a; font-weight:700 }
+.stats-compact-table .fail { color:#dc2626; font-weight:700 }
 .stats-one-line .stats-item { display:flex; align-items:center; gap:6rpx; padding:4rpx 8rpx; border-right:2rpx solid #e5e7eb; }
 .stats-one-line .stats-item:last-child { border-right:none; }
 .stat-label { color:#6b7280; font-size:26rpx; }
