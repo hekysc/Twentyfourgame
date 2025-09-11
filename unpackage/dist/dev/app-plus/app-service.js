@@ -33,6 +33,8 @@ if (uni.restoreGlobal) {
   "use strict";
   const UKEY = "tf24_users_v1";
   const SKEY = "tf24_stats_v1";
+  const STATS_VERSION = 2;
+  const MAX_ROUNDS = 1e3;
   function load(key, defVal) {
     try {
       const val = uni.getStorageSync(key);
@@ -74,8 +76,29 @@ if (uni.restoreGlobal) {
         save(UKEY, migrated);
     }
     const stats = load(SKEY, null);
-    if (!stats || typeof stats !== "object")
-      save(SKEY, {});
+    if (!stats || typeof stats !== "object") {
+      save(SKEY, { _version: STATS_VERSION });
+    } else {
+      if (!stats._version || stats._version < STATS_VERSION) {
+        const migrated = { ...stats };
+        for (const k of Object.keys(migrated)) {
+          if (k.startsWith && k.startsWith("_"))
+            continue;
+          const rec = migrated[k];
+          if (!rec || typeof rec !== "object") {
+            migrated[k] = { totals: { total: 0, success: 0, fail: 0 }, days: {}, rounds: [], agg: {} };
+            continue;
+          }
+          const totals = rec.totals && typeof rec.totals === "object" ? rec.totals : { total: 0, success: 0, fail: 0 };
+          const days = rec.days && typeof rec.days === "object" ? rec.days : {};
+          const rounds = Array.isArray(rec.rounds) ? rec.rounds : [];
+          const agg = rec.agg && typeof rec.agg === "object" ? rec.agg : {};
+          migrated[k] = { totals, days, rounds, agg };
+        }
+        migrated._version = STATS_VERSION;
+        save(SKEY, migrated);
+      }
+    }
   }
   function getUsers() {
     return load(UKEY, { list: [], currentId: "" });
@@ -127,26 +150,62 @@ if (uni.restoreGlobal) {
       u.currentId = u.list[0] && u.list[0].id || "";
     setUsers(u);
   }
-  function pushRound(success) {
+  function pushRound(arg) {
+    var _a, _b, _c;
     const users = getUsers();
     const uid = users.currentId;
     if (!uid)
       return;
-    const stats = load(SKEY, {});
+    const stats = load(SKEY, { _version: STATS_VERSION });
+    if (!stats._version)
+      stats._version = STATS_VERSION;
     if (!stats[uid])
-      stats[uid] = { totals: { total: 0, success: 0, fail: 0 }, days: {} };
+      stats[uid] = { totals: { total: 0, success: 0, fail: 0 }, days: {}, rounds: [], agg: {} };
+    const rec = stats[uid];
     const today = /* @__PURE__ */ new Date();
     const key = today.toISOString().slice(0, 10);
-    if (!stats[uid].days[key])
-      stats[uid].days[key] = { total: 0, success: 0, fail: 0 };
-    stats[uid].totals.total += 1;
-    stats[uid].days[key].total += 1;
+    if (!rec.days[key])
+      rec.days[key] = { total: 0, success: 0, fail: 0 };
+    const isBool = typeof arg === "boolean";
+    const success = isBool ? !!arg : !!(arg == null ? void 0 : arg.success);
+    const now = Date.now();
+    const round = isBool ? null : {
+      id: genId(),
+      ts: now,
+      success: !!(arg == null ? void 0 : arg.success),
+      timeMs: Number.isFinite(arg == null ? void 0 : arg.timeMs) ? Math.max(0, Math.floor(arg.timeMs)) : void 0,
+      hintUsed: !!(arg == null ? void 0 : arg.hintUsed),
+      retries: Number.isFinite(arg == null ? void 0 : arg.retries) ? Math.max(0, Math.floor(arg.retries)) : void 0,
+      ops: Array.isArray(arg == null ? void 0 : arg.ops) ? arg.ops.slice(0, 16) : void 0,
+      exprLen: Number.isFinite(arg == null ? void 0 : arg.exprLen) ? Math.max(0, Math.floor(arg.exprLen)) : void 0,
+      maxDepth: Number.isFinite(arg == null ? void 0 : arg.maxDepth) ? Math.max(0, Math.floor(arg.maxDepth)) : void 0,
+      faceUseHigh: typeof (arg == null ? void 0 : arg.faceUseHigh) === "boolean" ? arg.faceUseHigh : void 0,
+      hand: (arg == null ? void 0 : arg.hand) && Array.isArray(arg.hand.cards) ? { cards: arg.hand.cards.map((c) => ({ rank: +c.rank, suit: c.suit })) } : void 0,
+      solutionsCount: Number.isFinite(arg == null ? void 0 : arg.solutionsCount) ? Math.max(0, Math.floor(arg.solutionsCount)) : void 0,
+      expr: typeof (arg == null ? void 0 : arg.expr) === "string" ? arg.expr : void 0
+    };
+    rec.totals.total += 1;
+    rec.days[key].total += 1;
     if (success) {
-      stats[uid].totals.success += 1;
-      stats[uid].days[key].success += 1;
+      rec.totals.success += 1;
+      rec.days[key].success += 1;
     } else {
-      stats[uid].totals.fail += 1;
-      stats[uid].days[key].fail += 1;
+      rec.totals.fail += 1;
+      rec.days[key].fail += 1;
+    }
+    if (round) {
+      rec.rounds.push(round);
+      if (rec.rounds.length > MAX_ROUNDS)
+        rec.rounds.splice(0, rec.rounds.length - MAX_ROUNDS);
+      if (round.success && Number.isFinite(round.timeMs)) {
+        const best = (_a = rec.agg) == null ? void 0 : _a.bestTimeMs;
+        rec.agg.bestTimeMs = Number.isFinite(best) ? Math.min(best, round.timeMs) : round.timeMs;
+      }
+      const cur = ((_b = rec.agg) == null ? void 0 : _b.currentStreak) || 0;
+      rec.agg.currentStreak = success ? cur + 1 : 0;
+      const longest = ((_c = rec.agg) == null ? void 0 : _c.longestStreak) || 0;
+      if (rec.agg.currentStreak > longest)
+        rec.agg.longestStreak = rec.agg.currentStreak;
     }
     save(SKEY, stats);
     try {
@@ -158,6 +217,15 @@ if (uni.restoreGlobal) {
       }
     } catch (_) {
     }
+  }
+  function readStatsExtended(uid) {
+    const s = load(SKEY, { _version: STATS_VERSION });
+    const rec = s[uid] || { totals: { total: 0, success: 0, fail: 0 }, days: {}, rounds: [], agg: {} };
+    if (!rec.rounds)
+      rec.rounds = [];
+    if (!rec.agg)
+      rec.agg = {};
+    return rec;
   }
   function touchLastPlayed(id) {
     try {
@@ -187,7 +255,10 @@ if (uni.restoreGlobal) {
       const st = s[u.id] || { totals: { total: 0, success: 0, fail: 0 }, days: {} };
       const t = st.totals || { total: 0, success: 0, fail: 0 };
       const winRate = t.total ? Math.round(100 * (t.success / t.total)) : 0;
-      return { id: u.id, name: u.name, totals: t, winRate };
+      const bestTimeMs = st.agg && st.agg.bestTimeMs || void 0;
+      const currentStreak = st.agg && st.agg.currentStreak || 0;
+      const longestStreak = st.agg && st.agg.longestStreak || 0;
+      return { id: u.id, name: u.name, totals: t, winRate, bestTimeMs, currentStreak, longestStreak };
     });
   }
   function resetAllData() {
@@ -699,6 +770,9 @@ if (uni.restoreGlobal) {
       const successCount = vue.ref(0);
       const failCount = vue.ref(0);
       const sessionOver = vue.ref(false);
+      const handStartTs = vue.ref(Date.now());
+      const hintWasUsed = vue.ref(false);
+      const attemptCount = vue.ref(0);
       const remainingCards = vue.computed(() => (deck.value || []).length);
       const winRate = vue.computed(() => {
         const t = successCount.value + failCount.value;
@@ -739,6 +813,7 @@ if (uni.restoreGlobal) {
         return "op";
       });
       const currentText = vue.computed(() => {
+        attemptCount.value += 1;
         const s = expr.value;
         if (!s)
           return "";
@@ -800,6 +875,9 @@ if (uni.restoreGlobal) {
         tokens.value = [];
         usedByCard.value = [0, 0, 0, 0];
         handRecorded.value = false;
+        handStartTs.value = Date.now();
+        hintWasUsed.value = false;
+        attemptCount.value = 0;
         feedback.value = "拖入 + - × ÷ ( ) 组成 24";
         vue.nextTick(() => recomputeExprHeight());
       }
@@ -827,6 +905,28 @@ if (uni.restoreGlobal) {
         tokens.value = [];
         usedByCard.value = [0, 0, 0, 0];
       }
+      function computeExprStats() {
+        const arr = tokens.value || [];
+        const ops = [];
+        let depth = 0, maxDepth = 0;
+        for (const t of arr) {
+          if (t.type === "op") {
+            if (t.value === "(") {
+              depth++;
+              if (depth > maxDepth)
+                maxDepth = depth;
+              continue;
+            }
+            if (t.value === ")") {
+              depth = Math.max(0, depth - 1);
+              continue;
+            }
+            if (t.value === "+" || t.value === "-" || t.value === "×" || t.value === "÷")
+              ops.push(t.value);
+          }
+        }
+        return { exprLen: arr.length, maxDepth, ops };
+      }
       function check() {
         const usedCount = usedByCard.value.reduce((a, b) => a + (b ? 1 : 0), 0);
         if (usedCount !== 4) {
@@ -837,27 +937,48 @@ if (uni.restoreGlobal) {
         const v = evaluateExprToFraction(s);
         const ok = v && v.equalsInt && v.equalsInt(24);
         feedback.value = ok ? "恭喜，得到 24！" : "未得到 24，再试试";
-        try {
-          pushRound(!!ok);
-        } catch (_) {
-        }
         if (ok && !handRecorded.value) {
           handRecorded.value = true;
           handsPlayed.value += 1;
           successCount.value += 1;
           try {
-            pushRound(true);
+            const stats = computeExprStats();
+            pushRound({
+              success: true,
+              timeMs: Date.now() - (handStartTs.value || Date.now()),
+              hintUsed: !!hintWasUsed.value,
+              retries: Math.max(0, (attemptCount.value || 1) - 1),
+              ops: stats.ops,
+              exprLen: stats.exprLen,
+              maxDepth: stats.maxDepth,
+              faceUseHigh: !!faceUseHigh.value,
+              hand: { cards: (cards.value || []).map((c) => ({ rank: c.rank, suit: c.suit })) },
+              expr: s
+            });
           } catch (_) {
           }
         }
       }
       function showSolution() {
+        hintWasUsed.value = true;
         if (!handRecorded.value) {
           handRecorded.value = true;
           handsPlayed.value += 1;
           failCount.value += 1;
           try {
-            pushRound(false);
+            const stats = computeExprStats();
+            pushRound({
+              success: false,
+              timeMs: Date.now() - (handStartTs.value || Date.now()),
+              hintUsed: true,
+              retries: attemptCount.value || 0,
+              ops: stats.ops,
+              exprLen: stats.exprLen,
+              maxDepth: stats.maxDepth,
+              faceUseHigh: !!faceUseHigh.value,
+              hand: { cards: (cards.value || []).map((c) => ({ rank: c.rank, suit: c.suit })) },
+              expr: expr.value
+            });
           } catch (_) {
           }
         }
@@ -872,7 +993,19 @@ if (uni.restoreGlobal) {
           handsPlayed.value += 1;
           failCount.value += 1;
           try {
-            pushRound(false);
+            const stats = computeExprStats();
+            pushRound({
+              success: false,
+              timeMs: Date.now() - (handStartTs.value || Date.now()),
+              hintUsed: !!hintWasUsed.value,
+              retries: attemptCount.value || 0,
+              ops: stats.ops,
+              exprLen: stats.exprLen,
+              maxDepth: stats.maxDepth,
+              faceUseHigh: !!faceUseHigh.value,
+              hand: { cards: (cards.value || []).map((c) => ({ rank: c.rank, suit: c.suit })) },
+              expr: expr.value
+            });
           } catch (_) {
           }
         }
@@ -1149,10 +1282,8 @@ if (uni.restoreGlobal) {
             const hOps2 = ops2Rect && ops2Rect.height || 0;
             const hSubmit = submitRect && submitRect.height || 0;
             const hFail = failRect && failRect.height || 0;
-            let avail = winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12;
-            if (!isFinite(avail) || avail <= 0)
-              avail = 120;
-            exprZoneHeight.value = Math.max(120, Math.floor(avail));
+            winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12;
+            exprZoneHeight.value = 70;
           });
         });
       }
@@ -1214,7 +1345,7 @@ if (uni.restoreGlobal) {
         } catch (_) {
         }
       }
-      const __returned__ = { cards, solution, feedback, usedByCard, tokens, faceUseHigh, handRecorded, exprZoneHeight, currentUser, deck, handsPlayed, successCount, failCount, sessionOver, remainingCards, winRate, drag, exprBox, tokRects, dragInsertIndex, lastInsertedIndex, proxy, booted, expr, ghostStyle, exprScale, opsDensity, opsDensityClass, ghostText, placeholderSizeClass, currentText, refresh, initDeck, nextHand, clearAll, check, showSolution, toggleFaceMode, skipHand, goLogin, goStats, goGame, goUser, startDrag, onDrag, lastTap, tapKeyFor, endDrag, tryAppendToken, tryInsertTokenAt, removeTokenAt, measureDropZones, inside, pointFromEvent, updateExprScale, calcInsertIndex, moveToken, updateVHVar, recomputeExprHeight, evalRank, labelFor, cardImage, randomSuit, onSessionOver, ref: vue.ref, onMounted: vue.onMounted, getCurrentInstance: vue.getCurrentInstance, computed: vue.computed, watch: vue.watch, nextTick: vue.nextTick, get evaluateExprToFraction() {
+      const __returned__ = { cards, solution, feedback, usedByCard, tokens, faceUseHigh, handRecorded, exprZoneHeight, currentUser, deck, handsPlayed, successCount, failCount, sessionOver, handStartTs, hintWasUsed, attemptCount, remainingCards, winRate, drag, exprBox, tokRects, dragInsertIndex, lastInsertedIndex, proxy, booted, expr, ghostStyle, exprScale, opsDensity, opsDensityClass, ghostText, placeholderSizeClass, currentText, refresh, initDeck, nextHand, clearAll, computeExprStats, check, showSolution, toggleFaceMode, skipHand, goLogin, goStats, goGame, goUser, startDrag, onDrag, lastTap, tapKeyFor, endDrag, tryAppendToken, tryInsertTokenAt, removeTokenAt, measureDropZones, inside, pointFromEvent, updateExprScale, calcInsertIndex, moveToken, updateVHVar, recomputeExprHeight, evalRank, labelFor, cardImage, randomSuit, onSessionOver, ref: vue.ref, onMounted: vue.onMounted, getCurrentInstance: vue.getCurrentInstance, computed: vue.computed, watch: vue.watch, nextTick: vue.nextTick, get evaluateExprToFraction() {
         return evaluateExprToFraction;
       }, get solve24() {
         return solve24;
@@ -1234,7 +1365,7 @@ if (uni.restoreGlobal) {
       "view",
       {
         class: vue.normalizeClass(["page col", { booted: $setup.booted }]),
-        style: { "padding": "24rpx", "gap": "24rpx", "position": "relative" }
+        style: { "padding": "20rpx", "gap": "16rpx", "position": "relative" }
       },
       [
         vue.createCommentVNode(" 顶部：当前用户与切换 "),
@@ -1258,34 +1389,6 @@ if (uni.restoreGlobal) {
             onClick: $setup.goLogin
           }, "切换用户")
         ]),
-        vue.createCommentVNode(" 牌区：四张卡片等宽占满一行（每张卡片单独计数） "),
-        vue.createElementVNode("view", {
-          id: "cardGrid",
-          class: "card-grid",
-          style: { "padding-top": "50rpx" }
-        }, [
-          (vue.openBlock(true), vue.createElementBlock(
-            vue.Fragment,
-            null,
-            vue.renderList($setup.cards, (card, idx) => {
-              return vue.openBlock(), vue.createElementBlock("view", {
-                key: idx,
-                class: vue.normalizeClass(["card", { used: ($setup.usedByCard[idx] || 0) > 0 }]),
-                onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "num", value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event), ["stop", "prevent"]),
-                onTouchmove: _cache[0] || (_cache[0] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
-                onTouchend: _cache[1] || (_cache[1] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
-              }, [
-                vue.createElementVNode("image", {
-                  class: "card-img",
-                  src: $setup.cardImage(card),
-                  mode: "widthFix"
-                }, null, 8, ["src"])
-              ], 42, ["onTouchstart"]);
-            }),
-            128
-            /* KEYED_FRAGMENT */
-          ))
-        ]),
         vue.createCommentVNode(" 本局统计：单行紧凑显示 "),
         vue.createElementVNode("view", {
           id: "statsRow",
@@ -1302,7 +1405,7 @@ if (uni.restoreGlobal) {
             )
           ]),
           vue.createElementVNode("view", { class: "stats-item" }, [
-            vue.createElementVNode("text", { class: "stat-label" }, "次数"),
+            vue.createElementVNode("text", { class: "stat-label" }, "局数"),
             vue.createElementVNode(
               "text",
               { class: "stat-value" },
@@ -1342,18 +1445,114 @@ if (uni.restoreGlobal) {
             )
           ])
         ]),
-        vue.createCommentVNode(" 表达式卡片容器（高度由脚本计算） "),
-        vue.createElementVNode("view", { class: "expr-card" }, [
-          vue.createElementVNode("view", { class: "expr-title" }, [
-            vue.createTextVNode("当前表达式："),
+        vue.createCommentVNode(" 牌区：四张卡片等宽占满一行（每张卡片单独计数） "),
+        vue.createElementVNode("view", {
+          id: "cardGrid",
+          class: "card-grid",
+          style: { "padding-top": "0rpx" }
+        }, [
+          (vue.openBlock(true), vue.createElementBlock(
+            vue.Fragment,
+            null,
+            vue.renderList($setup.cards, (card, idx) => {
+              return vue.openBlock(), vue.createElementBlock("view", {
+                key: idx,
+                class: vue.normalizeClass(["card", { used: ($setup.usedByCard[idx] || 0) > 0 }]),
+                onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "num", value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event), ["stop", "prevent"]),
+                onTouchmove: _cache[0] || (_cache[0] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
+                onTouchend: _cache[1] || (_cache[1] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
+              }, [
+                vue.createElementVNode("image", {
+                  class: "card-img",
+                  src: $setup.cardImage(card),
+                  mode: "widthFix"
+                }, null, 8, ["src"])
+              ], 42, ["onTouchstart"]);
+            }),
+            128
+            /* KEYED_FRAGMENT */
+          ))
+        ]),
+        vue.createCommentVNode(" 运算符候选区：两行布局 "),
+        vue.createElementVNode(
+          "view",
+          {
+            id: "opsRow1",
+            class: vue.normalizeClass(["ops-row-1", $setup.opsDensityClass])
+          },
+          [
+            (vue.openBlock(), vue.createElementBlock(
+              vue.Fragment,
+              null,
+              vue.renderList(["+", "-", "×", "÷"], (op) => {
+                return vue.createElementVNode("button", {
+                  key: op,
+                  class: "btn btn-operator",
+                  onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "op", value: op }, $event), ["stop", "prevent"]),
+                  onTouchmove: _cache[2] || (_cache[2] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
+                  onTouchend: _cache[3] || (_cache[3] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
+                }, vue.toDisplayString(op), 41, ["onTouchstart"]);
+              }),
+              64
+              /* STABLE_FRAGMENT */
+            ))
+          ],
+          2
+          /* CLASS */
+        ),
+        vue.createElementVNode(
+          "view",
+          {
+            id: "opsRow2",
+            class: vue.normalizeClass(["ops-row-2", $setup.opsDensityClass])
+          },
+          [
+            vue.createElementVNode("view", { class: "ops-left" }, [
+              (vue.openBlock(), vue.createElementBlock(
+                vue.Fragment,
+                null,
+                vue.renderList(["(", ")"], (op) => {
+                  return vue.createElementVNode("button", {
+                    key: op,
+                    class: "btn btn-operator",
+                    onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "op", value: op }, $event), ["stop", "prevent"]),
+                    onTouchmove: _cache[4] || (_cache[4] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
+                    onTouchend: _cache[5] || (_cache[5] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
+                  }, vue.toDisplayString(op), 41, ["onTouchstart"]);
+                }),
+                64
+                /* STABLE_FRAGMENT */
+              ))
+            ]),
             vue.createElementVNode(
-              "text",
-              { class: "status-text" },
-              vue.toDisplayString($setup.currentText ? $setup.currentText : "未完成"),
+              "button",
+              {
+                class: "btn btn-secondary mode-btn",
+                onClick: $setup.toggleFaceMode
+              },
+              vue.toDisplayString($setup.faceUseHigh ? "J/Q/K=11/12/13" : "J/Q/K=1"),
               1
               /* TEXT */
             )
-          ]),
+          ],
+          2
+          /* CLASS */
+        ),
+        vue.createCommentVNode(" 拖拽中的浮层 "),
+        $setup.drag.active ? (vue.openBlock(), vue.createElementBlock(
+          "view",
+          {
+            key: 0,
+            class: "drag-ghost",
+            style: vue.normalizeStyle($setup.ghostStyle)
+          },
+          vue.toDisplayString($setup.ghostText),
+          5
+          /* TEXT, STYLE */
+        )) : vue.createCommentVNode("v-if", true),
+        vue.createCommentVNode(" 表达式卡片容器（高度由脚本计算） "),
+        vue.createElementVNode("view", { class: "expr-card" }, [
+          vue.createCommentVNode(` <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view> `),
           vue.createElementVNode(
             "view",
             {
@@ -1362,10 +1561,7 @@ if (uni.restoreGlobal) {
               style: vue.normalizeStyle({ height: $setup.exprZoneHeight + "px" })
             },
             [
-              $setup.tokens.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
-                key: 0,
-                class: "expr-placeholder"
-              }, "将卡牌和运算符拖到这里")) : vue.createCommentVNode("v-if", true),
+              vue.createCommentVNode(' <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view> '),
               vue.createElementVNode(
                 "view",
                 {
@@ -1395,8 +1591,8 @@ if (uni.restoreGlobal) {
                           vue.createElementVNode("view", {
                             class: vue.normalizeClass(["tok", [t.type === "num" ? "num" : "op", { "just-inserted": i === $setup.lastInsertedIndex, "dragging": $setup.drag.token && $setup.drag.token.type === "tok" && $setup.drag.token.index === i }]]),
                             onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "tok", index: i, value: t.value }, $event), ["stop", "prevent"]),
-                            onTouchmove: _cache[2] || (_cache[2] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
-                            onTouchend: _cache[3] || (_cache[3] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
+                            onTouchmove: _cache[6] || (_cache[6] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
+                            onTouchend: _cache[7] || (_cache[7] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
                           }, [
                             t.type === "num" ? (vue.openBlock(), vue.createElementBlock("image", {
                               key: 0,
@@ -1452,83 +1648,6 @@ if (uni.restoreGlobal) {
           1
           /* TEXT */
         ),
-        vue.createCommentVNode(" 运算符候选区：两行布局 "),
-        vue.createElementVNode(
-          "view",
-          {
-            id: "opsRow1",
-            class: vue.normalizeClass(["ops-row-1", $setup.opsDensityClass])
-          },
-          [
-            (vue.openBlock(), vue.createElementBlock(
-              vue.Fragment,
-              null,
-              vue.renderList(["+", "-", "×", "÷"], (op) => {
-                return vue.createElementVNode("button", {
-                  key: op,
-                  class: "btn btn-operator",
-                  onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "op", value: op }, $event), ["stop", "prevent"]),
-                  onTouchmove: _cache[4] || (_cache[4] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
-                  onTouchend: _cache[5] || (_cache[5] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
-                }, vue.toDisplayString(op), 41, ["onTouchstart"]);
-              }),
-              64
-              /* STABLE_FRAGMENT */
-            ))
-          ],
-          2
-          /* CLASS */
-        ),
-        vue.createElementVNode(
-          "view",
-          {
-            id: "opsRow2",
-            class: vue.normalizeClass(["ops-row-2", $setup.opsDensityClass])
-          },
-          [
-            vue.createElementVNode("view", { class: "ops-left" }, [
-              (vue.openBlock(), vue.createElementBlock(
-                vue.Fragment,
-                null,
-                vue.renderList(["(", ")"], (op) => {
-                  return vue.createElementVNode("button", {
-                    key: op,
-                    class: "btn btn-operator",
-                    onTouchstart: vue.withModifiers(($event) => $setup.startDrag({ type: "op", value: op }, $event), ["stop", "prevent"]),
-                    onTouchmove: _cache[6] || (_cache[6] = vue.withModifiers(($event) => $setup.onDrag($event), ["stop", "prevent"])),
-                    onTouchend: _cache[7] || (_cache[7] = vue.withModifiers(($event) => $setup.endDrag(), ["stop", "prevent"]))
-                  }, vue.toDisplayString(op), 41, ["onTouchstart"]);
-                }),
-                64
-                /* STABLE_FRAGMENT */
-              ))
-            ]),
-            vue.createElementVNode(
-              "button",
-              {
-                class: "btn btn-secondary mode-btn",
-                onClick: $setup.toggleFaceMode
-              },
-              vue.toDisplayString($setup.faceUseHigh ? "J/Q/K=11/12/13" : "J/Q/K=1"),
-              1
-              /* TEXT */
-            )
-          ],
-          2
-          /* CLASS */
-        ),
-        vue.createCommentVNode(" 拖拽中的浮层 "),
-        $setup.drag.active ? (vue.openBlock(), vue.createElementBlock(
-          "view",
-          {
-            key: 0,
-            class: "drag-ghost",
-            style: vue.normalizeStyle($setup.ghostStyle)
-          },
-          vue.toDisplayString($setup.ghostText),
-          5
-          /* TEXT, STYLE */
-        )) : vue.createCommentVNode("v-if", true),
         vue.createCommentVNode(" 提交 / 清空：各占一半宽度 "),
         vue.createElementVNode("view", {
           id: "submitRow",
@@ -1693,14 +1812,63 @@ if (uni.restoreGlobal) {
     setup(__props, { expose: __expose }) {
       __expose();
       const rows = vue.ref([]);
+      const overviewRange = vue.ref(7);
+      const hintFilter = vue.ref("all");
+      const selectedUserId = vue.ref("");
+      const userOptions = vue.computed(() => rows.value.map((r) => ({ id: r.id, name: r.name })));
+      const selectedUserLabel = vue.computed(() => {
+        var _a;
+        return ((_a = userOptions.value.find((o) => o.id === selectedUserId.value)) == null ? void 0 : _a.name) || "请选择用户";
+      });
+      const userExtMap = vue.ref({});
+      const userMap = vue.computed(() => {
+        const map = {};
+        for (const r of rows.value)
+          map[r.id] = { id: r.id, name: r.name };
+        return map;
+      });
+      const ext = vue.ref({ totals: { total: 0, success: 0, fail: 0 }, days: {}, rounds: [], agg: {} });
       vue.onMounted(() => {
         ensureInit();
         load2();
+        loadExt();
       });
       function load2() {
         const list = allUsersWithStats();
         list.sort((a, b) => b.winRate - a.winRate || b.totals.total - a.totals.total);
         rows.value = list;
+      }
+      function loadExt() {
+        const map = {};
+        for (const u of rows.value) {
+          map[u.id] = readStatsExtended(u.id);
+        }
+        userExtMap.value = map;
+        const uid = selectedUserId.value;
+        ext.value = map[uid] || { totals: { total: 0, success: 0, fail: 0 }, days: {}, rounds: [], agg: {} };
+      }
+      function selectUser(uid) {
+        selectedUserId.value = uid || "";
+        loadExt();
+        try {
+          uni.pageScrollTo && uni.pageScrollTo({ selector: ".trend", duration: 200 });
+        } catch (_) {
+        }
+      }
+      function onUserChange(e) {
+        var _a;
+        try {
+          const idx = ((_a = e == null ? void 0 : e.detail) == null ? void 0 : _a.value) | 0;
+          const opt = userOptions.value[idx];
+          if (opt) {
+            selectedUserId.value = opt.id;
+            loadExt();
+          }
+        } catch (_) {
+        }
+      }
+      function setOverviewRange(d) {
+        overviewRange.value = d;
       }
       function goUser() {
         try {
@@ -1708,10 +1876,94 @@ if (uni.restoreGlobal) {
         } catch (_) {
         }
       }
-      const __returned__ = { rows, load: load2, goUser, ref: vue.ref, onMounted: vue.onMounted, get ensureInit() {
+      function fmtTs(ts) {
+        try {
+          const d = new Date(ts);
+          return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        } catch (_) {
+          return "-";
+        }
+      }
+      function fmtMs(ms) {
+        if (!Number.isFinite(ms))
+          return "-";
+        if (ms < 1e3)
+          return ms + "ms";
+        const s = ms / 1e3;
+        if (s < 60)
+          return s.toFixed(1) + "s";
+        const m = Math.floor(s / 60);
+        const r = Math.round(s % 60);
+        return `${m}m${r}s`;
+      }
+      const activeRounds = vue.computed(() => {
+        const uid = selectedUserId.value;
+        if (uid === "all") {
+          const arr = [];
+          for (const id of Object.keys(userExtMap.value || {})) {
+            const rec = userExtMap.value[id];
+            const list = ((rec == null ? void 0 : rec.rounds) || []).map((r) => ({ ...r, uid: id }));
+            arr.push(...list);
+          }
+          return arr.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        } else {
+          const rec = userExtMap.value[uid] || { rounds: [] };
+          return (rec.rounds || []).map((r) => ({ ...r, uid }));
+        }
+      });
+      const filteredRounds = vue.computed(() => {
+        const list = activeRounds.value;
+        const cutoff = overviewRange.value && overviewRange.value > 0 ? Date.now() - overviewRange.value * 864e5 : 0;
+        return list.filter((r) => !cutoff || (r.ts || 0) >= cutoff);
+      });
+      const recentRounds = vue.computed(() => filteredRounds.value.slice(0, 12).map((r) => ({ ...r, user: userMap.value[r.uid] })));
+      const trendBars = vue.computed(() => {
+        const rounds = filteredRounds.value;
+        const byDay = /* @__PURE__ */ new Map();
+        for (const r of rounds) {
+          const key = new Date(r.ts || 0).toISOString().slice(0, 10);
+          const cur = byDay.get(key) || { total: 0, success: 0 };
+          cur.total += 1;
+          if (r.success)
+            cur.success += 1;
+          byDay.set(key, cur);
+        }
+        let days = Array.from(byDay.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1);
+        if (overviewRange.value > 0) {
+          const cutoff = Date.now() - overviewRange.value * 864e5;
+          days = days.filter(([k]) => (/* @__PURE__ */ new Date(k + "T00:00:00Z")).getTime() >= cutoff);
+        }
+        days = days.slice(-30);
+        const maxTotal = Math.max(1, ...days.map(([, v]) => v.total));
+        return days.map(([k, v]) => {
+          const h = Math.max(4, Math.round(120 * (v.total / maxTotal)));
+          const rate = v.total ? v.success / v.total : 0;
+          const color = v.total ? "#16a34a" : "#e5e7eb";
+          return { label: k, height: Math.max(6, Math.round(h * rate)), color };
+        });
+      });
+      const overviewRows = vue.computed(() => {
+        const cutoff = overviewRange.value && overviewRange.value > 0 ? Date.now() - overviewRange.value * 864e5 : 0;
+        const items = rows.value.map((u) => {
+          const rec = userExtMap.value[u.id] || { rounds: [], agg: {} };
+          const rounds = (rec.rounds || []).filter((r) => !cutoff || (r.ts || 0) >= cutoff);
+          const total = rounds.length;
+          const success = rounds.filter((r) => r.success).length;
+          const winRate = total ? Math.round(100 * success / total) : 0;
+          const times = rounds.filter((r) => r.success && Number.isFinite(r.timeMs)).map((r) => r.timeMs);
+          const bestTimeMs = times.length ? Math.min(...times) : null;
+          const avgTimeMs = times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null;
+          return { id: u.id, name: u.name, total, success, times: total, winRate, bestTimeMs, avgTimeMs };
+        });
+        items.sort((a, b) => b.winRate - a.winRate || b.times - a.times);
+        return items;
+      });
+      const __returned__ = { rows, overviewRange, hintFilter, selectedUserId, userOptions, selectedUserLabel, userExtMap, userMap, ext, load: load2, loadExt, selectUser, onUserChange, setOverviewRange, goUser, fmtTs, fmtMs, activeRounds, filteredRounds, recentRounds, trendBars, overviewRows, ref: vue.ref, onMounted: vue.onMounted, computed: vue.computed, get ensureInit() {
         return ensureInit;
       }, get allUsersWithStats() {
         return allUsersWithStats;
+      }, get readStatsExtended() {
+        return readStatsExtended;
       } };
       Object.defineProperty(__returned__, "__isScriptSetup", { enumerable: false, value: true });
       return __returned__;
@@ -1725,31 +1977,66 @@ if (uni.restoreGlobal) {
       vue.createElementVNode("view", { class: "section" }, [
         vue.createElementVNode("view", {
           class: "row",
-          style: { "justify-content": "space-between", "align-items": "center" }
+          style: { "justify-content": "space-between", "align-items": "center", "gap": "12rpx", "flex-wrap": "wrap" }
         }, [
           vue.createElementVNode("text", { class: "title" }, "玩家总览"),
-          vue.createElementVNode("button", {
-            class: "btn mini",
-            onClick: $setup.goUser
-          }, "管理用户")
+          vue.createElementVNode("view", {
+            class: "row",
+            style: { "display": "flex", "align-items": "center", "gap": "12rpx" }
+          }, [
+            vue.createElementVNode("view", { class: "seg" }, [
+              vue.createElementVNode(
+                "button",
+                {
+                  class: vue.normalizeClass(["seg-btn", { active: $setup.overviewRange === 7 }]),
+                  onClick: _cache[0] || (_cache[0] = ($event) => $setup.setOverviewRange(7))
+                },
+                "近7天",
+                2
+                /* CLASS */
+              ),
+              vue.createElementVNode(
+                "button",
+                {
+                  class: vue.normalizeClass(["seg-btn", { active: $setup.overviewRange === 30 }]),
+                  onClick: _cache[1] || (_cache[1] = ($event) => $setup.setOverviewRange(30))
+                },
+                "近30天",
+                2
+                /* CLASS */
+              ),
+              vue.createElementVNode(
+                "button",
+                {
+                  class: vue.normalizeClass(["seg-btn", { active: $setup.overviewRange === 0 }]),
+                  onClick: _cache[2] || (_cache[2] = ($event) => $setup.setOverviewRange(0))
+                },
+                "全部",
+                2
+                /* CLASS */
+              )
+            ])
+          ])
         ]),
         vue.createElementVNode("view", { class: "table" }, [
           vue.createElementVNode("view", { class: "thead" }, [
-            vue.createElementVNode("text", { class: "th rank" }, "#"),
+            vue.createElementVNode("text", { class: "th rank" }, "排名"),
             vue.createElementVNode("text", { class: "th user" }, "用户"),
-            vue.createElementVNode("text", { class: "th" }, "总局"),
+            vue.createElementVNode("text", { class: "th" }, "总局数"),
             vue.createElementVNode("text", { class: "th ok" }, "成功"),
-            vue.createElementVNode("text", { class: "th fail" }, "失败"),
-            vue.createElementVNode("text", { class: "th" }, "胜率")
+            vue.createElementVNode("text", { class: "th" }, "🎯胜率"),
+            vue.createElementVNode("text", { class: "th" }, "平均"),
+            vue.createElementVNode("text", { class: "th" }, "🏆最佳")
           ]),
           vue.createElementVNode("view", { class: "tbody" }, [
             (vue.openBlock(true), vue.createElementBlock(
               vue.Fragment,
               null,
-              vue.renderList($setup.rows, (row, i) => {
+              vue.renderList($setup.overviewRows, (row, i) => {
                 return vue.openBlock(), vue.createElementBlock("view", {
                   class: "tr",
-                  key: row.id
+                  key: row.id,
+                  onClick: ($event) => $setup.selectUser(row.id)
                 }, [
                   vue.createElementVNode(
                     "text",
@@ -1768,21 +2055,14 @@ if (uni.restoreGlobal) {
                   vue.createElementVNode(
                     "text",
                     { class: "td" },
-                    vue.toDisplayString(row.totals.total),
+                    vue.toDisplayString(row.times),
                     1
                     /* TEXT */
                   ),
                   vue.createElementVNode(
                     "text",
                     { class: "td ok" },
-                    vue.toDisplayString(row.totals.success),
-                    1
-                    /* TEXT */
-                  ),
-                  vue.createElementVNode(
-                    "text",
-                    { class: "td fail" },
-                    vue.toDisplayString(row.totals.fail),
+                    vue.toDisplayString(row.success),
                     1
                     /* TEXT */
                   ),
@@ -1792,15 +2072,143 @@ if (uni.restoreGlobal) {
                     vue.toDisplayString(row.winRate) + "%",
                     1
                     /* TEXT */
+                  ),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "td" },
+                    vue.toDisplayString(row.avgTimeMs != null ? $setup.fmtMs(row.avgTimeMs) : "-"),
+                    1
+                    /* TEXT */
+                  ),
+                  vue.createElementVNode(
+                    "text",
+                    { class: "td" },
+                    vue.toDisplayString(row.bestTimeMs != null ? $setup.fmtMs(row.bestTimeMs) : "-"),
+                    1
+                    /* TEXT */
                   )
-                ]);
+                ], 8, ["onClick"]);
               }),
               128
               /* KEYED_FRAGMENT */
             ))
           ])
         ])
-      ])
+      ]),
+      $setup.selectedUserId ? (vue.openBlock(), vue.createElementBlock("view", {
+        key: 0,
+        class: "section"
+      }, [
+        vue.createElementVNode("view", {
+          class: "row",
+          style: { "justify-content": "space-between", "align-items": "center", "gap": "12rpx", "flex-wrap": "wrap" }
+        }, [
+          vue.createElementVNode("text", { class: "title" }, "📈个人趋势"),
+          vue.createElementVNode("view", {
+            class: "user-picker",
+            style: { "display": "flex", "align-items": "center", "gap": "8rpx" }
+          }, [
+            vue.createElementVNode("text", { style: { "color": "#6b7280", "font-size": "26rpx" } }, "查看"),
+            vue.createElementVNode("picker", {
+              range: $setup.userOptions,
+              "range-key": "name",
+              onChange: $setup.onUserChange
+            }, [
+              vue.createElementVNode(
+                "view",
+                { class: "picker-trigger" },
+                vue.toDisplayString($setup.selectedUserLabel),
+                1
+                /* TEXT */
+              )
+            ], 40, ["range"])
+          ])
+        ]),
+        vue.createElementVNode("view", {
+          class: "trend",
+          style: { "margin-top": "12rpx", "height": "160rpx", "display": "flex", "align-items": "flex-end", "gap": "6rpx" }
+        }, [
+          (vue.openBlock(true), vue.createElementBlock(
+            vue.Fragment,
+            null,
+            vue.renderList($setup.trendBars, (d, i) => {
+              return vue.openBlock(), vue.createElementBlock(
+                "view",
+                {
+                  key: i,
+                  class: "bar",
+                  style: vue.normalizeStyle({ height: (d.height || 4) + "rpx", background: d.color })
+                },
+                null,
+                4
+                /* STYLE */
+              );
+            }),
+            128
+            /* KEYED_FRAGMENT */
+          ))
+        ]),
+        vue.createElementVNode("view", {
+          class: "trend-legend",
+          style: { "margin-top": "8rpx", "color": "#6b7280", "font-size": "24rpx" }
+        }, "绿色=成功占比，灰色=无数据")
+      ])) : vue.createCommentVNode("v-if", true),
+      $setup.selectedUserId ? (vue.openBlock(), vue.createElementBlock("view", {
+        key: 1,
+        class: "section"
+      }, [
+        vue.createElementVNode("view", {
+          class: "row",
+          style: { "justify-content": "space-between", "align-items": "center" }
+        }, [
+          vue.createElementVNode("text", { class: "title" }, "最近战绩")
+        ]),
+        vue.createElementVNode("view", { class: "rounds" }, [
+          (vue.openBlock(true), vue.createElementBlock(
+            vue.Fragment,
+            null,
+            vue.renderList($setup.recentRounds, (r) => {
+              return vue.openBlock(), vue.createElementBlock("view", {
+                key: r.id,
+                class: "round-item"
+              }, [
+                vue.createElementVNode(
+                  "text",
+                  { class: "r-time" },
+                  vue.toDisplayString($setup.fmtTs(r.ts)),
+                  1
+                  /* TEXT */
+                ),
+                vue.createElementVNode(
+                  "text",
+                  {
+                    class: vue.normalizeClass(["r-result", { ok: r.success, fail: !r.success }])
+                  },
+                  vue.toDisplayString(r.success ? "成功" : "失败"),
+                  3
+                  /* TEXT, CLASS */
+                ),
+                vue.createElementVNode(
+                  "text",
+                  { class: "r-timeMs" },
+                  vue.toDisplayString(r.timeMs != null ? r.timeMs + "ms" : "-"),
+                  1
+                  /* TEXT */
+                ),
+                vue.createElementVNode(
+                  "text",
+                  { class: "r-meta" },
+                  vue.toDisplayString((r.faceUseHigh ? "JQK高位" : "JQK低位") + " · " + (r.hintUsed ? "用提示" : "无提示")),
+                  1
+                  /* TEXT */
+                )
+              ]);
+            }),
+            128
+            /* KEYED_FRAGMENT */
+          ))
+        ])
+      ])) : vue.createCommentVNode("v-if", true)
     ]);
   }
   const PagesStatsIndex = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["render", _sfc_render], ["__scopeId", "data-v-1fa681a1"], ["__file", "D:/heky/SWProject/Twentyfourgame/pages/stats/index.vue"]]);

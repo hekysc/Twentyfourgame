@@ -10,7 +10,7 @@
     <!-- 本局统计：单行紧凑显示 -->
     <view id="statsRow" class="stats-card stats-one-line">
       <view class="stats-item"><text class="stat-label">剩余</text><text class="stat-value">{{ remainingCards }}</text></view>
-      <view class="stats-item"><text class="stat-label">次数</text><text class="stat-value">{{ handsPlayed }}</text></view>
+      <view class="stats-item"><text class="stat-label">局数</text><text class="stat-value">{{ handsPlayed }}</text></view>
       <view class="stats-item"><text class="stat-label ok">成功</text><text class="stat-value ok">{{ successCount }}</text></view>
       <view class="stats-item"><text class="stat-label fail">失败</text><text class="stat-value fail">{{ failCount }}</text></view>
       <view class="stats-item"><text class="stat-label">胜率</text><text class="stat-value">{{ winRate }}%</text></view>
@@ -107,6 +107,9 @@ const handsPlayed = ref(0)
 const successCount = ref(0)
 const failCount = ref(0)
 const sessionOver = ref(false)
+const handStartTs = ref(Date.now())
+const hintWasUsed = ref(false)
+const attemptCount = ref(0)
 
 const remainingCards = computed(() => (deck.value || []).length)
 const winRate = computed(() => {
@@ -145,6 +148,7 @@ const placeholderSizeClass = computed(() => {
 })
 
 const currentText = computed(() => {
+  attemptCount.value += 1
   const s = expr.value
   if (!s) return ''
   const v = evaluateExprToFraction(s)
@@ -184,6 +188,9 @@ function nextHand() {
   tokens.value = []
   usedByCard.value = [0,0,0,0]
   handRecorded.value = false
+  handStartTs.value = Date.now()
+  hintWasUsed.value = false
+  attemptCount.value = 0
   feedback.value = '拖入 + - × ÷ ( ) 组成 24'
   nextTick(() => recomputeExprHeight())
 }
@@ -200,6 +207,20 @@ onMounted(() => {
 
 function clearAll() { tokens.value = []; usedByCard.value = [0,0,0,0] }
 
+function computeExprStats() {
+  const arr = tokens.value || []
+  const ops = []
+  let depth = 0, maxDepth = 0
+  for (const t of arr) {
+    if (t.type === 'op') {
+      if (t.value === '(') { depth++; if (depth > maxDepth) maxDepth = depth; continue }
+      if (t.value === ')') { depth = Math.max(0, depth - 1); continue }
+      if (t.value === '+' || t.value === '-' || t.value === '×' || t.value === '÷') ops.push(t.value)
+    }
+  }
+  return { exprLen: arr.length, maxDepth, ops }
+}
+
 function check() {
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
   if (usedCount !== 4) { feedback.value = '请先使用四张牌再提交'; return }
@@ -207,21 +228,50 @@ function check() {
   const v = evaluateExprToFraction(s)
   const ok = (v && v.equalsInt && v.equalsInt(24))
   feedback.value = ok ? '恭喜，得到 24！' : '未得到 24，再试试'
-  try { pushRound(!!ok) } catch (_) {}
+  // 统计记录移至首次结算时写入（避免重复记账）
   if (ok && !handRecorded.value) {
     handRecorded.value = true
     handsPlayed.value += 1
     successCount.value += 1
-    try { pushRound(true) } catch (_) {}
+    try {
+      const stats = computeExprStats()
+      pushRound({
+        success: true,
+        timeMs: Date.now() - (handStartTs.value || Date.now()),
+        hintUsed: !!hintWasUsed.value,
+        retries: Math.max(0, (attemptCount.value || 1) - 1),
+        ops: stats.ops,
+        exprLen: stats.exprLen,
+        maxDepth: stats.maxDepth,
+        faceUseHigh: !!faceUseHigh.value,
+        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+        expr: s,
+      })
+    } catch (_) {}
   }
 }
 
 function showSolution() {
+  hintWasUsed.value = true
   if (!handRecorded.value) {
     handRecorded.value = true
     handsPlayed.value += 1
     failCount.value += 1
-    try { pushRound(false) } catch (_) {}
+    try {
+      const stats = computeExprStats()
+      pushRound({
+        success: false,
+        timeMs: Date.now() - (handStartTs.value || Date.now()),
+        hintUsed: true,
+        retries: attemptCount.value || 0,
+        ops: stats.ops,
+        exprLen: stats.exprLen,
+        maxDepth: stats.maxDepth,
+        faceUseHigh: !!faceUseHigh.value,
+        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+        expr: expr.value,
+      })
+    } catch (_) {}
   }
   feedback.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
 }
@@ -233,7 +283,21 @@ function skipHand() {
     handRecorded.value = true
     handsPlayed.value += 1
     failCount.value += 1
-    try { pushRound(false) } catch (_) {}
+    try {
+      const stats = computeExprStats()
+      pushRound({
+        success: false,
+        timeMs: Date.now() - (handStartTs.value || Date.now()),
+        hintUsed: !!hintWasUsed.value,
+        retries: attemptCount.value || 0,
+        ops: stats.ops,
+        exprLen: stats.exprLen,
+        maxDepth: stats.maxDepth,
+        faceUseHigh: !!faceUseHigh.value,
+        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+        expr: expr.value,
+      })
+    } catch (_) {}
   }
   nextHand()
 }

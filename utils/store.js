@@ -4,7 +4,9 @@
 //  - stats: { [userId]: { totals: { total, success, fail }, days: { 'YYYY-MM-DD': { total, success, fail } } } }
 
 const UKEY = 'tf24_users_v1'
-const SKEY = 'tf24_stats_v1'
+const SKEY = 'tf24_stats_v1' // 保持键名不变，内部加版本与扩展字段
+const STATS_VERSION = 2
+const MAX_ROUNDS = 1000 // 明细条数上限，超出丢弃最旧
 
 function load(key, defVal) {
   try {
@@ -40,8 +42,28 @@ export function ensureInit() {
     }
     if (migrated !== users) save(UKEY, migrated)
   }
+  // 统计初始化与迁移
   const stats = load(SKEY, null)
-  if (!stats || typeof stats !== 'object') save(SKEY, {})
+  if (!stats || typeof stats !== 'object') {
+    save(SKEY, { _version: STATS_VERSION })
+  } else {
+    // 若缺少版本或版本落后，进行惰性迁移（保持原有 totals/days 接口兼容）
+    if (!stats._version || stats._version < STATS_VERSION) {
+      const migrated = { ...stats }
+      for (const k of Object.keys(migrated)) {
+        if (k.startsWith && k.startsWith('_')) continue
+        const rec = migrated[k]
+        if (!rec || typeof rec !== 'object') { migrated[k] = { totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} }; continue }
+        const totals = rec.totals && typeof rec.totals === 'object' ? rec.totals : { total:0, success:0, fail:0 }
+        const days = rec.days && typeof rec.days === 'object' ? rec.days : {}
+        const rounds = Array.isArray(rec.rounds) ? rec.rounds : []
+        const agg = rec.agg && typeof rec.agg === 'object' ? rec.agg : {}
+        migrated[k] = { totals, days, rounds, agg }
+      }
+      migrated._version = STATS_VERSION
+      save(SKEY, migrated)
+    }
+  }
 }
 
 export function getUsers() { return load(UKEY, { list: [], currentId: '' }) }
@@ -69,18 +91,60 @@ export function removeUser(id) { const u=getUsers(); u.list=u.list.filter(x=>x.i
 export function setUserAvatar(id, avatar) { const u = getUsers(); const t = (u.list||[]).find(x=>x.id===id); if (t){ t.avatar = avatar || ''; setUsers(u) } }
 export function setUserColor(id, color) { const u = getUsers(); const t = (u.list||[]).find(x=>x.id===id); if (t){ t.color = color || randomColor(); setUsers(u) } }
 
-export function pushRound(success) {
+// 记录一局：兼容旧签名 pushRound(boolean)
+// 新签名：pushRound({ success, timeMs?, hintUsed?, retries?, ops?, exprLen?, maxDepth?, faceUseHigh?, hand?, solutionsCount?, expr? })
+export function pushRound(arg) {
   const users = getUsers(); const uid = users.currentId; if (!uid) return
-  const stats = load(SKEY, {})
-  if (!stats[uid]) stats[uid] = { totals: { total:0, success:0, fail:0 }, days: {} }
+  const stats = load(SKEY, { _version: STATS_VERSION })
+  if (!stats._version) stats._version = STATS_VERSION
+  if (!stats[uid]) stats[uid] = { totals: { total:0, success:0, fail:0 }, days: {}, rounds: [], agg: {} }
+  const rec = stats[uid]
   const today = new Date(); const key = today.toISOString().slice(0,10)
-  if (!stats[uid].days[key]) stats[uid].days[key] = { total:0, success:0, fail:0 }
-  stats[uid].totals.total += 1
-  stats[uid].days[key].total += 1
-  if (success) { stats[uid].totals.success += 1; stats[uid].days[key].success += 1 }
-  else { stats[uid].totals.fail += 1; stats[uid].days[key].fail += 1 }
+  if (!rec.days[key]) rec.days[key] = { total:0, success:0, fail:0 }
+
+  const isBool = (typeof arg === 'boolean')
+  const success = isBool ? !!arg : !!arg?.success
+  const now = Date.now()
+  const round = isBool ? null : {
+    id: genId(),
+    ts: now,
+    success: !!arg?.success,
+    timeMs: Number.isFinite(arg?.timeMs) ? Math.max(0, Math.floor(arg.timeMs)) : undefined,
+    hintUsed: !!arg?.hintUsed,
+    retries: Number.isFinite(arg?.retries) ? Math.max(0, Math.floor(arg.retries)) : undefined,
+    ops: Array.isArray(arg?.ops) ? arg.ops.slice(0, 16) : undefined,
+    exprLen: Number.isFinite(arg?.exprLen) ? Math.max(0, Math.floor(arg.exprLen)) : undefined,
+    maxDepth: Number.isFinite(arg?.maxDepth) ? Math.max(0, Math.floor(arg.maxDepth)) : undefined,
+    faceUseHigh: typeof arg?.faceUseHigh === 'boolean' ? arg.faceUseHigh : undefined,
+    hand: arg?.hand && Array.isArray(arg.hand.cards) ? { cards: arg.hand.cards.map(c => ({ rank: +c.rank, suit: c.suit })) } : undefined,
+    solutionsCount: Number.isFinite(arg?.solutionsCount) ? Math.max(0, Math.floor(arg.solutionsCount)) : undefined,
+    expr: typeof arg?.expr === 'string' ? arg.expr : undefined,
+  }
+
+  // 聚合计数（保持与 v1 兼容）
+  rec.totals.total += 1
+  rec.days[key].total += 1
+  if (success) { rec.totals.success += 1; rec.days[key].success += 1 }
+  else { rec.totals.fail += 1; rec.days[key].fail += 1 }
+
+  // 明细与派生聚合
+  if (round) {
+    rec.rounds.push(round)
+    if (rec.rounds.length > MAX_ROUNDS) rec.rounds.splice(0, rec.rounds.length - MAX_ROUNDS)
+    // 最佳耗时（仅成功局参与）
+    if (round.success && Number.isFinite(round.timeMs)) {
+      const best = rec.agg?.bestTimeMs
+      rec.agg.bestTimeMs = (Number.isFinite(best) ? Math.min(best, round.timeMs) : round.timeMs)
+    }
+    // 连胜：如果 success 则 +1，否则清零
+    const cur = rec.agg?.currentStreak || 0
+    rec.agg.currentStreak = success ? (cur + 1) : 0
+    const longest = rec.agg?.longestStreak || 0
+    if (rec.agg.currentStreak > longest) rec.agg.longestStreak = rec.agg.currentStreak
+  }
+
   save(SKEY, stats)
-  // update last played time on user record
+  // 更新用户最近游玩时间
   try {
     const u = getUsers();
     const t = (u.list || []).find(x => x.id === uid)
@@ -89,6 +153,15 @@ export function pushRound(success) {
 }
 
 export function readStats(uid) { const s = load(SKEY, {}); return s[uid] || { totals: { total:0, success:0, fail:0 }, days:{} } }
+
+// 读取包含 rounds/agg 的扩展统计（若不存在则回退最小结构）
+export function readStatsExtended(uid) {
+  const s = load(SKEY, { _version: STATS_VERSION })
+  const rec = s[uid] || { totals: { total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} }
+  if (!rec.rounds) rec.rounds = []
+  if (!rec.agg) rec.agg = {}
+  return rec
+}
 
 // Update only the last played timestamp for a user (no stats change)
 export function touchLastPlayed(id) {
@@ -116,7 +189,10 @@ export function allUsersWithStats() {
     const st = s[u.id] || { totals:{ total:0, success:0, fail:0 }, days:{} }
     const t = st.totals || { total:0, success:0, fail:0 }
     const winRate = t.total ? Math.round(100 * (t.success / t.total)) : 0
-    return { id: u.id, name: u.name, totals: t, winRate }
+    const bestTimeMs = (st.agg && st.agg.bestTimeMs) || undefined
+    const currentStreak = (st.agg && st.agg.currentStreak) || 0
+    const longestStreak = (st.agg && st.agg.longestStreak) || 0
+    return { id: u.id, name: u.name, totals: t, winRate, bestTimeMs, currentStreak, longestStreak }
   })
 }
 
