@@ -105,7 +105,7 @@
 <script setup>
 import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
-import { ensureInit, getCurrentUser, pushRound, readStatsExtended } from '../../utils/store.js'
+import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
@@ -260,6 +260,29 @@ function initDeck() {
 
 onMounted(() => {
   ensureInit()
+  try {
+    const u = getUsers && getUsers()
+    const list = (u && Array.isArray(u.list)) ? u.list : []
+    if (list.length==0) {
+      try {
+        uni.showModal({
+          title: '暂无用户',
+          content: '请先新建用户后再开始游戏。',
+          confirmText: '去新建',
+          showCancel: false,
+          success: () => {
+            try { uni.reLaunch({ url: '/pages/login/index' }) }
+            catch (e1) { try { uni.navigateTo({ url: '/pages/login/index' }) } catch (_) {} }
+          }
+        })
+      } catch (_) {
+        try { uni.reLaunch({ url: '/pages/login/index' }) }
+        catch (e1) { try { uni.navigateTo({ url: '/pages/login/index' }) } catch (_) {} }
+      }
+      return
+    }
+  } catch (_) { /* noop */ }
+
   currentUser.value = getCurrentUser() || null
   initDeck()
   nextHand()
