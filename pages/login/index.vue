@@ -50,15 +50,7 @@
       </view>
     </view>
 
-    <!-- 底部区块 -->
-    <view class="login-footer">
-      <view class="or-row">
-        <view class="line"/>
-        <text class="or">也可以</text>
-        <view class="line"/>
-      </view>
-      <button class="guest-btn" @tap="guest">以游客登录</button>
-    </view>
+    <!-- 底部区块：原“以游客登录”入口已移除 -->
   </view>
 </template>
 
@@ -69,7 +61,22 @@ import { ensureInit, getUsers, addUser, switchUser, resetAllData, touchLastPlaye
 const users = ref({ list: [], currentId: '' })
 const errMsg = ref('')
 
-onMounted(() => { ensureInit(); safeLoad() })
+onMounted(() => {
+  ensureInit();
+  safeLoad();
+  try { updateVHVar() } catch(_) {}
+  if (uni.onWindowResize) uni.onWindowResize(() => { try { updateVHVar() } catch(_) {} })
+})
+
+function updateVHVar(){
+  try {
+    const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+    const h = sys.windowHeight || (typeof window !== 'undefined' ? window.innerHeight : 0) || 0
+    if (h && typeof document !== 'undefined' && document.documentElement && document.documentElement.style) {
+      document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px')
+    }
+  } catch (_) { /* noop */ }
+}
 
 function safeLoad(){
   try {
@@ -133,10 +140,6 @@ function finalizeCreate(name, avatar){
   touchLastPlayed(id)
   go('/pages/login/index')
 }
-function guest() {
-  // 游客身份：不创建、不切换、不持久化任何用户，仅进入游戏
-  go('/pages/index/index')
-}
 function avatarText(name){
   if (!name) return 'U'
   const s = String(name).trim()
@@ -169,9 +172,10 @@ function resetData(){
 </script>
 
 <style scoped>
-.login-page {
-  height: 100dvh;  /* 固定为视口高度 */
-  max-height: 100dvh;  /* 防止超出 */
+ .login-page {
+  /* 视口高度填满，兼容移动端动态地址栏 */
+  min-height: 100dvh;
+  min-height: calc(var(--vh, 1vh) * 100);
   background: #f1f5f9;
   display: flex;
   flex-direction: column;
@@ -272,14 +276,7 @@ body {
 .create-btn{ margin-top:20rpx; height:100rpx; border-radius:24rpx; background:#e2e8f0; color:#0f172a; font-size:32rpx; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:12rpx }
 .create-btn.highlight{ background:#145751; color:#fff }
 .create-plus{ font-size:36rpx }
-.login-footer {
-  flex-shrink: 0;  /* 不收缩 */
-  padding: 0 32rpx 32rpx 32rpx;
-}
-.or-row{ display:flex; align-items:center; gap:12rpx; margin:36rpx 0 }
-.line{ flex:1; height:2rpx; background:#cbd5e1 }
-.or{ color:#94a3b8; font-size:24rpx; font-weight:600 }
-.guest-btn{ height:92rpx; border-radius:9999rpx; background:#0f172a; color:#fff; font-weight:800; border:none; font-size:30rpx }
+/* 底部区块相关样式已移除（guest 入口下线） */
 button{ -webkit-tap-highlight-color:rgba(0,0,0,0) }
 
 /* 空/错 视图 */

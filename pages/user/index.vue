@@ -6,9 +6,14 @@
     </view>
     <view class="list">
       <view v-for="u in visibleUsers" :key="u.id" class="item card section" :class="{ active: u.id===users.currentId }">
-        <view class="name" @tap="choose(u.id)">{{ u.name }}</view>
+        <view class="user-left" @tap="choose(u.id)">
+          <image v-if="u.avatar" class="avatar-img" :src="u.avatar" mode="aspectFill" />
+          <view v-else class="avatar" :style="{ backgroundColor: u.color || '#e2e8f0' }">{{ avatarText(u.name) }}</view>
+          <view class="name">{{ u.name }}</view>
+        </view>
         <view class="ops">
           <button class="mini" @tap="rename(u)">改名</button>
+          <button class="mini" @tap="changeAvatar(u)">头像</button>
           <button class="mini danger" @tap="remove(u.id)">删除</button>
         </view>
       </view>
@@ -21,7 +26,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import CustomTabBar from '../../components/CustomTabBar.vue'
-import { ensureInit, getUsers, setUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
+import { ensureInit, getUsers, setUsers, addUser, renameUser, removeUser as rmUser, switchUser, setUserAvatar } from '../../utils/store.js'
 
 const users = ref({ list: [], currentId: '' })
 const newName = ref('')
@@ -45,6 +50,28 @@ function rename(u){
 function remove(id){
   uni.showModal({ title:'删除用户', content:'确定删除该用户？', success(res){ if(res.confirm){ rmUser(id); refresh() } } })
 }
+function changeAvatar(u){
+  try {
+    uni.showActionSheet({ itemList:['从相册选择','移除头像','取消'], success(a){
+      const i = a.tapIndex
+      if (i === 0) {
+        uni.chooseImage({ count:1, sizeType:['compressed'], success(sel){
+          const path = (sel.tempFilePaths && sel.tempFilePaths[0]) || ''
+          setUserAvatar(u.id, path)
+          refresh()
+        }})
+      } else if (i === 1) {
+        setUserAvatar(u.id, '')
+        refresh()
+      }
+    } })
+  } catch (_) { /* noop */ }
+}
+function avatarText(name){
+  if (!name) return 'U'
+  const s = String(name).trim()
+  return s.length ? s[0].toUpperCase() : 'U'
+}
 </script>
 
 <style scoped>
@@ -52,6 +79,9 @@ function remove(id){
 .list{ display:flex; flex-direction:column; gap:12rpx }
 .item{ display:flex; justify-content:space-between; align-items:center; padding:16rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; background:#fff; box-shadow:0 6rpx 16rpx rgba(15,23,42,0.06) }
 .item.active{ border-color:#1677ff55; box-shadow:0 6rpx 16rpx rgba(22, 119, 255, 0.12) }
+.user-left{ display:flex; align-items:center; gap:12rpx }
+.avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; }
+.avatar-img{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0 }
 .name{ font-size:32rpx; font-weight:700 }
 .ops{ display:flex; gap:8rpx }
 .mini{ padding:8rpx 12rpx; border-radius:10rpx; background:#eef2f7; font-size:24rpx }

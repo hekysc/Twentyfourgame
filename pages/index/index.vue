@@ -81,7 +81,7 @@
     </view>
 
     <!-- 轻提示文案 -->
-    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出 24' }}</text>
+    <text id="hintText" class="hint-text" :class="{ error: feedbackIsError }">{{ feedback || '请用四张牌和运算符算出 24' }}</text>
 
     <!-- 提交：占满一行宽度 -->
     <view id="submitRow">
@@ -91,7 +91,7 @@
     <!-- 提示 / 换题：位于提交区下方 -->
     <view id="failRow" class="pair-grid">
       <button class="btn btn-secondary" @click="showSolution">提示</button>
-      <button class="btn btn-secondary" @click="skipHand">换题</button>
+      <button class="btn btn-secondary" @click="skipHand">下一题</button>
     </view>
 
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
@@ -99,12 +99,19 @@
     <view v-if="successAnimating" class="success-overlay">
       <view class="success-burst">24!</view>
     </view>
+    <view v-if="errorAnimating" class="success-overlay">
+      <view class="error-burst">
+        <text class="err-title">计算错误</text>
+        <text v-if="errorValueText" class="err-val">{{ errorValueText }}</text>
+      </view>
+    </view>
   </view>
   <CustomTabBar />
 </template>
 
 <script setup>
 import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
+import { onHide, onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
@@ -124,10 +131,62 @@ const successCount = ref(0)
 const failCount = ref(0)
 const sessionOver = ref(false)
 const successAnimating = ref(false)
+const errorAnimating = ref(false)
+const feedbackIsError = ref(false)
+const errorValueText = ref('')
 const handStartTs = ref(Date.now())
 const hintWasUsed = ref(false)
 const attemptCount = ref(0)
 const lastSuccessMs = ref(null)
+const SESSION_KEY = 'tf24_game_session_v1'
+
+function saveSession() {
+  try {
+    const data = {
+      deck: deck.value || [],
+      cards: cards.value || [],
+      tokens: (tokens.value || []).map(t => ({ type: t.type, value: t.value, rank: t.rank, suit: t.suit })),
+      usedByCard: usedByCard.value || [],
+      faceUseHigh: !!faceUseHigh.value,
+      handRecorded: !!handRecorded.value,
+      handStartTs: handStartTs.value || 0,
+      hintWasUsed: !!hintWasUsed.value,
+      attemptCount: attemptCount.value || 0,
+      handsPlayed: handsPlayed.value || 0,
+      successCount: successCount.value || 0,
+      failCount: failCount.value || 0,
+      feedback: feedback.value || '',
+    }
+    uni.setStorageSync(SESSION_KEY, JSON.stringify(data))
+  } catch (_) { /* noop */ }
+}
+
+function loadSession() {
+  try {
+    const raw = uni.getStorageSync(SESSION_KEY)
+    if (!raw) return false
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!data || !Array.isArray(data.deck) || !Array.isArray(data.cards)) return false
+    if ((data.cards || []).length === 4) {
+      deck.value = data.deck
+      cards.value = data.cards
+      tokens.value = Array.isArray(data.tokens) ? data.tokens : []
+      usedByCard.value = Array.isArray(data.usedByCard) ? data.usedByCard : [0,0,0,0]
+      faceUseHigh.value = !!data.faceUseHigh
+      handRecorded.value = !!data.handRecorded
+      handStartTs.value = data.handStartTs || Date.now()
+      hintWasUsed.value = !!data.hintWasUsed
+      attemptCount.value = data.attemptCount || 0
+      handsPlayed.value = data.handsPlayed || 0
+      successCount.value = data.successCount || 0
+      failCount.value = data.failCount || 0
+      feedback.value = data.feedback || ''
+      nextTick(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
+      return true
+    }
+    return false
+  } catch (_) { return false }
+}
 
 const remainingCards = computed(() => (deck.value || []).length)
 const winRate = computed(() => {
@@ -272,6 +331,7 @@ function initDeck() {
   attemptCount.value = 0
   feedback.value = '拖入 + - × ÷ ( ) 组成 24'
   nextTick(() => recomputeExprHeight())
+  try { saveSession() } catch(_) {}
 }
 
 onMounted(() => {
@@ -301,13 +361,16 @@ onMounted(() => {
   } catch (_) { /* noop */ }
 
   currentUser.value = getCurrentUser() || null
-  initDeck()
-  nextHand()
+  const restored = loadSession()
+  if (!restored) { initDeck(); nextHand() }
   setTimeout(() => { booted.value = true }, 0)
   nextTick(() => { updateVHVar(); recomputeExprHeight(); updateExprScale() })
   if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
   updateLastSuccess()
 })
+
+onShow(() => { loadSession() })
+onHide(() => { saveSession() })
 
 // 已移除“清空表达式”功能，避免误触清空
 
@@ -337,13 +400,39 @@ function updateLastSuccess() {
 
 function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
 
+function isExprComplete() {
+  const arr = tokens.value || []
+  if (!arr.length) return false
+  let bal = 0
+  let prev = null
+  const isBin = v => (v==='+'||v==='-'||v==='×'||v==='÷')
+  for (const t of arr) {
+    if (t.type === 'op' && t.value === '(') bal++
+    else if (t.type === 'op' && t.value === ')') { bal--; if (bal < 0) return false }
+    if (!prev) {
+      if (t.type==='op' && (t.value===')' || isBin(t.value))) return false
+    } else {
+      const pa = prev.type === 'op' ? prev.value : 'num'
+      const pb = t.type === 'op' ? t.value : 'num'
+      if (isBin(pa) && isBin(pb)) return false
+    }
+    prev = t
+  }
+  const last = arr[arr.length-1]
+  if (last && last.type==='op' && (last.value==='(' || isBin(last.value))) return false
+  return bal === 0
+}
+
 function check() {
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
-  if (usedCount !== 4) { feedback.value = '请先使用四张牌再提交'; return }
+  errorValueText.value = ''
+  if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return }
+  if (!isExprComplete()) { feedback.value = '表达式错误'; feedbackIsError.value = true; return }
   const s = expr.value
   const v = evaluateExprToFraction(s)
   const ok = (v && v.equalsInt && v.equalsInt(24))
-  feedback.value = ok ? '恭喜，得到 24！' : '未得到 24，再试试'
+  feedback.value = ok ? '恭喜，得到 24！' : '计算错误'
+  feedbackIsError.value = !ok
   // 统计记录移至首次结算时写入（避免重复记账）
   if (ok && !handRecorded.value) {
     handRecorded.value = true
@@ -370,7 +459,35 @@ function check() {
       successAnimating.value = true
       setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
     } catch (_) { nextHand() }
+  } else if (!ok) {
+    try {
+      if (v && typeof v.toString === 'function') {
+        errorValueText.value = '结果：' + v.toString()
+      }
+    } catch (_) { errorValueText.value = '' }
+    // 计为失败但不换题；允许继续尝试成功
+    try {
+      const stats = computeExprStats()
+      failCount.value += 1
+      pushRound({
+        success: false,
+        timeMs: Date.now() - (handStartTs.value || Date.now()),
+        hintUsed: !!hintWasUsed.value,
+        retries: attemptCount.value || 0,
+        ops: stats.ops,
+        exprLen: stats.exprLen,
+        maxDepth: stats.maxDepth,
+        faceUseHigh: !!faceUseHigh.value,
+        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+        expr: s,
+      })
+    } catch (_) { /* noop */ }
+    try {
+      errorAnimating.value = true
+      setTimeout(() => { errorAnimating.value = false }, 500)
+    } catch (_) {}
   }
+  try { saveSession() } catch(_) {}
 }
 
 function showSolution() {
@@ -721,6 +838,9 @@ function onSessionOver() {
 /* 成功动画覆盖层 */
 .success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
 .success-burst { background: rgba(34,197,94,0.92); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(34,197,94,.35); animation: success-pop .5s ease-out both; }
+.error-burst { background: rgba(239,68,68,0.92); color:#fff; font-weight:800; font-size:48rpx; padding:28rpx 40rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(239,68,68,.35); animation: success-pop .5s ease-out both; display:flex; flex-direction:column; align-items:center; gap:6rpx }
+.error-burst .err-title{ font-size:48rpx; font-weight:800 }
+.error-burst .err-val{ font-size:28rpx; font-weight:700; opacity:.95 }
 @keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
 /* 表达式区 */
@@ -745,6 +865,7 @@ function onSessionOver() {
 
 /* 提示 */
 .hint-text { font-size: 28rpx; color:#6b7280; text-align:center; }
+.hint-text.error { color:#dc2626; font-weight:700 }
 
 /* 统计：单行紧凑 */
 .stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:20rpx; padding:16rpx; }
