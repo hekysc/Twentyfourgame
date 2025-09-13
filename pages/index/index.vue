@@ -1,21 +1,21 @@
-<template>
+﻿<template>
   <view class="page col" :class="{ booted }" style="padding: 20rpx; gap: 16rpx; position: relative;">
 
-    <!-- 顶部：当前用户与切换 -->
+    <!-- 椤堕儴锛氬綋鍓嶇敤鎴蜂笌鍒囨崲 -->
     <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
-      <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
-      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
+      <text class="topbar-title" style="text-align:left; flex:1;">褰撳墠鐢ㄦ埛锛歿{ currentUser && currentUser.name ? currentUser.name : '鏈€夋嫨' }}</text>
+      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">鍒囨崲鐢ㄦ埛</button>
     </view>
 
-    <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
+    <!-- 鏈眬缁熻锛氱揣鍑戣〃鏍硷紙1琛岃〃澶?+ 1琛屾暟鎹級 -->
     <view id="statsRow" class="stats-card stats-compact-table">
       <view class="thead">
-        <text class="th">剩余</text>
+        <text class="th">鍓╀綑</text>
         <text class="th">局数</text>
-        <text class="th ok">成功</text>
-        <text class="th fail">失败</text>
-        <text class="th">胜率</text>
-        <text class="th">上一局</text>
+        <text class="th ok">鎴愬姛</text>
+        <text class="th fail">澶辫触</text>
+        <text class="th">鑳滅巼</text>
+        <text class="th">涓婁竴灞€</text>
       </view>
       <view class="tbody">
         <text class="td">{{ remainingCards }}</text>
@@ -27,7 +27,7 @@
       </view>
     </view>
 
-    <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
+    <!-- 鐗屽尯锛氬洓寮犲崱鐗囩瓑瀹藉崰婊′竴琛岋紙姣忓紶鍗＄墖鍗曠嫭璁℃暟锛?-->
     <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
       <view v-for="(card, idx) in cards" :key="idx"
             class="card"
@@ -39,9 +39,9 @@
       </view>
     </view>
 
-    <!-- 运算符候选区：两行布局 -->
+    <!-- 杩愮畻绗﹀€欓€夊尯锛氫袱琛屽竷灞€ -->
     <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
-      <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
+      <button v-for="op in ['+','-','脳','梅']" :key="op" class="btn btn-operator"
               @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
               @touchmove.stop.prevent="onDrag($event)"
               @touchend.stop.prevent="endDrag()">{{ op }}</button>
@@ -56,14 +56,14 @@
       <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
     </view>
 
-    <!-- 拖拽中的浮层 -->
+    <!-- 鎷栨嫿涓殑娴眰 -->
     <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
 
-    <!-- 表达式卡片容器（高度由脚本计算） -->
+    <!-- 琛ㄨ揪寮忓崱鐗囧鍣紙楂樺害鐢辫剼鏈绠楋級 -->
     <view class="expr-card">
-      <!-- <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view> -->
+      <!-- <view class="expr-title">褰撳墠琛ㄨ揪寮忥細<text class="status-text">{{ currentText ? currentText : '鏈畬鎴? }}</text></view> -->
       <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
-        <!-- <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view> -->
+        <!-- <view v-if="tokens.length === 0" class="expr-placeholder">灏嗗崱鐗屽拰杩愮畻绗︽嫋鍒拌繖閲?/view> -->
         <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center' }">
           <block v-for="(t, i) in tokens" :key="i">
             <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
@@ -81,18 +81,18 @@
     </view>
 
     <!-- 轻提示文案 -->
-    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出24' }}</text>
+    <text id="hintText" class="hint-text">{{ feedback || '请用四张牌和运算符算出 24' }}</text>
 
     <!-- 提交 / 清空：各占一半宽度 -->
     <view id="submitRow" class="pair-grid">
-      <button class="btn btn-primary" @click="check">提交答案</button>
+      <button class="btn btn-primary" @click="check">鎻愪氦绛旀</button>
       <button class="btn btn-primary" @click="clearAll">清空表达式</button>
     </view>
 
-    <!-- 答案 / 换题：位于提交区下方 -->
+    <!-- 绛旀 / 鎹㈤锛氫綅浜庢彁浜ゅ尯涓嬫柟 -->
     <view id="failRow" class="pair-grid">
-      <button class="btn btn-secondary" @click="showSolution">答案</button>
-      <button class="btn btn-secondary" @click="skipHand">换题</button>
+      <button class="btn btn-secondary" @click="showSolution">绛旀</button>
+      <button class="btn btn-secondary" @click="skipHand">鎹㈤</button>
     </view>
 
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
@@ -185,13 +185,13 @@ function initDeck() {
 
   function nextHand() {
     if (!deck.value || deck.value.length < 4) {
-      // 整副用尽：提示是否重洗，不计入“本局结束”与统计
+      // 鏁村壇鐢ㄥ敖锛氭彁绀烘槸鍚﹂噸娲楋紝涓嶈鍏モ€滄湰灞€缁撴潫鈥濅笌缁熻
       try {
         uni.showModal({
-          title: '牌库用尽',
+          title: '鐗屽簱鐢ㄥ敖',
           content: '余牌无解或整副用完，是否重新洗牌？',
-          confirmText: '重洗',
-          cancelText: '进入统计',
+          confirmText: '閲嶆礂',
+          cancelText: '杩涘叆缁熻',
           success: (res) => {
             if (res.confirm) {
               initDeck()
@@ -203,7 +203,7 @@ function initDeck() {
           }
         })
       } catch (_) {
-        // 回退策略：直接重洗继续
+        // 鍥為€€绛栫暐锛氱洿鎺ラ噸娲楃户缁?
         initDeck()
         nextTick(() => nextHand())
       }
@@ -221,13 +221,13 @@ function initDeck() {
     if (sol) { pickIdx = { ids, sol }; break }
   }
     if (!pickIdx) {
-      // 无可解手牌：按“用尽重洗”流程处理，不判定为本局结束
+      // 鏃犲彲瑙ｆ墜鐗岋細鎸夆€滅敤灏介噸娲椻€濇祦绋嬪鐞嗭紝涓嶅垽瀹氫负鏈眬缁撴潫
       try {
         uni.showModal({
-          title: '牌库用尽',
+          title: '鐗屽簱鐢ㄥ敖',
           content: '余牌无解或整副用完，是否重新洗牌？',
-          confirmText: '重洗',
-          cancelText: '进入统计',
+          confirmText: '閲嶆礂',
+          cancelText: '杩涘叆缁熻',
           success: (res) => {
             if (res.confirm) {
               initDeck()
@@ -255,7 +255,7 @@ function initDeck() {
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
-  feedback.value = '拖入 + - × ÷ ( ) 组成 24'
+  feedback.value = '鎷栧叆 + - 脳 梅 ( ) 缁勬垚 24'
   nextTick(() => recomputeExprHeight())
 }
 
@@ -280,7 +280,7 @@ function computeExprStats() {
     if (t.type === 'op') {
       if (t.value === '(') { depth++; if (depth > maxDepth) maxDepth = depth; continue }
       if (t.value === ')') { depth = Math.max(0, depth - 1); continue }
-      if (t.value === '+' || t.value === '-' || t.value === '×' || t.value === '÷') ops.push(t.value)
+      if (t.value === '+' || t.value === '-' || t.value === '脳' || t.value === '梅') ops.push(t.value)
     }
   }
   return { exprLen: arr.length, maxDepth, ops }
@@ -300,12 +300,12 @@ function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return 
 
 function check() {
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
-  if (usedCount !== 4) { feedback.value = '请先使用四张牌再提交'; return }
+  if (usedCount !== 4) { feedback.value = '璇峰厛浣跨敤鍥涘紶鐗屽啀鎻愪氦'; return }
   const s = expr.value
   const v = evaluateExprToFraction(s)
   const ok = (v && v.equalsInt && v.equalsInt(24))
   feedback.value = ok ? '恭喜，得到 24！' : '未得到 24，再试试'
-  // 统计记录移至首次结算时写入（避免重复记账）
+  // 缁熻璁板綍绉昏嚦棣栨缁撶畻鏃跺啓鍏ワ紙閬垮厤閲嶅璁拌处锛?
   if (ok && !handRecorded.value) {
     handRecorded.value = true
     handsPlayed.value += 1
@@ -326,8 +326,7 @@ function check() {
       })
       updateLastSuccess()
     } catch (_) {}
-    // 成功动画并自动下一题（0.5s）
-    try {
+    // 鎴愬姛鍔ㄧ敾骞惰嚜鍔ㄤ笅涓€棰橈紙0.5s）?    try {
       successAnimating.value = true
       setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
     } catch (_) { nextHand() }
@@ -357,7 +356,7 @@ function showSolution() {
       updateLastSuccess()
     } catch (_) {}
   }
-  feedback.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
+  feedback.value = solution.value ? ('绛旀锛? + solution.value) : '鏆傛棤鎻愮ず'
 }
 
 function toggleFaceMode() { faceUseHigh.value = !faceUseHigh.value }
@@ -437,8 +436,7 @@ function endDrag() {
   const x = drag.value.x, y = drag.value.y
   const token = drag.value.token
   const inExpr = inside(exprBox.value, x, y)
-  // 单击快捷操作：未发生拖动时立即处理
-  if (token && !drag.value.moved) {
+  // 鍗曞嚮蹇嵎鎿嶄綔锛氭湭鍙戠敓鎷栧姩鏃剁珛鍗冲鐞?  if (token && !drag.value.moved) {
     if (token.type === 'tok') {
       removeTokenAt(token.index)
     } else if (token.type === 'num' || token.type === 'op') {
@@ -477,7 +475,7 @@ function tryInsertTokenAt(token, to) {
   const clamped = Math.max(0, Math.min(to, tokens.value.length))
   if (token.type === 'num') {
     const ci = token.cardIndex
-    if (ci == null) { feedback.value = '请选择一张牌'; return }
+    if (ci == null) { feedback.value = '璇烽€夋嫨涓€寮犵墝'; return }
     if ((usedByCard.value[ci] || 0) >= 1) { feedback.value = '该牌已使用'; return }
     const arr = tokens.value.slice()
     arr.splice(clamped, 0, { type: 'num', value: token.value, rank: token.rank, suit: token.suit, cardIndex: ci })
@@ -575,7 +573,7 @@ function updateVHVar() {
   } catch (e) { /* noop */ }
 }
 
-// 表达式区域高度：页面高度扣除（提示、运算符两行、提交/清空、答案/换题）后的剩余；至少 120
+// 琛ㄨ揪寮忓尯鍩熼珮搴︼細椤甸潰楂樺害鎵ｉ櫎锛堟彁绀恒€佽繍绠楃涓よ銆佹彁浜?娓呯┖銆佺瓟妗?鎹㈤锛夊悗鐨勫墿浣欙紱鑷冲皯 120
 function recomputeExprHeight() {
   const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
   const winH = sys.windowHeight || sys.screenHeight || 0
@@ -598,7 +596,7 @@ function recomputeExprHeight() {
        const hOps2 = (ops2Rect && ops2Rect.height) || 0
        const hSubmit = (submitRect && submitRect.height) || 0
        const hFail = (failRect && failRect.height) || 0
-       // 适当留白 12px
+       // 閫傚綋鐣欑櫧 12px
        let avail = winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12
        if (!isFinite(avail) || avail <= 0) avail = 120
       //  exprZoneHeight.value = Math.max(120, Math.floor(avail))
@@ -631,10 +629,10 @@ function randomSuit() { return ['S','H','D','C'][Math.floor(Math.random()*4)] }
 function onSessionOver() {
   try {
     uni.showModal({
-      title: '本局结束',
-      content: `局：${handsPlayed.value}\n成功：${successCount.value}\n胜率：${winRate.value}%\n是否开始下一局？`,
-      confirmText: '下一局',
-      cancelText: '统计',
+      title: '鏈眬缁撴潫',
+      content: `局数：${handsPlayed.value}\n成功：${successCount.value}\n胜率：${winRate.value}%\n是否开始下一局？`,
+      confirmText: '涓嬩竴灞€',
+      cancelText: '缁熻',
       success: (res) => {
         if (res.confirm) {
           initDeck()
@@ -661,13 +659,13 @@ function onSessionOver() {
 .topbar { position: sticky; top: 0; z-index: 10; padding: 18rpx 0; background: rgba(255,255,255,0.88); backdrop-filter: blur(6rpx); border-bottom: 2rpx solid #e5e7eb; }
 .topbar-title { font-size: 36rpx; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block; }
 
-/* 牌区 */
+/* 鐗屽尯 */
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .card { background:#fff; border-radius:28rpx; overflow:hidden; box-shadow:0 12rpx 28rpx rgba(15,23,42,.08); }
 .card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
 .card-img { width:100%; height:auto; display:block; }
 
-/* 运算符与按钮 */
+/* 杩愮畻绗︿笌鎸夐挳 */
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:18rpx; align-items:stretch; }
 .ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
@@ -679,12 +677,12 @@ function onSessionOver() {
 .btn-primary { background:#145751; color:#fff; }
 .btn-secondary { color:#0f172a; background: linear-gradient(to bottom, #f8fafc, #0961d3); box-shadow: 0 10px 12px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.6); border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
 
-/* 成功动画覆盖层 */
+/* 鎴愬姛鍔ㄧ敾瑕嗙洊灞?*/
 .success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
 .success-burst { background: rgba(34,197,94,0.92); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(34,197,94,.35); animation: success-pop .5s ease-out both; }
 @keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
-/* 表达式区 */
+/* 琛ㄨ揪寮忓尯 */
 .expr-card { background:#fff; padding:24rpx; border-radius:28rpx; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
@@ -704,10 +702,10 @@ function onSessionOver() {
 .insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
 .drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
 
-/* 提示 */
+/* 鎻愮ず */
 .hint-text { font-size: 28rpx; color:#6b7280; text-align:center; }
 
-/* 统计：单行紧凑 */
+/* 缁熻锛氬崟琛岀揣鍑?*/
 .stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:20rpx; padding:16rpx; }
 .stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
 .stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(6, 1fr); align-items:center; column-gap:12rpx; }
@@ -726,3 +724,8 @@ function onSessionOver() {
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
 @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
 </style>
+
+
+
+
+

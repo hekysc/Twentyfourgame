@@ -1,35 +1,35 @@
-{
+﻿{
   "pages": [
     {
       "path": "pages/login/index",
       "style": {
-        "navigationBarTitleText": "登录",
+        "navigationBarTitleText": "鐧诲綍",
         "enablePullDownRefresh": false
       }
     },
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "24点小游戏"
+        "navigationBarTitleText": "24鐐瑰皬娓告垙"
       }
     },
     {
       "path": "pages/user/index",
       "style": {
-        "navigationBarTitleText": "用户管理"
+        "navigationBarTitleText": "鐢ㄦ埛绠＄悊"
       }
     },
     {
       "path": "pages/stats/index",
       "style": {
-        "navigationBarTitleText": "历史统计",
+        "navigationBarTitleText": "鍘嗗彶缁熻",
         "enablePullDownRefresh": true
       }
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "24点",
+    "navigationBarTitleText": "24鐐?,
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
   },
@@ -39,9 +39,10 @@
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/stats/index", "text": "统计" },
-      { "pagePath": "pages/index/index", "text": "游戏" },
-      { "pagePath": "pages/user/index", "text": "用户" }
+      { "pagePath": "pages/stats/index", "text": "缁熻" },
+      { "pagePath": "pages/index/index", "text": "娓告垙" },
+      { "pagePath": "pages/user/index", "text": "鐢ㄦ埛" }
     ]
   }
 }
+
