@@ -53,6 +53,41 @@
               :style="{ height: (d.height||4) + 'rpx', background: d.color }"></view>
       </view>
       <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=成功占比，灰色=无数据</view>
+      <!-- <view class="table" style="margin-top:12rpx;">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+          <text class="th">窗口</text>
+          <text class="th">滚动胜率</text>
+          <text class="th">滚动平均用时</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+            <text class="td">7天</text>
+            <text class="td">{{ rolling.win7 }}%</text>
+            <text class="td">{{ rolling.avg7 }}</text>
+          </view>
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+            <text class="td">30天</text>
+            <text class="td">{{ rolling.win30 }}%</text>
+            <text class="td">{{ rolling.avg30 }}</text>
+          </view>
+        </view>
+      </view> -->
+      <view class="table" style="margin-top:12rpx;">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)' }">
+          <text class="th">当前连胜</text>
+          <text class="th">最长连胜</text>
+          <text class="th">当前连败</text>
+          <text class="th">最长连败</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)' }">
+            <text class="td ok">{{ streakStats.curWin }}</text>
+            <text class="td ok">{{ streakStats.maxWin }}</text>
+            <text class="td fail">{{ streakStats.curLose }}</text>
+            <text class="td fail">{{ streakStats.maxLose }}</text>
+          </view>
+        </view>
+      </view>
     </view>
 
     <view v-if="selectedUserId" class="section">
@@ -65,6 +100,225 @@
           <text class="r-result" :class="{ ok: r.success, fail: !r.success }">{{ r.success ? '成功' : '失败' }}</text>
           <text class="r-timeMs">{{ r.timeMs != null ? (r.timeMs + 'ms') : '-' }}</text>
           <text class="r-meta">{{ (r.faceUseHigh ? 'JQK高位' : 'JQK低位') + ' · ' + (r.hintUsed ? '用提示' : '无提示') }}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 错误近似度与差一点榜 -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">差一点榜（错误近似度）</text>
+      </view>
+      <view class="table" v-if="nearMisses.length">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'200rpx 1fr 160rpx 160rpx' }">
+          <text class="th" style="width:200rpx">时间</text>
+          <text class="th">表达式</text>
+          <text class="th">结果</text>
+          <text class="th">偏差</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'200rpx 1fr 160rpx 160rpx' }" v-for="(m,i) in nearMisses" :key="i">
+            <text class="td" style="width:200rpx">{{ fmtTs(m.ts) }}</text>
+            <text class="td" style="text-align:left">{{ m.expr }}</text>
+            <text class="td">{{ m.value }}</text>
+            <text class="td" :style="{color: m.diff>0?'#2563eb':'#dc2626', fontWeight:'700'}">{{ m.diff>0? ('+'+m.diff.toFixed(3)) : m.diff.toFixed(3) }}</text>
+          </view>
+        </view>
+      </view>
+      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无可展示的错误记录</view>
+      <!-- 近似度分布摘要 -->
+      <view class="table" style="margin-top:12rpx;">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)' }">
+          <text class="th">错误样本</text>
+          <text class="th">|24-值| 中位</text>
+          <text class="th">P90</text>
+          <text class="th"><1 占比</text>
+          <text class="th"><0.1 占比</text>
+          <text class="th">偏上/偏下</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)' }">
+            <text class="td">{{ nearSummary.count }}</text>
+            <text class="td">{{ nearSummary.median }}</text>
+            <text class="td">{{ nearSummary.p90 }}</text>
+            <text class="td">{{ nearSummary.lt1 }}%</text>
+            <text class="td">{{ nearSummary.lt01 }}%</text>
+            <text class="td">{{ nearSummary.biasUp }}% / {{ nearSummary.biasDown }}%</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 首运算符成功率 + 运算熵 -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">运算偏好与效率</text>
+        <text style="color:#64748b; font-size:26rpx;">运算熵：{{ opStats.entropyPct }}%</text>
+      </view>
+      <view class="table">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr' }">
+          <text class="th">运算符</text>
+          <text class="th">总出现</text>
+          <text class="th">首运算-局数</text>
+          <text class="th">首运算-胜率</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr' }" v-for="o in ['+','-','×','÷']" :key="o">
+            <text class="td">{{ o }}</text>
+            <text class="td">{{ opStats.allCounts[o] }}</text>
+            <text class="td">{{ opStats.first[o].total }}</text>
+            <text class="td">{{ opStats.first[o].total ? Math.round(100*opStats.first[o].success/opStats.first[o].total) : 0 }}%</text>
+          </view>
+        </view>
+      </view>
+      <!-- 运算序列偏好 bigram/trigram + 首两步 -->
+      <view class="table" style="margin-top:12rpx;">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+          <text class="th">Top 序列</text>
+          <text class="th">局数</text>
+          <text class="th">胜率</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in seqStats.topBigrams" :key="'b-'+r.key">
+            <text class="td">{{ r.key }}</text>
+            <text class="td">{{ r.total }}</text>
+            <text class="td">{{ r.win }}%</text>
+          </view>
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in seqStats.topTrigrams" :key="'t-'+r.key">
+            <text class="td">{{ r.key }}</text>
+            <text class="td">{{ r.total }}</text>
+            <text class="td">{{ r.win }}%</text>
+          </view>
+        </view>
+      </view>
+      <view class="table" style="margin-top:12rpx;">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+          <text class="th">首两步</text>
+          <text class="th">局数</text>
+          <text class="th">胜率</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in seqStats.firstTwo" :key="'f2-'+r.key">
+            <text class="td">{{ r.key }}</text>
+            <text class="td">{{ r.total }}</text>
+            <text class="td">{{ r.win }}%</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 牌型签名命中率（Top 5） -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">牌型签名命中率（Top 5）</text>
+      </view>
+      <view class="table" v-if="faceSignStats.length">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }">
+          <text class="th">签名</text>
+          <text class="th">局数</text>
+          <text class="th">成功</text>
+          <text class="th">胜率</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }" v-for="r in faceSignStats" :key="r.sig">
+            <text class="td">{{ r.sig }}</text>
+            <text class="td">{{ r.total }}</text>
+            <text class="td ok">{{ r.success }}</text>
+            <text class="td">{{ r.win }}%</text>
+          </view>
+        </view>
+      </view>
+      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无统计</view>
+    </view>
+
+    <!-- 难度热力（列表版）：Top/Bottom -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">难度热力（Top/Bottom）</text>
+        <text style="color:#64748b; font-size:24rpx;">样本门槛：{{ faceHeat.minTotal }} 局</text>
+      </view>
+      <view class="row" style="display:grid; grid-template-columns:1fr 1fr; gap:12rpx; margin-top:8rpx;">
+        <view class="table">
+          <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+            <text class="th">Top 容易</text>
+            <text class="th">局数</text>
+            <text class="th">胜率</text>
+          </view>
+          <view class="tbody">
+            <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in faceHeat.top" :key="'top-'+r.sig">
+              <text class="td">{{ r.sig }}</text>
+              <text class="td">{{ r.total }}</text>
+              <text class="td ok">{{ r.win }}%</text>
+            </view>
+          </view>
+        </view>
+        <view class="table">
+          <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+            <text class="th">Bottom 困难</text>
+            <text class="th">局数</text>
+            <text class="th">胜率</text>
+          </view>
+          <view class="tbody">
+            <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in faceHeat.bottom" :key="'bot-'+r.sig">
+              <text class="td">{{ r.sig }}</text>
+              <text class="td">{{ r.total }}</text>
+              <text class="td fail">{{ r.win }}%</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 称号系统（基础版） -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">称号</text>
+      </view>
+      <view style="display:flex; flex-wrap:wrap; gap:8rpx; margin-top:8rpx;">
+        <text v-for="(b,i) in badges" :key="i" style="padding:6rpx 12rpx; background:#f1f5f9; border-radius:20rpx; font-size:26rpx;">{{ b }}</text>
+      </view>
+    </view>
+
+    <!-- 速度-准确概览（时间分桶） -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">速度-准确概览</text>
+      </view>
+      <view class="table">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }">
+          <text class="th">时间段</text>
+          <text class="th">总数</text>
+          <text class="th">成功</text>
+          <text class="th">失败</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }" v-for="b in speedBuckets" :key="b.label">
+            <text class="td">{{ b.label }}</text>
+            <text class="td">{{ b.total }}</text>
+            <text class="td ok">{{ b.success }}</text>
+            <text class="td fail">{{ b.fail }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 技能雷达（表格版） -->
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center;">
+        <text class="title">技能雷达（表格版）</text>
+      </view>
+      <view class="table">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
+          <text class="th">技能</text>
+          <text class="th">使用占比</text>
+          <text class="th">胜率</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in skillsRadar" :key="r.key">
+            <text class="td">{{ r.label }}</text>
+            <text class="td">{{ r.usePct }}%</text>
+            <text class="td">{{ r.winPct }}%</text>
+          </view>
         </view>
       </view>
     </view>
@@ -215,6 +469,304 @@ const overviewRows = computed(() => {
   })
   items.sort((a,b)=> (b.winRate - a.winRate) || (b.times - a.times))
   return items
+})
+
+// ========== 首批 4 项：计算逻辑 ==========
+const currentRounds = computed(() => {
+  const uid = selectedUserId.value
+  const rec = uid ? (userExtMap.value[uid] || { rounds: [] }) : { rounds: [] }
+  const cutoff = calcCutoffMs()
+  const arr = (rec.rounds || [])
+  return cutoff > 0 ? arr.filter(r => (r.ts||0) >= cutoff) : arr.slice()
+})
+
+function evalExprToNumber(expr){
+  if (!expr || typeof expr !== 'string') return null
+  // 仅允许数字/空格/小数点/括号/+-×÷
+  const cleaned = expr.replace(/×/g,'*').replace(/÷/g,'/').replace(/\s+/g,'')
+  if (!/^[0-9+\-*/().]+$/.test(cleaned)) return null
+  try {
+    // 使用 Function 计算，表达式来源受控，已白名单替换
+    // 防止诸如 "1/0" 返回 Infinity：这里统一返回 null 以便跳过
+    // eslint-disable-next-line no-new-func
+    const val = Function(`"use strict";return(${cleaned})`)()
+    return (typeof val === 'number' && Number.isFinite(val)) ? val : null
+  } catch (_) { return null }
+}
+
+// 1) 错误近似度画像与“差一点”榜
+const nearMisses = computed(() => {
+  const rows = []
+  for (const r of currentRounds.value) {
+    if (r && !r.success && typeof r.expr === 'string') {
+      const v = evalExprToNumber(r.expr)
+      if (v == null) continue
+      const diff = v - 24
+      const abs = Math.abs(diff)
+      rows.push({ ts: r.ts||0, expr: r.expr, value: v, diff, abs })
+    }
+  }
+  rows.sort((a,b)=> a.abs - b.abs)
+  return rows.slice(0, 5)
+})
+
+function percentile(sortedArray, p){
+  if (!sortedArray.length) return 0
+  const idx = Math.min(sortedArray.length - 1, Math.max(0, Math.ceil((p/100) * sortedArray.length) - 1))
+  return +sortedArray[idx].toFixed(3)
+}
+const nearSummary = computed(() => {
+  const diffs = [] // { abs, sign }
+  for (const r of currentRounds.value) {
+    if (r && !r.success && typeof r.expr === 'string') {
+      const v = evalExprToNumber(r.expr)
+      if (v == null) continue
+      const d = v - 24
+      diffs.push({ abs: Math.abs(d), sign: Math.sign(d) })
+    }
+  }
+  const absArr = diffs.map(x=>x.abs).sort((a,b)=>a-b)
+  const count = absArr.length
+  if (!count) return { count:0, median: '-', p90:'-', lt1:0, lt01:0, biasUp:0, biasDown:0 }
+  const median = percentile(absArr, 50)
+  const p90 = percentile(absArr, 90)
+  const lt1 = Math.round(100 * (absArr.filter(x=>x<1).length / count))
+  const lt01 = Math.round(100 * (absArr.filter(x=>x<0.1).length / count))
+  const up = diffs.filter(x=>x.sign>0).length
+  const down = diffs.filter(x=>x.sign<0).length
+  const total = up + down
+  const biasUp = total ? Math.round(100 * up / total) : 0
+  const biasDown = total ? Math.round(100 * down / total) : 0
+  return { count, median, p90, lt1, lt01, biasUp, biasDown }
+})
+
+// 2) 首运算符成功率 + 运算熵
+const opStats = computed(() => {
+  const ops = ['+','-','×','÷']
+  const first = Object.fromEntries(ops.map(o => [o, { total:0, success:0 }]))
+  const allCounts = Object.fromEntries(ops.map(o => [o, 0]))
+  for (const r of currentRounds.value) {
+    const seq = Array.isArray(r?.ops) ? r.ops : []
+    if (seq.length) {
+      const f = seq[0]
+      if (first[f]) { first[f].total += 1; if (r.success) first[f].success += 1 }
+    }
+    for (const o of seq) { if (allCounts[o] != null) allCounts[o] += 1 }
+  }
+  const totalOps = Object.values(allCounts).reduce((a,b)=>a+b,0)
+  let entropy = 0
+  if (totalOps > 0) {
+    for (const o of ops) {
+      const p = allCounts[o] / totalOps
+      if (p > 0) entropy += -p * Math.log2(p)
+    }
+  }
+  const entropyMax = Math.log2(4) // 最多 4 类运算符
+  const entropyPct = entropyMax ? Math.round((entropy/entropyMax)*100) : 0
+  return { first, allCounts, totalOps, entropy, entropyPct }
+})
+
+// 运算序列偏好（bigram/trigram）与首两步
+const seqStats = computed(() => {
+  const big = new Map() // key -> { total, success }
+  const tri = new Map()
+  const firstTwo = new Map()
+  const add = (map, key, success) => {
+    if (!key) return
+    const cur = map.get(key) || { total:0, success:0 }
+    cur.total += 1; if (success) cur.success += 1
+    map.set(key, cur)
+  }
+  for (const r of currentRounds.value) {
+    const seq = Array.isArray(r?.ops) ? r.ops : []
+    const ok = !!r?.success
+    if (seq.length >= 2) add(firstTwo, `${seq[0]} → ${seq[1]}`, ok)
+    for (let i=0;i+1<seq.length;i++) add(big, `${seq[i]} ${seq[i+1]}`, ok)
+    for (let i=0;i+2<seq.length;i++) add(tri, `${seq[i]} ${seq[i+1]} ${seq[i+2]}`, ok)
+  }
+  const toRows = (map) => Array.from(map.entries()).map(([key,v])=>({ key, total:v.total, win: v.total ? Math.round(100*v.success/v.total) : 0 }))
+  const byTotal = (a,b)=> (b.total - a.total) || (b.win - a.win)
+  const topBigrams = toRows(big).sort(byTotal).slice(0,6)
+  const topTrigrams = toRows(tri).sort(byTotal).slice(0,6)
+  const firstTwoRows = toRows(firstTwo).sort(byTotal).slice(0,6)
+  return { topBigrams: topBigrams, topTrigrams: topTrigrams, firstTwo: firstTwoRows }
+})
+
+// ========== 趋势与连胜 ==========
+const streakStats = computed(() => {
+  // 在当前时间窗口内计算连胜/连败
+  const arr = (currentRounds.value || []).slice().sort((a,b)=> (a.ts||0)-(b.ts||0))
+  let curWin = 0, maxWin = 0, curLose = 0, maxLose = 0
+  for (const r of arr) {
+    if (r.success) {
+      curWin += 1; if (curWin > maxWin) maxWin = curWin
+      curLose = 0
+    } else {
+      curLose += 1; if (curLose > maxLose) maxLose = curLose
+      curWin = 0
+    }
+  }
+  return { curWin, maxWin, curLose, maxLose }
+})
+
+// ========== 技能雷达（表格版） ==========
+const skillsRadar = computed(() => {
+  const rounds = currentRounds.value || []
+  const total = rounds.length || 1
+  const mk = (key, label, pred) => {
+    let t = 0, ok = 0
+    for (const r of rounds) {
+      const yes = !!pred(r)
+      if (yes) { t += 1; if (r.success) ok += 1 }
+    }
+    const usePct = Math.round(100 * (t / total))
+    const winPct = t ? Math.round(100 * (ok / t)) : 0
+    return { key, label, usePct, winPct }
+  }
+  const hasOp = (r, op) => Array.isArray(r?.ops) && r.ops.includes(op)
+  const hasParen = (r) => typeof r?.expr === 'string' && /[()]/.test(r.expr)
+  const hasFraction = (r) => {
+    if (typeof r?.expr === 'string' && /[.]/.test(r.expr)) return true
+    if (typeof r?.expr === 'string' && /[÷/]/.test(r.expr)) return true
+    const v = typeof r?.expr === 'string' ? evalExprToNumber(r.expr) : null
+    return (v != null && Math.abs(v - Math.round(v)) > 1e-9)
+  }
+  return [
+    mk('plus','＋ 加法', r=>hasOp(r,'+')),
+    mk('minus','－ 减法', r=>hasOp(r,'-')),
+    mk('mul','× 乘法', r=>hasOp(r,'×')),
+    mk('div','÷ 除法', r=>hasOp(r,'÷') || (typeof r?.expr==='string' && r.expr.includes('/'))),
+    mk('paren','括号', hasParen),
+    mk('frac','分数', hasFraction),
+  ]
+})
+
+// ========== 滚动指标 ==========
+const dailySeries = computed(() => {
+  const rounds = filteredRounds.value
+  const byDay = new Map() // day -> { total, success, successTimes: [] }
+  for (const r of rounds) {
+    const key = new Date(r.ts||0).toISOString().slice(0,10)
+    const cur = byDay.get(key) || { total:0, success:0, successTimes: [] }
+    cur.total += 1; if (r.success) { cur.success += 1; if (Number.isFinite(r.timeMs)) cur.successTimes.push(r.timeMs) }
+    byDay.set(key, cur)
+  }
+  return Array.from(byDay.entries()).sort((a,b)=> a[0]<b[0]? -1: 1)
+})
+function rollingOf(windowDays){
+  const days = dailySeries.value
+  if (!days.length) return { win:0, avg:'-' }
+  const tail = days.slice(-windowDays)
+  const total = tail.reduce((a,[,v])=>a+v.total,0)
+  const success = tail.reduce((a,[,v])=>a+v.success,0)
+  const times = tail.flatMap(([,v])=>v.successTimes)
+  const win = total ? Math.round(100*success/total) : 0
+  const avg = times.length ? fmtMs(Math.round(times.reduce((a,b)=>a+b,0)/times.length)) : '-'
+  return { win, avg }
+}
+const rolling = computed(() => ({
+  win7: rollingOf(7).win,
+  win30: rollingOf(30).win,
+  avg7: rollingOf(7).avg,
+  avg30: rollingOf(30).avg,
+}))
+
+// ========== 难度热力（Top/Bottom 列表版） ==========
+const faceHeat = computed(() => {
+  const minTotal = 2
+  const map = new Map()
+  for (const r of currentRounds.value) {
+    const sig = handSignature(r?.hand)
+    if (!sig) continue
+    const cur = map.get(sig) || { total:0, success:0 }
+    cur.total += 1; if (r.success) cur.success += 1
+    map.set(sig, cur)
+  }
+  const rows = Array.from(map.entries()).map(([sig, v])=>{
+    const win = v.total ? Math.round(100*v.success/v.total) : 0
+    return { sig, total:v.total, success:v.success, win }
+  }).filter(r => r.total >= minTotal)
+  const top = rows.slice().sort((a,b)=> (b.win - a.win) || (b.total - a.total)).slice(0,5)
+  const bottom = rows.slice().sort((a,b)=> (a.win - b.win) || (b.total - a.total)).slice(0,5)
+  return { top, bottom, minTotal }
+})
+
+// ========== 称号系统（基础规则） ==========
+const badges = computed(() => {
+  const out = []
+  const rounds = currentRounds.value || []
+  const total = rounds.length
+  const success = rounds.filter(r=>r.success).length
+  const winRate = total ? (100*success/total) : 0
+  // 多样探索者/单核惯性
+  if (opStats.value.entropyPct >= 75) out.push('多样探索者')
+  else if (opStats.value.entropyPct <= 35) out.push('单核惯性')
+  // 乘法信徒
+  const opsTotal = Math.max(1, opStats.value.totalOps)
+  if ((opStats.value.allCounts['×']||0)/opsTotal >= 0.4) out.push('乘法信徒')
+  // 精准狙击：错误近似 |24-值| < 1 的占比 >= 50%
+  if ((nearSummary.value.count>0) && (nearSummary.value.lt1 >= 50)) out.push('精准狙击')
+  // 分数恐惧症：分数技能胜率比总胜率低 >= 20pt
+  const frac = (skillsRadar.value || []).find(x=>x.key==='frac')
+  if (frac && frac.usePct>0 && (winRate - frac.winPct) >= 20) out.push('分数恐惧症')
+  // 逆转之王：成功中 retries>=1 的占比 >= 50%
+  const succWithRetries = rounds.filter(r=>r.success && Number.isFinite(r.retries) && r.retries>0).length
+  const succTotal = rounds.filter(r=>r.success).length || 1
+  if (succWithRetries/succTotal >= 0.5 && succTotal>=4) out.push('逆转之王')
+  // 极速手/磨刀匠
+  const succTimes = rounds.filter(r=>r.success && Number.isFinite(r.timeMs)).map(r=>r.timeMs)
+  const best = succTimes.length ? Math.min(...succTimes) : Infinity
+  if (best <= 1500) out.push('极速手')
+  const avgRetriesAll = (rounds.filter(r=>Number.isFinite(r.retries)).reduce((a,b)=>a+b.retries,0) / Math.max(1, rounds.filter(r=>Number.isFinite(r.retries)).length)) || 0
+  if (avgRetriesAll >= 1 && winRate >= 50) out.push('磨刀匠')
+  return out
+})
+
+// 3) 牌型签名命中率
+function handSignature(hand){
+  try {
+    const cs = (hand && Array.isArray(hand.cards)) ? hand.cards : []
+    const ranks = cs.map(c => +c.rank).filter(n => Number.isFinite(n)).sort((a,b)=>a-b)
+    return ranks.join(',')
+  } catch (_) { return '' }
+}
+const faceSignStats = computed(() => {
+  const map = new Map() // sig -> { total, success }
+  for (const r of currentRounds.value) {
+    const sig = handSignature(r?.hand)
+    if (!sig) continue
+    const cur = map.get(sig) || { total:0, success:0 }
+    cur.total += 1; if (r.success) cur.success += 1
+    map.set(sig, cur)
+  }
+  const rows = Array.from(map.entries()).map(([sig, v])=>{
+    const win = v.total ? Math.round(100 * v.success / v.total) : 0
+    return { sig, total: v.total, success: v.success, win }
+  })
+  rows.sort((a,b)=> (b.total - a.total) || (b.win - a.win))
+  return rows.slice(0, 5)
+})
+
+// 4) 速度-准确散点（用时间分桶概览代替复杂图表）
+const speedBuckets = computed(() => {
+  const buckets = [
+    { key:'<1s', min:0, max:1000 },
+    { key:'1-2s', min:1000, max:2000 },
+    { key:'2-5s', min:2000, max:5000 },
+    { key:'5-10s', min:5000, max:10000 },
+    { key:'10-30s', min:10000, max:30000 },
+    { key:'≥30s', min:30000, max:Infinity },
+  ]
+  const rows = buckets.map(b=>({ label:b.key, total:0, success:0, fail:0 }))
+  for (const r of currentRounds.value) {
+    if (!Number.isFinite(r?.timeMs)) continue
+    const t = r.timeMs
+    const i = buckets.findIndex(b => t >= b.min && t < b.max)
+    if (i < 0) continue
+    rows[i].total += 1
+    if (r.success) rows[i].success += 1; else rows[i].fail += 1
+  }
+  return rows
 })
 </script>
 
