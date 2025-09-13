@@ -16,6 +16,7 @@
         <text class="th fail">失败</text>
         <text class="th">胜率</text>
         <text class="th">上一局</text>
+        <text class="th">本局</text>
         </view>
       <view class="tbody">
         <text class="td">{{ remainingCards }}</text>
@@ -24,6 +25,14 @@
         <text class="td fail">{{ failCount }}</text>
         <text class="td">{{ winRate }}%</text>
         <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
+        <view class="td">
+          <block v-if="handElapsedMs < 120000">
+            <text>{{ fmtMs1(handElapsedMs) }}</text>
+          </block>
+          <block v-else>
+            <button class="btn btn-secondary btn-reshuffle" @click="reshuffle">洗牌</button>
+          </block>
+        </view>
       </view>
     </view>
 
@@ -110,7 +119,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
@@ -135,6 +144,7 @@ const errorAnimating = ref(false)
 const feedbackIsError = ref(false)
 const errorValueText = ref('')
 const handStartTs = ref(Date.now())
+const nowTs = ref(Date.now())
 const hintWasUsed = ref(false)
 const attemptCount = ref(0)
 const lastSuccessMs = ref(null)
@@ -193,6 +203,19 @@ const winRate = computed(() => {
   const t = successCount.value + failCount.value
   return t ? Math.round(100 * successCount.value / t) : 0
 })
+const handElapsedMs = computed(() => {
+  const start = handStartTs.value || Date.now()
+  const now = nowTs.value || Date.now()
+  const d = now - start
+  return d > 0 ? d : 0
+})
+
+let handTimer = null
+function startHandTimer() {
+  if (handTimer) return
+  try { handTimer = setInterval(() => { nowTs.value = Date.now() }, 100) } catch (_) { handTimer = null }
+}
+function stopHandTimer() { if (handTimer) { try { clearInterval(handTimer) } catch(_){} handTimer = null } }
 
 const drag = ref({ active: false, token: null, x: 0, y: 0, startX: 0, startY: 0, moved: false })
 const exprBox = ref({ left: 0, top: 0, right: 0, bottom: 0 })
@@ -367,10 +390,12 @@ onMounted(() => {
   nextTick(() => { updateVHVar(); recomputeExprHeight(); updateExprScale() })
   if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
   updateLastSuccess()
+  startHandTimer()
 })
 
-onShow(() => { loadSession() })
-onHide(() => { saveSession() })
+onShow(() => { loadSession(); startHandTimer() })
+onHide(() => { saveSession(); stopHandTimer() })
+onUnmounted(() => { stopHandTimer() })
 
 // 已移除“清空表达式”功能，避免误触清空
 
@@ -399,6 +424,7 @@ function updateLastSuccess() {
 }
 
 function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
+function fmtMs1(ms){ if (!Number.isFinite(ms)) return '-'; const s = ms/1000; if (s < 120) return s.toFixed(1)+'s'; return fmtMs(ms) }
 
 function isExprComplete() {
   const arr = tokens.value || []
@@ -541,6 +567,17 @@ function skipHand() {
     } catch (_) {}
   }
   nextHand()
+}
+
+function reshuffle() {
+  // 主动重洗：不计失败，清零本副统计并开始新副牌
+  initDeck()
+  handsPlayed.value = 0
+  successCount.value = 0
+  failCount.value = 0
+  handRecorded.value = false
+  feedback.value = ''
+  nextTick(() => { nextHand(); saveSession() })
 }
 
 function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
@@ -870,7 +907,7 @@ function onSessionOver() {
 /* 统计：单行紧凑 */
 .stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:20rpx; padding:16rpx; }
 .stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
-.stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(6, 1fr); align-items:center; column-gap:12rpx; }
+.stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(7, 1fr); align-items:center; column-gap:12rpx; }
 .stats-compact-table .thead { color:#6b7280; font-weight:700; font-size:26rpx; text-align: center;}
 .stats-compact-table .tbody { font-size:28rpx; text-align: center;}
 .stats-compact-table .ok { color:#16a34a; font-weight:700 }
@@ -881,6 +918,8 @@ function onSessionOver() {
 .stat-label.ok, .stat-value.ok { color:#16a34a; font-weight:700 }
 .stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
 .stat-value { font-weight:700; color:#111827; font-size:28rpx; }
+ 
+.btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
