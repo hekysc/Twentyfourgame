@@ -100,10 +100,12 @@
       <view class="success-burst">24!</view>
     </view>
   </view>
+  <CustomTabBar />
 </template>
 
 <script setup>
 import { ref, onMounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
+import CustomTabBar from '../../components/CustomTabBar.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 
@@ -196,7 +198,7 @@ function initDeck() {
               initDeck()
               nextTick(() => nextHand())
             } else {
-              try { uni.switchTab({ url: '/pages/stats/index' }) }
+              try { uni.reLaunch({ url: '/pages/stats/index' }) }
               catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
             }
           }
@@ -232,7 +234,7 @@ function initDeck() {
               initDeck()
               nextTick(() => nextHand())
             } else {
-              try { uni.switchTab({ url: '/pages/stats/index' }) }
+              try { uni.reLaunch({ url: '/pages/stats/index' }) }
               catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
             }
           }
@@ -260,6 +262,7 @@ function initDeck() {
 
 onMounted(() => {
   ensureInit()
+  try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   try {
     const u = getUsers && getUsers()
     const list = (u && Array.isArray(u.list)) ? u.list : []
@@ -410,9 +413,9 @@ function skipHand() {
 }
 
 function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
-function goStats(){ try { uni.switchTab({ url:'/pages/stats/index' }) } catch(_){} }
-function goGame(){ try { uni.switchTab({ url:'/pages/index/index' }) } catch(_){} }
-function goUser(){ try { uni.switchTab({ url:'/pages/user/index' }) } catch(_){} }
+function goStats(){ try { uni.reLaunch({ url:'/pages/stats/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} } }
+function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(_){} } }
+function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} } }
 
 function startDrag(token, e) {
   drag.value.active = true
@@ -667,7 +670,7 @@ function onSessionOver() {
           sessionOver.value = false
           nextTick(() => nextHand())
         } else {
-          try { uni.switchTab({ url: '/pages/stats/index' }) }
+          try { uni.reLaunch({ url: '/pages/stats/index' }) }
           catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
         }
       }

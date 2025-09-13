@@ -67,11 +67,12 @@
       </view>
     </view>
   </view>
-  
+  <CustomTabBar />
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import CustomTabBar from '../../components/CustomTabBar.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
 
@@ -93,6 +94,7 @@ const userMap = computed(() => {
 const ext = ref({ totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} })
 
 onMounted(() => {
+  try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   ensureInit();
   load();
   loadExt()
@@ -131,7 +133,7 @@ function loadExt(){
 function selectUser(uid){ selectedUserId.value = uid || ''; loadExt(); try { uni.pageScrollTo && uni.pageScrollTo({ selector: '.trend', duration: 200 }) } catch(_){} }
 function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = userOptions.value[idx]; if (opt){ selectedUserId.value = opt.id; loadExt() } } catch(_){} }
 function setOverviewRange(d){ overviewRange.value = d }
-function goUser(){ try { uni.switchTab({ url:'/pages/user/index' }) } catch(_){} }
+function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} } }
 function fmtTs(ts){ try { const d=new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` } catch(_) { return '-' } }
 function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
 

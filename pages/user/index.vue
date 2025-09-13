@@ -1,24 +1,26 @@
-<template>
+﻿<template>
   <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:16rpx;">
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
-      <button class="btn btn-primary" @click="create">添加</button>
+      <button class="btn btn-primary" @tap="create">添加</button>
     </view>
     <view class="list">
       <view v-for="u in visibleUsers" :key="u.id" class="item" :class="{ active: u.id===users.currentId }">
-        <view class="name" @click="choose(u.id)">{{ u.name }}</view>
+        <view class="name" @tap="choose(u.id)">{{ u.name }}</view>
         <view class="ops">
-          <button class="mini" @click="rename(u)">改名</button>
-          <button class="mini danger" @click="remove(u.id)">删除</button>
+          <button class="mini" @tap="rename(u)">改名</button>
+          <button class="mini danger" @tap="remove(u.id)">删除</button>
         </view>
       </view>
     </view>
   </view>
+  <CustomTabBar />
   
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import CustomTabBar from '../../components/CustomTabBar.vue'
 import { ensureInit, getUsers, setUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
 
 const users = ref({ list: [], currentId: '' })
@@ -27,11 +29,16 @@ const newName = ref('')
 // 过滤掉游客账号（名称为 Guest 的历史记录）
 const visibleUsers = computed(() => (users.value.list || []).filter(u => String(u.name||'') !== 'Guest'))
 
-onMounted(() => { ensureInit(); users.value = getUsers() })
+onMounted(() => { try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}; ensureInit(); users.value = getUsers() })
 
 function refresh(){ users.value = getUsers() }
 function create(){ addUser(newName.value.trim()||undefined); newName.value=''; refresh() }
-function choose(id){ switchUser(id); refresh(); uni.showToast({ title:'已切换', icon:'success' }) }
+function choose(id){
+  switchUser(id)
+  refresh()
+  try { uni.reLaunch({ url:'/pages/index/index' }) }
+  catch(_){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(e) {} }
+}
 function rename(u){
   uni.showModal({ title:'改名', editable:true, placeholderText:u.name, success(res){ if(res.confirm){ renameUser(u.id, res.content||u.name); refresh() } } })
 }
@@ -51,3 +58,4 @@ function remove(id){
 .mini.danger{ background:#fee2e2; color:#b91c1c }
 .btn-primary{ background:#1677ff; color:#fff; border:none; padding:18rpx 24rpx; border-radius:12rpx }
 </style>
+

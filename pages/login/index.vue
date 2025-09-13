@@ -93,9 +93,8 @@ const sortedUsers = computed(() => {
 
 function refresh() { safeLoad() }
 function go(url){
-  const tabs = ['/pages/index/index','/pages/stats/index','/pages/user/index']
-  if (tabs.includes(url)) { try { uni.switchTab({ url }) } catch(_) {} return }
-  try { uni.reLaunch({ url }) } catch(e1) { try { uni.navigateTo({ url }) } catch(_) {} }
+  try { uni.reLaunch({ url }) }
+  catch(e1){ try { uni.navigateTo({ url }) } catch(_) { try { uni.switchTab({ url }) } catch(_) {} } }
 }
 // function goBack() { try { uni.navigateBack() } catch(e) { go('/pages/index/index') } }
 function choose(u) { switchUser(u.id); touchLastPlayed(u.id); go('/pages/index/index') }

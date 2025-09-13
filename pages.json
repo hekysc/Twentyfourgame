@@ -1,4 +1,4 @@
-﻿{
+{
   "pages": [
     {
       "path": "pages/login/index",
@@ -32,17 +32,5 @@
     "navigationBarTitleText": "24点",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
-  },
-  "tabBar": {
-    "color": "#6b7280",
-    "selectedColor": "#3a7afe",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
-    "list": [
-      { "pagePath": "pages/stats/index", "text": "📊统计" },
-      { "pagePath": "pages/index/index", "text": "🂡游戏" },
-      { "pagePath": "pages/user/index", "text": "👤用户" }
-    ]
   }
 }
-
