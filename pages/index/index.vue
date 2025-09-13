@@ -367,7 +367,7 @@ onMounted(() => {
       try {
         uni.showModal({
           title: '暂无用户',
-          content: '请先新建用户后再开始游戏。',
+          content: '请先新建用户后再开始程序。',
           confirmText: '去新建',
           showCancel: false,
           success: () => {

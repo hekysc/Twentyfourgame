@@ -3,7 +3,7 @@
     <!-- 顶部栏 -->
     <view class="login-topbar">
       <!-- <button class="icon-btn" @tap="goBack">←</button> -->
-      <text class="login-title">无敌24点游戏·观测</text>
+      <text class="login-title">无敌24点程序·观测</text>
       <!-- <view style="width:40rpx"></view> -->
     </view>
 
@@ -37,7 +37,7 @@
           <view v-else class="avatar" :style="{ backgroundColor: u.color || colorFrom(u) }">{{ avatarText(u.name) }}</view>
           <view class="user-col">
             <view class="user-name">{{ u.name }}</view>
-            <view class="user-sub">最近游戏：{{ lastPlayedText(u.lastPlayedAt) }}</view>
+            <view class="user-sub">最近程序：{{ lastPlayedText(u.lastPlayedAt) }}</view>
               <!-- </text>
             </text> -->
           </view>
@@ -241,7 +241,7 @@ body {
 .user-col{
   flex:1;
   display:grid;
-  /* 方案A：定宽（最稳妥，确保“最近游戏”纵向齐） */
+  /* 方案A：定宽（最稳妥，确保“最近程序”纵向齐） */
   grid-template-columns: minmax(0, 200rpx) 1fr;  /* ← 原来是 auto 1fr */
   /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
      （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
