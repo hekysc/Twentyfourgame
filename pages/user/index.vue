@@ -5,7 +5,7 @@
       <button class="btn btn-primary" @tap="create">添加</button>
     </view>
     <view class="list">
-      <view v-for="u in visibleUsers" :key="u.id" class="item" :class="{ active: u.id===users.currentId }">
+      <view v-for="u in visibleUsers" :key="u.id" class="item card section" :class="{ active: u.id===users.currentId }">
         <view class="name" @tap="choose(u.id)">{{ u.name }}</view>
         <view class="ops">
           <button class="mini" @tap="rename(u)">改名</button>

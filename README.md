@@ -48,6 +48,21 @@
 - 如修改运算符或语法，请同步 UI 与 `utils/solver.js` 的解析与计算
 - 不要手工修改 `unpackage/`（构建产物）
 
+## 样式与图形化约定（UI 二轮）
+
+- 全局样式
+  - 入口：`uni.scss`（引入 `styles/common.css`）。
+  - 通用类：`.card`（白底+边框+圆角+阴影）、`.section`（内边距）、`.title`、`.btn-primary`、`.btn-ghost`、`.grid-table`。
+
+- 迷你图形组件（无三方库）
+  - `components/MiniBar.vue`：单值百分比条，props：`pct`（0–100）。
+  - `components/MicroSpark.vue`：微火柴趋势，props：`values=[{rate:0..1}]`、`height`。
+  - 用法示例：统计页“首运算-胜率”“速度分桶成功率”加入 MiniBar；滚动 7/30 天旁展示 MicroSpark。
+
+- 落地范围
+  - 统计页（`pages/stats/index.vue`）：两处数字补充为迷你图形，提升可读性并保持跨端一致。
+  - 页面风格：在 index/user/login 的主要卡片与按钮处应用 `.card`、`.title`、`.btn-*` 等通用类，统一视觉。
+
 ## 统计算法说明（概览）
 
 - 时间范围筛选（今天/3天/7天/30天/全部）

@@ -15,10 +15,15 @@
       </view>
       <view class="table">
         <view class="thead">
-          <text class="th rank">排名</text>
+          <text class="th rank">名</text>
           <text class="th user">用户</text>
           <text class="th">总局数</text>
-          <text class="th ok">成功</text>
+          <text class="th ok">成
+            <text>/
+              <text class="th fail">败
+              </text>
+            </text>
+          </text>
           <text class="th">🎯胜率</text>
           <text class="th">平均</text>
           <text class="th">🏆最佳</text>
@@ -28,7 +33,12 @@
             <text class="td rank">{{ i+1 }}</text>
             <text class="td user">{{ row.name }}</text>
             <text class="td">{{ row.times }}</text>
-            <text class="td ok">{{ row.success }}</text>
+            <text class="td ok">{{ row.success }}
+              <text>/
+                <text class="td fail">{{ row.fail }}
+                </text>
+              </text>
+            </text>
             <text class="td">{{ row.winRate }}%</text>
             <text class="td">{{ row.avgTimeMs != null ? fmtMs(row.avgTimeMs) : '-' }}</text>
             <text class="td">{{ row.bestTimeMs != null ? fmtMs(row.bestTimeMs) : '-' }}</text>
@@ -95,11 +105,10 @@
         <text class="title">最近战绩</text>
       </view>
       <view class="rounds">
-        <view v-for="r in recentRounds" :key="r.id" class="round-item">
+        <view v-for="r in recentRounds" :key="r.id" class="round-item compact3">
           <text class="r-time">{{ fmtTs(r.ts) }}</text>
           <text class="r-result" :class="{ ok: r.success, fail: !r.success }">{{ r.success ? '成功' : '失败' }}</text>
-          <text class="r-timeMs">{{ r.timeMs != null ? (r.timeMs + 'ms') : '-' }}</text>
-          <text class="r-meta">{{ (r.faceUseHigh ? 'JQK高位' : 'JQK低位') + ' · ' + (r.hintUsed ? '用提示' : '无提示') }}</text>
+          <text class="r-timeMs">{{ (r.timeMs != null && Number.isFinite(r.timeMs)) ? ((r.timeMs/1000).toFixed(1) + 's') : '-' }}</text>
         </view>
       </view>
     </view>
@@ -156,18 +165,22 @@
         <text style="color:#64748b; font-size:26rpx;">运算熵：{{ opStats.entropyPct }}%</text>
       </view>
       <view class="table">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr' }">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr 1fr' }">
           <text class="th">运算符</text>
           <text class="th">总出现</text>
           <text class="th">首运算-局数</text>
           <text class="th">首运算-胜率</text>
+          <text class="th">可视化</text>
         </view>
         <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr' }" v-for="o in ['+','-','×','÷']" :key="o">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr 1fr' }" v-for="o in ['+','-','×','÷']" :key="o">
             <text class="td">{{ o }}</text>
             <text class="td">{{ opStats.allCounts[o] }}</text>
             <text class="td">{{ opStats.first[o].total }}</text>
             <text class="td">{{ opStats.first[o].total ? Math.round(100*opStats.first[o].success/opStats.first[o].total) : 0 }}%</text>
+            <view class="td" style="padding:0 8rpx">
+              <MiniBar :pct="opStats.first[o].total ? Math.round(100*opStats.first[o].success/opStats.first[o].total) : 0" />
+            </view>
           </view>
         </view>
       </view>
@@ -285,18 +298,22 @@
         <text class="title">速度-准确概览</text>
       </view>
       <view class="table">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr' }">
           <text class="th">时间段</text>
           <text class="th">总数</text>
           <text class="th">成功</text>
           <text class="th">失败</text>
+          <text class="th">成功率</text>
         </view>
         <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }" v-for="b in speedBuckets" :key="b.label">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr' }" v-for="b in speedBuckets" :key="b.label">
             <text class="td">{{ b.label }}</text>
             <text class="td">{{ b.total }}</text>
             <text class="td ok">{{ b.success }}</text>
             <text class="td fail">{{ b.fail }}</text>
+            <view class="td" style="padding:0 8rpx">
+              <MiniBar :pct="b.total ? Math.round(100*b.success/b.total) : 0" />
+            </view>
           </view>
         </view>
       </view>
@@ -329,11 +346,13 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import CustomTabBar from '../../components/CustomTabBar.vue'
+import MiniBar from '../../components/MiniBar.vue'
+import MicroSpark from '../../components/MicroSpark.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
 
 const rows = ref([]) // 基础用户列表（不含筛选数据）
-const overviewRange = ref(7) // 1 / 3 / 7 / 30 / 0（0=全部；其余为“今天+前N-1天”）
+const overviewRange = ref(1) // 默认“今天”：1 / 3 / 7 / 30 / 0（0=全部；其余为“今天+前N-1天”）
 // 备注：面牌/提示筛选已移除，仅保留全局时间筛选
 const hintFilter = ref('all') // all | hint | nohint（全局）
 // 用户选择与扩展数据载入
@@ -388,7 +407,10 @@ function loadExt(){
 }
 function selectUser(uid){ selectedUserId.value = uid || ''; loadExt(); try { uni.pageScrollTo && uni.pageScrollTo({ selector: '.trend', duration: 200 }) } catch(_){} }
 function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = userOptions.value[idx]; if (opt){ selectedUserId.value = opt.id; loadExt() } } catch(_){} }
-function setOverviewRange(d){ overviewRange.value = d }
+function setOverviewRange(d = 0){
+  // 若未传参则激活“今天”；显式传 0 仍表示“全部”
+  overviewRange.value = (arguments.length === 0 ? 1 : d)
+}
 
 function startOfTodayMs(){
   const d = new Date()
@@ -465,7 +487,8 @@ const overviewRows = computed(() => {
     const times = rounds.filter(r=>r.success && Number.isFinite(r.timeMs)).map(r=>r.timeMs)
     const bestTimeMs = times.length ? Math.min(...times) : null
     const avgTimeMs = times.length ? Math.round(times.reduce((a,b)=>a+b,0) / times.length) : null
-    return { id: u.id, name: u.name, total, success, times: total, winRate, bestTimeMs, avgTimeMs }
+    const fail = total - success
+    return { id: u.id, name: u.name, total, success, fail, times: total, winRate, bestTimeMs, avgTimeMs }
   })
   items.sort((a,b)=> (b.winRate - a.winRate) || (b.times - a.times))
   return items
@@ -671,6 +694,15 @@ const rolling = computed(() => ({
   avg30: rollingOf(30).avg,
 }))
 
+const spark7 = computed(() => {
+  const days = dailySeries.value.slice(-7)
+  return days.map(([,v]) => ({ rate: v.total ? (v.success/v.total) : 0 }))
+})
+const spark30 = computed(() => {
+  const days = dailySeries.value.slice(-30)
+  return days.map(([,v]) => ({ rate: v.total ? (v.success/v.total) : 0 }))
+})
+
 // ========== 难度热力（Top/Bottom 列表版） ==========
 const faceHeat = computed(() => {
   const minTotal = 2
@@ -781,7 +813,7 @@ const speedBuckets = computed(() => {
 }
 .thead, .tr { 
   display: grid; 
-  grid-template-columns: 60rpx 1fr 80rpx 80rpx 80rpx 120rpx 120rpx; 
+  grid-template-columns: 40rpx 1fr 120rpx 120rpx 80rpx 80rpx 80rpx; 
   align-items: center; 
   grid-gap: 6rpx; 
   min-height: 44rpx;
@@ -828,7 +860,7 @@ const speedBuckets = computed(() => {
   color: #dc2626; 
   font-weight: 700; 
 }
-/* 数值列居右对齐，更紧凑 */
+/* 数值列居中对齐，更紧凑 */
 .th:nth-child(3), .th:nth-child(4), .th:nth-child(5), .th:nth-child(6), .th:nth-child(7),
 .td:nth-child(3), .td:nth-child(4), .td:nth-child(5), .td:nth-child(6), .td:nth-child(7) {
   text-align: center;
@@ -851,8 +883,14 @@ const speedBuckets = computed(() => {
 .seg-btn{ padding:10rpx 16rpx; background:transparent; border:none }
 .seg-btn.active{ background:#fff; font-weight:700 }
 .trend .bar{ width:18rpx; border-radius:8rpx; background:#e5e7eb }
-.rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:8rpx }
+.rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
 .round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
+.round-item.compact3{ grid-template-columns: 200rpx 120rpx 160rpx }
+.r-time, .r-result, .r-timeMs {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1e293b;
+}
 .r-result.ok{ color:#16a34a; font-weight:700 }
 .r-result.fail{ color:#dc2626; font-weight:700 }
 .picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }

@@ -14,14 +14,14 @@
       </view>
 
       <!-- 错误状态 -->
-      <view v-if="errMsg" class="error-card">
+      <view v-if="errMsg" class="error-card card section">
         <text class="err-title">数据异常</text>
         <text class="err-text">{{ errMsg }}</text>
         <button class="btn danger" @tap="resetData">重置数据</button>
       </view>
 
       <!-- 空状态 -->
-      <view v-else-if="(sortedUsers.length === 0)" class="empty-card">
+      <view v-else-if="(sortedUsers.length === 0)" class="empty-card card section">
         <text class="empty-ill">🃏</text>
         <text class="empty-text">还没有玩家，快创建一个吧！</text>
         <button class="create-btn highlight" @tap="createUser">
@@ -32,7 +32,7 @@
 
       <!-- 用户列表 -->
       <view v-else class="user-list">
-        <button class="user-item" v-for="u in sortedUsers" :key="u.id" @tap="choose(u)">
+        <button class="user-item card section" v-for="u in sortedUsers" :key="u.id" @tap="choose(u)">
           <image v-if="u.avatar" class="avatar-img" :src="u.avatar" mode="aspectFill" />
           <view v-else class="avatar" :style="{ backgroundColor: u.color || colorFrom(u) }">{{ avatarText(u.name) }}</view>
           <view class="user-col">

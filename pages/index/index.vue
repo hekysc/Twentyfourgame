@@ -8,7 +8,7 @@
     </view>
 
     <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
-      <view id="statsRow" class="stats-card stats-compact-table">
+      <view id="statsRow" class="card section stats-compact-table stats-card">
         <view class="thead">
         <text class="th">剩余</text>
         <text class="th">局数</text>
@@ -60,7 +60,7 @@
     <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
 
     <!-- 表达式卡片容器（高度由脚本计算） -->
-    <view class="expr-card">
+    <view class="expr-card card section">
       <!-- <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view> -->
       <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
         <!-- <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view> -->
@@ -196,6 +196,10 @@ function initDeck() {
           success: (res) => {
             if (res.confirm) {
               initDeck()
+              // 新一副牌开始：本副内统计清零
+              handsPlayed.value = 0
+              successCount.value = 0
+              failCount.value = 0
               nextTick(() => nextHand())
             } else {
               try { uni.reLaunch({ url: '/pages/stats/index' }) }
@@ -204,8 +208,11 @@ function initDeck() {
           }
         })
       } catch (_) {
-        // 回退策略：直接重洗继续
+        // 回退策略：直接重洗继续（同时清零本副内统计）
         initDeck()
+        handsPlayed.value = 0
+        successCount.value = 0
+        failCount.value = 0
         nextTick(() => nextHand())
       }
       return
@@ -232,6 +239,10 @@ function initDeck() {
           success: (res) => {
             if (res.confirm) {
               initDeck()
+              // 新一副牌开始：本副内统计清零
+              handsPlayed.value = 0
+              successCount.value = 0
+              failCount.value = 0
               nextTick(() => nextHand())
             } else {
               try { uni.reLaunch({ url: '/pages/stats/index' }) }
@@ -241,6 +252,9 @@ function initDeck() {
         })
       } catch (_) {
         initDeck()
+        handsPlayed.value = 0
+        successCount.value = 0
+        failCount.value = 0
         nextTick(() => nextHand())
       }
       return
