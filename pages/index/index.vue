@@ -1,5 +1,5 @@
 ﻿<template>
-  <view class="page col" :class="{ booted }" style="padding: 20rpx; gap: 16rpx; position: relative;">
+  <view class="page col" :class="{ booted }" style="padding: 24rpx; gap: 16rpx; position: relative;">
 
     <!-- 顶部：当前用户与切换 -->
     <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
@@ -39,7 +39,7 @@
     <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
     <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
       <view v-for="(card, idx) in cards" :key="idx"
-            class="card"
+            class="playing-card"
             :class="{ used: (usedByCard[idx]||0) > 0 }"
             @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
             @touchmove.stop.prevent="onDrag($event)"
@@ -847,18 +847,18 @@ function onSessionOver() {
 }
 </script>
 
-<style scoped>
-.page { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); background: linear-gradient(180deg, #f7f9ff 0%, #a7ceff 100%); display:flex; flex-direction: column; }
-.page { opacity: 0; }
-.page.booted { animation: page-fade-in .28s ease-out forwards; }
-.topbar { position: sticky; top: 0; z-index: 10; padding: 18rpx 0; background: rgba(255,255,255,0.88); backdrop-filter: blur(6rpx); border-bottom: 2rpx solid #e5e7eb; }
-.topbar-title { font-size: 36rpx; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block; }
-
-/* 牌区 */
-.card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
-.card { background:#fff; border-radius:28rpx; overflow:hidden; box-shadow:0 12rpx 28rpx rgba(15,23,42,.08); }
-.card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
-.card-img { width:100%; height:auto; display:block; }
+<style scoped> 
+.page { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); background: #f8fafc; display:flex; flex-direction: column; } 
+.page { opacity: 0; } 
+.page.booted { animation: page-fade-in .28s ease-out forwards; } 
+.topbar { padding: 12rpx 0; } 
+.topbar-title { font-size: 36rpx; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block; } 
+ 
+/* 牌区 */ 
+.card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; } 
+.playing-card { background:#fff; border-radius:16rpx; overflow:hidden; box-shadow:0 8rpx 20rpx rgba(15,23,42,.08); border:1rpx solid #e5e7eb; } 
+.playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; } 
+.card-img { width:100%; height:auto; display:block; } 
 
 /* 运算符与按钮 */
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
@@ -867,10 +867,10 @@ function onSessionOver() {
 .pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .mode-btn { width: 100%; white-space: nowrap; }
 
-.btn { border:none; border-radius:20rpx; padding:28rpx 0; font-size:34rpx; line-height:1; box-shadow:0 10rpx 24rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; }
-.btn-primary { background:#145751; color:#fff; }
-.btn-secondary { color:#0f172a; background: linear-gradient(to bottom, #f8fafc, #0961d3); box-shadow: 0 10px 12px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.6); border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
+.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; } 
+.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; } 
+.btn-primary { background:#145751; color:#fff; } 
+/* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */ 
 
 /* 成功动画覆盖层 */
 .success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
@@ -881,7 +881,7 @@ function onSessionOver() {
 @keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
 /* 表达式区 */
-.expr-card { background:#fff; padding:24rpx; border-radius:28rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
+.expr-card { background:#fff; padding:20rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); } 
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
 .expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; }
@@ -905,7 +905,7 @@ function onSessionOver() {
 .hint-text.error { color:#dc2626; font-weight:700 }
 
 /* 统计：单行紧凑 */
-.stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:20rpx; padding:16rpx; }
+.stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; } 
 .stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
 .stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(7, 1fr); align-items:center; column-gap:12rpx; }
 .stats-compact-table .thead { color:#6b7280; font-weight:700; font-size:26rpx; text-align: center;}
