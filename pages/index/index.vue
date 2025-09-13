@@ -96,6 +96,10 @@
     </view>
 
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
+    <!-- 成功动画覆盖层（0.5s） -->
+    <view v-if="successAnimating" class="success-overlay">
+      <view class="success-burst">24!</view>
+    </view>
   </view>
 </template>
 
@@ -118,6 +122,7 @@ const handsPlayed = ref(0)
 const successCount = ref(0)
 const failCount = ref(0)
 const sessionOver = ref(false)
+const successAnimating = ref(false)
 const handStartTs = ref(Date.now())
 const hintWasUsed = ref(false)
 const attemptCount = ref(0)
@@ -178,8 +183,32 @@ function initDeck() {
   deck.value = arr
 }
 
-function nextHand() {
-  if (!deck.value || deck.value.length < 4) { sessionOver.value = true; feedback.value = '牌库不足，已结束本局'; onSessionOver(); return }
+  function nextHand() {
+    if (!deck.value || deck.value.length < 4) {
+      // 整副用尽：提示是否重洗，不计入“本局结束”与统计
+      try {
+        uni.showModal({
+          title: '牌库用尽',
+          content: '余牌无解或整副用完，是否重新洗牌？',
+          confirmText: '重洗',
+          cancelText: '进入统计',
+          success: (res) => {
+            if (res.confirm) {
+              initDeck()
+              nextTick(() => nextHand())
+            } else {
+              try { uni.switchTab({ url: '/pages/stats/index' }) }
+              catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
+            }
+          }
+        })
+      } catch (_) {
+        // 回退策略：直接重洗继续
+        initDeck()
+        nextTick(() => nextHand())
+      }
+      return
+    }
   const maxTry = Math.min(200, 1 + (deck.value.length * deck.value.length))
   let pickIdx = null
   for (let t=0; t<maxTry; t++) {
@@ -191,7 +220,30 @@ function nextHand() {
     const sol = solve24(mapped)
     if (sol) { pickIdx = { ids, sol }; break }
   }
-  if (!pickIdx) { sessionOver.value = true; feedback.value = '本副牌无可解手牌，已结束本局'; onSessionOver(); return }
+    if (!pickIdx) {
+      // 无可解手牌：按“用尽重洗”流程处理，不判定为本局结束
+      try {
+        uni.showModal({
+          title: '牌库用尽',
+          content: '余牌无解或整副用完，是否重新洗牌？',
+          confirmText: '重洗',
+          cancelText: '进入统计',
+          success: (res) => {
+            if (res.confirm) {
+              initDeck()
+              nextTick(() => nextHand())
+            } else {
+              try { uni.switchTab({ url: '/pages/stats/index' }) }
+              catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
+            }
+          }
+        })
+      } catch (_) {
+        initDeck()
+        nextTick(() => nextHand())
+      }
+      return
+    }
   const ids = pickIdx.ids.sort((a,b)=>b-a)
   const cs = []
   for (const i of ids) { cs.unshift(deck.value[i]); deck.value.splice(i,1) }
@@ -274,6 +326,11 @@ function check() {
       })
       updateLastSuccess()
     } catch (_) {}
+    // 成功动画并自动下一题（0.5s）
+    try {
+      successAnimating.value = true
+      setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+    } catch (_) { nextHand() }
   }
 }
 
@@ -375,44 +432,24 @@ function onDrag(e) {
     dragInsertIndex.value = inExpr ? calcInsertIndex(x, y) : -1
   }
 }
-const lastTap = ref({ time: 0, key: '' })
-function tapKeyFor(token) {
-  if (!token) return ''
-  if (token.type === 'num' && token.cardIndex != null) return `num-${token.cardIndex}`
-  if (token.type === 'op') return `op-${token.value}`
-  if (token.type === 'tok') return `tok-${token.index}`
-  return `${token.type}-${token.value || ''}`
-}
-
 function endDrag() {
   if (!drag.value.active) return
   const x = drag.value.x, y = drag.value.y
   const token = drag.value.token
   const inExpr = inside(exprBox.value, x, y)
-  // 双击快捷操作
+  // 单击快捷操作：未发生拖动时立即处理
   if (token && !drag.value.moved) {
-    const now = Date.now()
-    const key = tapKeyFor(token)
-    if (now - (lastTap.value.time || 0) < 300 && lastTap.value.key === key) {
-      if (token.type === 'tok') {
-        removeTokenAt(token.index)
-      } else if (token.type === 'num' || token.type === 'op') {
-        tryAppendToken(token)
-        lastInsertedIndex.value = Math.max(0, tokens.value.length - 1)
-        setTimeout(() => { lastInsertedIndex.value = -1 }, 220)
-      }
-      lastTap.value = { time: 0, key: '' }
-      drag.value.active = false
-      drag.value.token = null
-      dragInsertIndex.value = -1
-      return
-    } else {
-      lastTap.value = { time: now, key }
-      drag.value.active = false
-      drag.value.token = null
-      dragInsertIndex.value = -1
-      return
+    if (token.type === 'tok') {
+      removeTokenAt(token.index)
+    } else if (token.type === 'num' || token.type === 'op') {
+      tryAppendToken(token)
+      lastInsertedIndex.value = Math.max(0, tokens.value.length - 1)
+      setTimeout(() => { lastInsertedIndex.value = -1 }, 220)
     }
+    drag.value.active = false
+    drag.value.token = null
+    dragInsertIndex.value = -1
+    return
   }
   if (token && token.type === 'tok') {
     if (inExpr) {
@@ -608,7 +645,8 @@ function onSessionOver() {
           sessionOver.value = false
           nextTick(() => nextHand())
         } else {
-          try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {}
+          try { uni.switchTab({ url: '/pages/stats/index' }) }
+          catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
         }
       }
     })
@@ -640,6 +678,11 @@ function onSessionOver() {
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; }
 .btn-primary { background:#145751; color:#fff; }
 .btn-secondary { color:#0f172a; background: linear-gradient(to bottom, #f8fafc, #0961d3); box-shadow: 0 10px 12px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.6); border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
+
+/* 成功动画覆盖层 */
+.success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+.success-burst { background: rgba(34,197,94,0.92); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(34,197,94,.35); animation: success-pop .5s ease-out both; }
+@keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
 /* 表达式区 */
 .expr-card { background:#fff; padding:24rpx; border-radius:28rpx; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }

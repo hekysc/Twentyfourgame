@@ -22,7 +22,8 @@
     {
       "path": "pages/stats/index",
       "style": {
-        "navigationBarTitleText": "历史统计"
+        "navigationBarTitleText": "历史统计",
+        "enablePullDownRefresh": true
       }
     }
   ],

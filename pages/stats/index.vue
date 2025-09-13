@@ -72,6 +72,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
 
 const rows = ref([]) // 基础用户列表（不含筛选数据）
@@ -95,6 +96,20 @@ onMounted(() => {
   ensureInit();
   load();
   loadExt()
+})
+
+onShow(() => {
+  load();
+  loadExt();
+})
+
+onPullDownRefresh(() => {
+  try {
+    load();
+    loadExt();
+  } finally {
+    try { uni.stopPullDownRefresh && uni.stopPullDownRefresh() } catch (_) {}
+  }
 })
 
 function load(){
