@@ -39,9 +39,9 @@
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/stats/index", "text": "统计" },
-      { "pagePath": "pages/index/index", "text": "游戏" },
-      { "pagePath": "pages/user/index", "text": "用户" }
+      { "pagePath": "pages/stats/index", "text": "📊统计" },
+      { "pagePath": "pages/index/index", "text": "🂡游戏" },
+      { "pagePath": "pages/user/index", "text": "👤用户" }
     ]
   }
 }

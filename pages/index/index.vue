@@ -677,7 +677,7 @@ function onSessionOver() {
 </script>
 
 <style scoped>
-.page { min-height: calc(var(--vh, 1vh) * 90); background: linear-gradient(180deg, #f7f9ff 0%, #a7ceff 100%); display:flex; flex-direction: column; }
+.page { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); background: linear-gradient(180deg, #f7f9ff 0%, #a7ceff 100%); display:flex; flex-direction: column; }
 .page { opacity: 0; }
 .page.booted { animation: page-fade-in .28s ease-out forwards; }
 .topbar { position: sticky; top: 0; z-index: 10; padding: 18rpx 0; background: rgba(255,255,255,0.88); backdrop-filter: blur(6rpx); border-bottom: 2rpx solid #e5e7eb; }

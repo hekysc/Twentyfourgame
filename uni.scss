@@ -10,3 +10,12 @@
 .space-between { justify-content: space-between; }
 .gap-16 > * { margin-right: 16rpx; }
 .gap-16 > *:last-child { margin-right: 0; }
+
+/* 提升 tabBar 文案可读性（H5/App 生效；小程序需自定义 tabBar） */
+.uni-tabbar .uni-tabbar__label {
+  font-size: 30rpx !important;
+  font-weight: 700;
+}
+.uni-tabbar .uni-tabbar__item {
+  padding-top: 6rpx;
+}
