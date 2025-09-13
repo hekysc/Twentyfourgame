@@ -3,7 +3,7 @@
     <!-- 顶部栏 -->
     <view class="login-topbar">
       <!-- <button class="icon-btn" @tap="goBack">←</button> -->
-      <text class="login-title">无敌24点</text>
+      <text class="login-title">无敌24点游戏·观测</text>
       <!-- <view style="width:40rpx"></view> -->
     </view>
 

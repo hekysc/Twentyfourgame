@@ -10,7 +10,7 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "24点"
+        "navigationBarTitleText": "无敌24点游戏·观测"
       }
     },
     {
@@ -29,7 +29,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "24点",
+    "navigationBarTitleText": "无敌24点游戏·观测",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
   }
