@@ -710,7 +710,7 @@ function onSessionOver() {
 @keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
 /* 表达式区 */
-.expr-card { background:#fff; padding:24rpx; border-radius:28rpx; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
+.expr-card { background:#fff; padding:24rpx; border-radius:28rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
 .expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; }

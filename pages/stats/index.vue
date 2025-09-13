@@ -5,8 +5,10 @@
         <text class="title">玩家总览</text>
         <view class="row" style="display:flex; align-items:center; gap:12rpx;">
           <view class="seg">
-            <button class="seg-btn" :class="{ active: overviewRange===7 }" @click="setOverviewRange(7)">近7天</button>
-            <button class="seg-btn" :class="{ active: overviewRange===30 }" @click="setOverviewRange(30)">近30天</button>
+            <button class="seg-btn" :class="{ active: overviewRange===1 }" @click="setOverviewRange(1)">今天</button>
+            <button class="seg-btn" :class="{ active: overviewRange===3 }" @click="setOverviewRange(3)">3天</button>
+            <button class="seg-btn" :class="{ active: overviewRange===7 }" @click="setOverviewRange(7)">7天</button>
+            <button class="seg-btn" :class="{ active: overviewRange===30 }" @click="setOverviewRange(30)">30天</button>
             <button class="seg-btn" :class="{ active: overviewRange===0 }" @click="setOverviewRange(0)">全部</button>
           </view>
         </view>
@@ -77,7 +79,7 @@ import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
 
 const rows = ref([]) // 基础用户列表（不含筛选数据）
-const overviewRange = ref(7) // 7 / 30 / 0（全局范围，作用于总览与趋势）
+const overviewRange = ref(7) // 1 / 3 / 7 / 30 / 0（0=全部；其余为“今天+前N-1天”）
 // 备注：面牌/提示筛选已移除，仅保留全局时间筛选
 const hintFilter = ref('all') // all | hint | nohint（全局）
 // 用户选择与扩展数据载入
@@ -133,6 +135,19 @@ function loadExt(){
 function selectUser(uid){ selectedUserId.value = uid || ''; loadExt(); try { uni.pageScrollTo && uni.pageScrollTo({ selector: '.trend', duration: 200 }) } catch(_){} }
 function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = userOptions.value[idx]; if (opt){ selectedUserId.value = opt.id; loadExt() } } catch(_){} }
 function setOverviewRange(d){ overviewRange.value = d }
+
+function startOfTodayMs(){
+  const d = new Date()
+  d.setHours(0,0,0,0)
+  return d.getTime()
+}
+function calcCutoffMs(){
+  const d = Number(overviewRange.value)
+  if (!d || d <= 0) return 0
+  const day = 86400000
+  // 包含“今天”在内的近 d 天：从本地今天 00:00 起，往前推 (d-1) 天
+  return startOfTodayMs() - (d - 1) * day
+}
 function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} } }
 function fmtTs(ts){ try { const d=new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` } catch(_) { return '-' } }
 function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
@@ -154,7 +169,7 @@ const activeRounds = computed(() => {
 })
 const filteredRounds = computed(() => {
   const list = activeRounds.value
-  const cutoff = (overviewRange.value && overviewRange.value > 0) ? (Date.now() - overviewRange.value*86400000) : 0
+  const cutoff = calcCutoffMs()
   return list.filter(r => (!cutoff || (r.ts||0) >= cutoff))
 })
 const recentRounds = computed(() => filteredRounds.value.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] })))
@@ -171,7 +186,7 @@ const trendBars = computed(() => {
   }
   let days = Array.from(byDay.entries()).sort((a,b)=> a[0]<b[0]? -1: 1)
   if (overviewRange.value>0) {
-    const cutoff = Date.now() - overviewRange.value*86400000
+    const cutoff = calcCutoffMs()
     days = days.filter(([k]) => new Date(k+'T00:00:00Z').getTime() >= cutoff)
   }
   // 至多展示 30 根柱
@@ -186,7 +201,7 @@ const trendBars = computed(() => {
 })
 // 玩家总览：按筛选范围/提示/面牌统计并按胜率排序
 const overviewRows = computed(() => {
-  const cutoff = (overviewRange.value && overviewRange.value > 0) ? (Date.now() - overviewRange.value*86400000) : 0
+  const cutoff = calcCutoffMs()
   const items = rows.value.map(u => {
     const rec = userExtMap.value[u.id] || { rounds: [], agg: {} }
     const rounds = (rec.rounds||[]).filter(r => (!cutoff || (r.ts||0) >= cutoff))

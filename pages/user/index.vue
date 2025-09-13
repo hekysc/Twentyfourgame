@@ -50,9 +50,9 @@ function remove(id){
 <style scoped>
 .input{ flex:1; border:2rpx solid #e5e7eb; border-radius:12rpx; padding:16rpx; background:#fff }
 .list{ display:flex; flex-direction:column; gap:12rpx }
-.item{ display:flex; justify-content:space-between; align-items:center; padding:16rpx; border-radius:14rpx; border:2rpx solid #e5e7eb; background:#fff }
+.item{ display:flex; justify-content:space-between; align-items:center; padding:16rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; background:#fff; box-shadow:0 6rpx 16rpx rgba(15,23,42,0.06) }
 .item.active{ border-color:#1677ff55; box-shadow:0 6rpx 16rpx rgba(22, 119, 255, 0.12) }
-.name{ font-size:30rpx; font-weight:600 }
+.name{ font-size:32rpx; font-weight:700 }
 .ops{ display:flex; gap:8rpx }
 .mini{ padding:8rpx 12rpx; border-radius:10rpx; background:#eef2f7; font-size:24rpx }
 .mini.danger{ background:#fee2e2; color:#b91c1c }
