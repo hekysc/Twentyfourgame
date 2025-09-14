@@ -1,26 +1,132 @@
 <template>
-  <view class="page col" :class="{ booted }" style="padding: 24rpx; padding-top: 24rpx; gap: 24rpx; position: relative;">
+  <view class="ctb" :style="wrapStyle">
+    <button class="ctb-item" :class="{ active: isActive('stats') }" @click="go('/pages/stats/index')">
+      <text class="icon" :class="{ active: isActive('stats') }">📊</text>
+      <text class="label">统计</text>
+    </button>
+    <button class="ctb-item" :class="{ active: isActive('index') }" @click="go('/pages/index/index')">
+      <text class="icon" :class="{ active: isActive('index') }">🂡</text>
+      <text class="label" :class="{ active: isActive('index') }">程序</text>
+    </button>
+    <button class="ctb-item" :class="{ active: isActive('user') }" @click="go('/pages/user/index')">
+      <text class="icon" :class="{ active: isActive('user') }">👤</text>
+      <text class="label" :class="{ active: isActive('index') }">用户</text>
+    </button>
+  </view>
+  <view class="ctb-safe"/>
+</template>
 
-    <!-- 当前用户与切�?-->
-    <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
-      <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
-      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
-    </view>
+<script setup>
+import { ref, onMounted } from 'vue'
 
-    <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数�?-->
-    <view id="cardGrid" class="card-grid" style="padding-top: 50rpx;">
-      <view v-for="(card, idx) in cards" :key="idx"
-            class="card"
-            :class="{ used: (usedByCard[idx]||0) > 0 }"
-            @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-            @touchmove.stop.prevent="onDrag($event)"
-            @touchend.stop.prevent="endDrag()">
-        <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
-      </view>
-    </view>
+const currentPath = ref('')
+const wrapStyle = ref('')
 
-    <!-- 本局统计（牌�?+ 胜负�?-->
-    <view class="stats-card">
-      <view class="stats-row">
-        <text class="stat-label">剩余扑克</text>
-        <text class="stat-value">{{ remainingCards }}</text>
+onMounted(() => {
+  try {
+    uni.hideTabBar && uni.hideTabBar()
+  } catch (_) {}
+  updatePath()
+  try {
+    const sys = uni.getSystemInfoSync && uni.getSystemInfoSync()
+    const hb = (sys && sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0
+    wrapStyle.value = `padding-bottom:${hb ? hb + 'px' : 'env(safe-area-inset-bottom)'}`
+  } catch (_) {}
+})
+
+function updatePath(){
+  try {
+    const pages = getCurrentPages && getCurrentPages()
+    const cur = pages && pages[pages.length - 1]
+    currentPath.value = (cur && (cur.route || cur.$page?.fullPath || '')) || ''
+  } catch (_) { currentPath.value = '' }
+}
+function isActive(key){
+  const p = currentPath.value
+  if (!p) return false
+  if (key === 'stats') return p.includes('pages/stats/index')
+  if (key === 'index') return p.includes('pages/index/index')
+  if (key === 'user') return p.includes('pages/user/index')
+  return false
+}
+function go(url){
+  // 避免重复跳转到当前页�?  const p = currentPath.value
+  if (p === url || p.includes(url)) {
+    return
+  }
+  
+  try { 
+    uni.reLaunch({ url })
+    updatePath()
+  }
+  catch(_) { 
+    try { 
+      uni.navigateTo({ url })
+      updatePath()
+    } catch(e1) { 
+      try { 
+        uni.switchTab({ url })
+        updatePath()
+      } catch(e2) {} 
+    } 
+  }
+}
+</script>
+
+<style scoped>
+.ctb { 
+  position: fixed; 
+  left: 0; 
+  right: 0; 
+  bottom: 0; 
+  z-index: 999; 
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr); 
+  background: #ffffff; 
+  box-shadow: 0 -6rpx 16rpx rgba(15,23,42,.06); 
+  padding: 10rpx 8rpx; 
+  transition: background-color 0.3s ease;
+}
+.ctb-safe { height: env(safe-area-inset-bottom); }
+.ctb-item { 
+  background: transparent; 
+  border: none; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center; 
+  width: 25dvw;
+  padding: 10rpx 0; 
+  gap: 6rpx; 
+  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border-radius: 12rpx;
+  overflow: visible;
+}
+.ctb-item:active {
+  transform: scale(0.8);
+  background: rgba(58, 122, 254, 0.08);
+}
+.icon { 
+  font-size: 28rpx; 
+  line-height: 1; 
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  filter: grayscale(1) opacity(0.6);
+}
+.icon.active {
+  transform: scale(1.2);
+  filter: grayscale(0) opacity(1);
+}
+.label { 
+  font-size: 28rpx; 
+  font-weight: 800; 
+  color: #0953e9; 
+  transition: color 0.3s ease;
+  filter: grayscale(1) opacity(0.6);
+  white-space: nowrap;
+  overflow: visible;
+}
+.label.active { 
+  transform: scale(1.2);
+  filter: grayscale(0) opacity(1);
+}
+</style>

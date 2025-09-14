@@ -1,5 +1,5 @@
 {
-    "name" : "24点程序·观测站",
+    "name" : "24点小程序·观测站",
     "appid" : "__UNI__4357127",
     "description" : "24点小程序",
     "versionName" : "1.0.0",
@@ -14,6 +14,7 @@
         },
         "distribute" : {
             "android" : {
+                "package" : "com.semi2025.super24",
                 "minSdkVersion" : 21,
                 "targetSdkVersion" : 34,
                 "permissions" : [],
@@ -55,14 +56,12 @@
                 }
             },
             "sdkConfigs" : {
-                "ad" : {
-                    "gdt" : {}
-                }
+                "ad" : {}
             }
         }
     },
     "mp-weixin" : {
-        "appid" : "wx182f62e6b98e0d06",
+        "appid" : "wx0d5bca3652116f7e",
         "setting" : {
             "urlCheck" : true
         }
