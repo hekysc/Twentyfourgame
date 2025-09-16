@@ -15,7 +15,7 @@
       </view>
       <view class="table">
         <view class="thead">
-          <text class="th rank">名</text>
+          <text class="th rank">#</text>
           <text class="th user">用户</text>
           <text class="th">总局数</text>
           <text class="th ok">成
