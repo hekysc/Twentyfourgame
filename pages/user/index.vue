@@ -1,5 +1,6 @@
 ﻿<template>
-  <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:16rpx;">
+  <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:16rpx;"
+        @touchstart="swipeStart" @touchmove="swipeMove" @touchend="swipeEnd">
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
       <button class="btn btn-primary" @tap="create">添加</button>
@@ -71,6 +72,73 @@ function avatarText(name){
   if (!name) return 'U'
   const s = String(name).trim()
   return s.length ? s[0].toUpperCase() : 'U'
+}
+
+// —— 左右滑动切换 Tab ——
+const swipeTracking = ref(false)
+const swipeStartX = ref(0)
+const swipeStartY = ref(0)
+const swipeDX = ref(0)
+const swipeDY = ref(0)
+
+function swipeStart(e){
+  try {
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+    if (!t) return
+    swipeTracking.value = true
+    swipeStartX.value = t.clientX || t.pageX || 0
+    swipeStartY.value = t.clientY || t.pageY || 0
+    swipeDX.value = 0
+    swipeDY.value = 0
+  } catch(_) {}
+}
+function swipeMove(e){
+  if (!swipeTracking.value) return
+  try {
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+    if (!t) return
+    const x = t.clientX || t.pageX || 0
+    const y = t.clientY || t.pageY || 0
+    swipeDX.value = x - swipeStartX.value
+    swipeDY.value = y - swipeStartY.value
+  } catch(_) {}
+}
+function swipeEnd(){
+  if (!swipeTracking.value) return
+  swipeTracking.value = false
+  const dx = swipeDX.value
+  const dy = swipeDY.value
+  const absX = Math.abs(dx)
+  const absY = Math.abs(dy)
+  if (absX > 60 && absX > absY * 1.5) {
+    if (dx > 0) {
+      navigateTab('/pages/index/index')
+    }
+  }
+}
+function navigateTab(url){
+  const done = () => {}
+  if (uni && typeof uni.switchTab === 'function') {
+    uni.switchTab({ url, success: done, fail(){
+      if (typeof uni.navigateTo === 'function') {
+        uni.navigateTo({ url, success: done, fail(){
+          if (typeof uni.reLaunch === 'function') {
+            uni.reLaunch({ url, success: done, fail: done })
+          } else { done() }
+        } })
+      } else if (typeof uni.reLaunch === 'function') {
+        uni.reLaunch({ url, success: done, fail: done })
+      } else { done() }
+    } })
+  } else if (typeof uni.navigateTo === 'function') {
+    uni.navigateTo({ url, success: done, fail(){
+      if (typeof uni.reLaunch === 'function') {
+        uni.reLaunch({ url, success: done, fail: done })
+      } else { done() }
+    } })
+  } else if (typeof uni.reLaunch === 'function') {
+    uni.reLaunch({ url, success: done, fail: done })
+  }
 }
 </script>
 

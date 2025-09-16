@@ -1,5 +1,6 @@
 <template>
-  <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:18rpx;">
+  <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:18rpx;"
+        @touchstart="swipeStart" @touchmove="swipeMove" @touchend="swipeEnd">
     <view class="section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">玩家总览</text>
@@ -16,7 +17,7 @@
       <view class="table">
         <view class="thead">
           <text class="th rank">#</text>
-          <text class="th user">用户</text>
+          <text class="th user" @click="sortBy('name')" :class="{ active: sortKey==='name' }">用户</text>
           <text class="th">总局数</text>
           <text class="th ok">成
             <text>/
@@ -24,12 +25,12 @@
               </text>
             </text>
           </text>
-          <text class="th">🎯胜率</text>
+          <text class="th" @click="sortBy('winRate')" :class="{ active: sortKey==='winRate' }">🎯胜率</text>
           <text class="th">平均</text>
           <text class="th">🏆最佳</text>
         </view>
         <view class="tbody">
-          <view class="tr" v-for="(row, i) in overviewRows" :key="row.id" @click="selectUser(row.id)">
+          <view class="tr" v-for="(row, i) in overviewRowsSorted" :key="row.id" @click="selectUser(row.id)">
             <text class="td rank">{{ i+1 }}</text>
             <text class="td user">{{ row.name }}</text>
             <text class="td">{{ row.times }}</text>
@@ -800,6 +801,126 @@ const speedBuckets = computed(() => {
   }
   return rows
 })
+
+// —— 玩家总览：表头排序 ——
+const SORT_STORE_KEY = 'tf24_overview_sort_v1'
+const sortKey = ref('winRate') // 默认按胜率
+const sortDir = ref('desc')    // 胜率默认降序
+
+try {
+  const raw = uni.getStorageSync && uni.getStorageSync(SORT_STORE_KEY)
+  const cfg = raw && (typeof raw === 'string' ? JSON.parse(raw) : raw)
+  if (cfg && cfg.key && cfg.dir && (cfg.dir === 'asc' || cfg.dir === 'desc')) {
+    sortKey.value = cfg.key
+    sortDir.value = cfg.dir
+  }
+} catch (_) {}
+
+function persistSort(){
+  try { uni.setStorageSync && uni.setStorageSync(SORT_STORE_KEY, JSON.stringify({ key: sortKey.value, dir: sortDir.value })) } catch(_) {}
+}
+
+function sortBy(key){
+  const defaultDir = (key === 'name' || key === 'avgTimeMs' || key === 'bestTimeMs') ? 'asc' : 'desc'
+  if (sortKey.value !== key) {
+    sortKey.value = key
+    sortDir.value = defaultDir
+  } else {
+    sortDir.value = (sortDir.value === 'asc') ? 'desc' : 'asc'
+  }
+  persistSort()
+}
+
+const overviewRowsSorted = computed(() => {
+  try {
+    const rows = Array.isArray(overviewRows) ? overviewRows : (overviewRows?.value || [])
+    const list = [...rows]
+    const key = sortKey.value
+    const dir = sortDir.value
+    const sign = dir === 'asc' ? 1 : -1
+    list.sort((a,b) => {
+      const av = a?.[key]
+      const bv = b?.[key]
+      if (key === 'name') {
+        const as = String(av || '')
+        const bs = String(bv || '')
+        return as.localeCompare(bs, 'zh') * sign
+      }
+      const na = Number.isFinite(av) ? av : -Infinity
+      const nb = Number.isFinite(bv) ? bv : -Infinity
+      if (na === nb) return 0
+      return (na > nb ? 1 : -1) * sign
+    })
+    return list
+  } catch(_) { return [] }
+})
+
+// —— 左右滑动切换 Tab ——
+const swipeTracking = ref(false)
+const swipeStartX = ref(0)
+const swipeStartY = ref(0)
+const swipeDX = ref(0)
+const swipeDY = ref(0)
+
+function swipeStart(e){
+  try {
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+    if (!t) return
+    swipeTracking.value = true
+    swipeStartX.value = t.clientX || t.pageX || 0
+    swipeStartY.value = t.clientY || t.pageY || 0
+    swipeDX.value = 0
+    swipeDY.value = 0
+  } catch(_) {}
+}
+function swipeMove(e){
+  if (!swipeTracking.value) return
+  try {
+    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
+    if (!t) return
+    const x = t.clientX || t.pageX || 0
+    const y = t.clientY || t.pageY || 0
+    swipeDX.value = x - swipeStartX.value
+    swipeDY.value = y - swipeStartY.value
+  } catch(_) {}
+}
+function swipeEnd(){
+  if (!swipeTracking.value) return
+  swipeTracking.value = false
+  const dx = swipeDX.value
+  const dy = swipeDY.value
+  const absX = Math.abs(dx)
+  const absY = Math.abs(dy)
+  if (absX > 60 && absX > absY * 1.5) {
+    if (dx < 0) {
+      navigateTab('/pages/index/index')
+    }
+  }
+}
+function navigateTab(url){
+  const done = () => {}
+  if (uni && typeof uni.switchTab === 'function') {
+    uni.switchTab({ url, success: done, fail(){
+      if (typeof uni.navigateTo === 'function') {
+        uni.navigateTo({ url, success: done, fail(){
+          if (typeof uni.reLaunch === 'function') {
+            uni.reLaunch({ url, success: done, fail: done })
+          } else { done() }
+        } })
+      } else if (typeof uni.reLaunch === 'function') {
+        uni.reLaunch({ url, success: done, fail: done })
+      } else { done() }
+    } })
+  } else if (typeof uni.navigateTo === 'function') {
+    uni.navigateTo({ url, success: done, fail(){
+      if (typeof uni.reLaunch === 'function') {
+        uni.reLaunch({ url, success: done, fail: done })
+      } else { done() }
+    } })
+  } else if (typeof uni.reLaunch === 'function') {
+    uni.reLaunch({ url, success: done, fail: done })
+  }
+}
 </script>
 
 <style scoped>
@@ -894,5 +1015,8 @@ const speedBuckets = computed(() => {
 .r-result.ok{ color:#16a34a; font-weight:700 }
 .r-result.fail{ color:#dc2626; font-weight:700 }
 .picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
+
+/* 表头排序：高亮当前列 */
+.th.active{ color:#0953e9; font-weight:800 }
 
 </style>
