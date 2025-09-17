@@ -31,6 +31,11 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "无敌24点程序·观测",
     "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
+    "backgroundColor": "#F8F8F8",
+    // 在这里添加或修改动画配置
+		"app-plus": { // 针对 App 平台（iOS 和 Android）
+      "animationType": "none",
+      "animationDuration": 0
+  }
   }
 }
