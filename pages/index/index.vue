@@ -512,6 +512,16 @@ function isExprComplete() {
       const pa = prev.type === 'op' ? prev.value : 'num'
       const pb = t.type === 'op' ? t.value : 'num'
       if (isBin(pa) && isBin(pb)) return false
+
+      // 新增和修改的逻辑：检查数字和括号之间的关系
+      // 规则：数字后不能是左括号，右括号后不能是数字
+      if (prev.type === 'num' && t.type === 'op' && t.value === '(') {
+        return false;
+      }
+      if (prev.type === 'op' && prev.value === ')' && t.type === 'num') {
+        return false;
+      }
+      
       // 新增功能：检查相邻 token 是否都是数字
       if (prev.type === 'num' && t.type === 'num') {
         return false;
