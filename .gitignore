@@ -1,0 +1,48 @@
+# 通用
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+
+# 操作系统
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Node/前端（虽然本项目主要用 HBuilderX，但仍做兼容）
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 环境变量（本地私有配置）
+.env.local
+.env.*.local
+
+# HBuilderX / Uni-App 构建产物与缓存
+unpackage/
+uniapp.compile-cache/
+
+# IDE / 编辑器配置（团队可按需取消注释）
+.vscode/
+.idea/
+*.iml
+
+# Gradle/Android（若使用 App 原生打包）
+.gradle/
+build/
+local.properties
+*.keystore
+*.jks
+
+# 归档临时文件
+*.zip
+*.7z
+*.rar
+
