@@ -529,11 +529,23 @@ function check() {
   errorValueText.value = ''
   if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return }
   if (!isExprComplete()) { feedback.value = '表达式错误'; feedbackIsError.value = true; return }
+
+  // 新增：检查是否已经记录过此手牌的成绩
+  if (handRecorded.value) {
+  feedback.value = '此手牌已提交过，结果不再计入统计';
+  feedbackIsError.value = true;
+  return;
+  }
+
   const s = expr.value
   const v = evaluateExprToFraction(s)
   const ok = (v && v.equalsInt && v.equalsInt(24))
   feedback.value = ok ? '恭喜，得到 24！' : '计算错误'
   feedbackIsError.value = !ok
+
+  // 标记为已记录，确保同一手牌只记录一次
+  handRecorded.value = true
+
   // 统计记录移至首次结算时写入（避免重复记账）
   if (ok && !handRecorded.value) {
     handRecorded.value = true
@@ -567,9 +579,11 @@ function check() {
       }
     } catch (_) { errorValueText.value = '' }
     // 计为失败但不换题；允许继续尝试成功
+    handsPlayed.value += 1
+    failCount.value += 1
     try {
       const stats = computeExprStats()
-      failCount.value += 1
+      // failCount.value += 1
       pushRound({
         success: false,
         timeMs: Date.now() - (handStartTs.value || Date.now()),
@@ -1000,8 +1014,3 @@ function onSessionOver() {
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
 @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
 </style>
-
-
-
-
-
