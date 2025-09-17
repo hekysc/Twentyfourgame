@@ -18,16 +18,16 @@
         <view class="thead">
           <text class="th rank">#</text>
           <text class="th user" @click="sortBy('name')" :class="{ active: sortKey==='name' }">用户</text>
-          <text class="th">总局数</text>
-          <text class="th ok">成
+          <text class="th" @click="sortBy('times')" :class="{ active: sortKey==='times' }">总局数</text>
+          <text class="th ok" @click="sortBy('success')" :class="{ active: sortKey==='success' }">成
             <text>/
               <text class="th fail">败
               </text>
             </text>
           </text>
           <text class="th" @click="sortBy('winRate')" :class="{ active: sortKey==='winRate' }">🎯胜率</text>
-          <text class="th">平均</text>
-          <text class="th">🏆最佳</text>
+          <text class="th" @click="sortBy('avgTimeMs')" :class="{ active: sortKey==='avgTimeMs' }">平均</text>
+          <text class="th" @click="sortBy('bestTimeMs')" :class="{ active: sortKey==='bestTimeMs' }">🏆最佳</text>
         </view>
         <view class="tbody">
           <view class="tr" v-for="(row, i) in overviewRowsSorted" :key="row.id" @click="selectUser(row.id)">
@@ -351,6 +351,22 @@ import MiniBar from '../../components/MiniBar.vue'
 import MicroSpark from '../../components/MicroSpark.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
+import {
+  computeTrendBars,
+  computeOverviewRows,
+  computeNearMisses,
+  summarizeNearMisses,
+  computeOpStats,
+  computeSeqStats,
+  computeStreakStats,
+  computeSkillsRadar,
+  computeDailySeries,
+  computeSparkSeries,
+  computeFaceHeat,
+  computeBadges,
+  computeFaceSignStats,
+  computeSpeedBuckets,
+} from '../../utils/stats.js'
 
 const rows = ref([]) // 基础用户列表（不含筛选数据）
 const overviewRange = ref(1) // 默认“今天”：1 / 3 / 7 / 30 / 0（0=全部；其余为“今天+前N-1天”）
@@ -406,7 +422,10 @@ function loadExt(){
   const uid = selectedUserId.value
   ext.value = map[uid] || { totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} }
 }
-function selectUser(uid){ selectedUserId.value = uid || ''; loadExt(); try { uni.pageScrollTo && uni.pageScrollTo({ selector: '.trend', duration: 200 }) } catch(_){} }
+function selectUser(uid){ 
+  selectedUserId.value = uid || ''; 
+  loadExt(); 
+}
 function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = userOptions.value[idx]; if (opt){ selectedUserId.value = opt.id; loadExt() } } catch(_){} }
 function setOverviewRange(d = 0){
   // 若未传参则激活“今天”；显式传 0 仍表示“全部”
@@ -477,23 +496,7 @@ const trendBars = computed(() => {
   })
 })
 // 玩家总览：按筛选范围/提示/面牌统计并按胜率排序
-const overviewRows = computed(() => {
-  const cutoff = calcCutoffMs()
-  const items = rows.value.map(u => {
-    const rec = userExtMap.value[u.id] || { rounds: [], agg: {} }
-    const rounds = (rec.rounds||[]).filter(r => (!cutoff || (r.ts||0) >= cutoff))
-    const total = rounds.length
-    const success = rounds.filter(r=>r.success).length
-    const winRate = total ? Math.round(100 * success / total) : 0
-    const times = rounds.filter(r=>r.success && Number.isFinite(r.timeMs)).map(r=>r.timeMs)
-    const bestTimeMs = times.length ? Math.min(...times) : null
-    const avgTimeMs = times.length ? Math.round(times.reduce((a,b)=>a+b,0) / times.length) : null
-    const fail = total - success
-    return { id: u.id, name: u.name, total, success, fail, times: total, winRate, bestTimeMs, avgTimeMs }
-  })
-  items.sort((a,b)=> (b.winRate - a.winRate) || (b.times - a.times))
-  return items
-})
+const overviewRows = computed(() => computeOverviewRows(rows.value, userExtMap.value, calcCutoffMs()))
 
 // ========== 首批 4 项：计算逻辑 ==========
 const currentRounds = computed(() => {
@@ -519,50 +522,9 @@ function evalExprToNumber(expr){
 }
 
 // 1) 错误近似度画像与“差一点”榜
-const nearMisses = computed(() => {
-  const rows = []
-  for (const r of currentRounds.value) {
-    if (r && !r.success && typeof r.expr === 'string') {
-      const v = evalExprToNumber(r.expr)
-      if (v == null) continue
-      const diff = v - 24
-      const abs = Math.abs(diff)
-      rows.push({ ts: r.ts||0, expr: r.expr, value: v, diff, abs })
-    }
-  }
-  rows.sort((a,b)=> a.abs - b.abs)
-  return rows.slice(0, 5)
-})
+const nearMisses = computed(() => computeNearMisses(currentRounds.value))
 
-function percentile(sortedArray, p){
-  if (!sortedArray.length) return 0
-  const idx = Math.min(sortedArray.length - 1, Math.max(0, Math.ceil((p/100) * sortedArray.length) - 1))
-  return +sortedArray[idx].toFixed(3)
-}
-const nearSummary = computed(() => {
-  const diffs = [] // { abs, sign }
-  for (const r of currentRounds.value) {
-    if (r && !r.success && typeof r.expr === 'string') {
-      const v = evalExprToNumber(r.expr)
-      if (v == null) continue
-      const d = v - 24
-      diffs.push({ abs: Math.abs(d), sign: Math.sign(d) })
-    }
-  }
-  const absArr = diffs.map(x=>x.abs).sort((a,b)=>a-b)
-  const count = absArr.length
-  if (!count) return { count:0, median: '-', p90:'-', lt1:0, lt01:0, biasUp:0, biasDown:0 }
-  const median = percentile(absArr, 50)
-  const p90 = percentile(absArr, 90)
-  const lt1 = Math.round(100 * (absArr.filter(x=>x<1).length / count))
-  const lt01 = Math.round(100 * (absArr.filter(x=>x<0.1).length / count))
-  const up = diffs.filter(x=>x.sign>0).length
-  const down = diffs.filter(x=>x.sign<0).length
-  const total = up + down
-  const biasUp = total ? Math.round(100 * up / total) : 0
-  const biasDown = total ? Math.round(100 * down / total) : 0
-  return { count, median, p90, lt1, lt01, biasUp, biasDown }
-})
+const nearSummary = computed(() => summarizeNearMisses(currentRounds.value))
 
 // 2) 首运算符成功率 + 运算熵
 const opStats = computed(() => {
@@ -666,17 +628,7 @@ const skillsRadar = computed(() => {
 })
 
 // ========== 滚动指标 ==========
-const dailySeries = computed(() => {
-  const rounds = filteredRounds.value
-  const byDay = new Map() // day -> { total, success, successTimes: [] }
-  for (const r of rounds) {
-    const key = new Date(r.ts||0).toISOString().slice(0,10)
-    const cur = byDay.get(key) || { total:0, success:0, successTimes: [] }
-    cur.total += 1; if (r.success) { cur.success += 1; if (Number.isFinite(r.timeMs)) cur.successTimes.push(r.timeMs) }
-    byDay.set(key, cur)
-  }
-  return Array.from(byDay.entries()).sort((a,b)=> a[0]<b[0]? -1: 1)
-})
+const dailySeries = computed(() => computeDailySeries(filteredRounds.value))
 function rollingOf(windowDays){
   const days = dailySeries.value
   if (!days.length) return { win:0, avg:'-' }
@@ -695,34 +647,11 @@ const rolling = computed(() => ({
   avg30: rollingOf(30).avg,
 }))
 
-const spark7 = computed(() => {
-  const days = dailySeries.value.slice(-7)
-  return days.map(([,v]) => ({ rate: v.total ? (v.success/v.total) : 0 }))
-})
-const spark30 = computed(() => {
-  const days = dailySeries.value.slice(-30)
-  return days.map(([,v]) => ({ rate: v.total ? (v.success/v.total) : 0 }))
-})
+const spark7 = computed(() => computeSparkSeries(dailySeries.value, 7))
+const spark30 = computed(() => computeSparkSeries(dailySeries.value, 30))
 
 // ========== 难度热力（Top/Bottom 列表版） ==========
-const faceHeat = computed(() => {
-  const minTotal = 2
-  const map = new Map()
-  for (const r of currentRounds.value) {
-    const sig = handSignature(r?.hand)
-    if (!sig) continue
-    const cur = map.get(sig) || { total:0, success:0 }
-    cur.total += 1; if (r.success) cur.success += 1
-    map.set(sig, cur)
-  }
-  const rows = Array.from(map.entries()).map(([sig, v])=>{
-    const win = v.total ? Math.round(100*v.success/v.total) : 0
-    return { sig, total:v.total, success:v.success, win }
-  }).filter(r => r.total >= minTotal)
-  const top = rows.slice().sort((a,b)=> (b.win - a.win) || (b.total - a.total)).slice(0,5)
-  const bottom = rows.slice().sort((a,b)=> (a.win - b.win) || (b.total - a.total)).slice(0,5)
-  return { top, bottom, minTotal }
-})
+const faceHeat = computed(() => computeFaceHeat(currentRounds.value))
 
 // ========== 称号系统（基础规则） ==========
 const badges = computed(() => {
@@ -763,22 +692,7 @@ function handSignature(hand){
     return ranks.join(',')
   } catch (_) { return '' }
 }
-const faceSignStats = computed(() => {
-  const map = new Map() // sig -> { total, success }
-  for (const r of currentRounds.value) {
-    const sig = handSignature(r?.hand)
-    if (!sig) continue
-    const cur = map.get(sig) || { total:0, success:0 }
-    cur.total += 1; if (r.success) cur.success += 1
-    map.set(sig, cur)
-  }
-  const rows = Array.from(map.entries()).map(([sig, v])=>{
-    const win = v.total ? Math.round(100 * v.success / v.total) : 0
-    return { sig, total: v.total, success: v.success, win }
-  })
-  rows.sort((a,b)=> (b.total - a.total) || (b.win - a.win))
-  return rows.slice(0, 5)
-})
+const faceSignStats = computed(() => computeFaceSignStats(currentRounds.value))
 
 // 4) 速度-准确散点（用时间分桶概览代替复杂图表）
 const speedBuckets = computed(() => {
@@ -1017,6 +931,7 @@ function navigateTab(url){
 .picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
 
 /* 表头排序：高亮当前列 */
-.th.active{ color:#0953e9; font-weight:800 }
+/* .th.active{ color:#0953e9; font-weight:800 } */
+.th.active{ color:#e5e7eb; background-color:#030300; font-weight:800 }
 
 </style>

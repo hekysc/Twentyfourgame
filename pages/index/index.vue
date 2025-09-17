@@ -512,6 +512,10 @@ function isExprComplete() {
       const pa = prev.type === 'op' ? prev.value : 'num'
       const pb = t.type === 'op' ? t.value : 'num'
       if (isBin(pa) && isBin(pb)) return false
+      // 新增功能：检查相邻 token 是否都是数字
+      if (prev.type === 'num' && t.type === 'num') {
+        return false;
+      }
     }
     prev = t
   }
@@ -939,7 +943,7 @@ function onSessionOver() {
 .mode-btn { width: 100%; white-space: nowrap; }
 
 .btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; } 
-.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; } 
+.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;} 
 .btn-primary { background:#145751; color:#fff; } 
 /* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */ 
 
