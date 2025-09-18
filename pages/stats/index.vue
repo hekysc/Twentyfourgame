@@ -395,6 +395,7 @@ onMounted(() => {
 onShow(() => {
   load();
   loadExt();
+  try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
 })
 
 onPullDownRefresh(() => {

@@ -26,6 +26,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import { ensureInit, getUsers, setUsers, addUser, renameUser, removeUser as rmUser, switchUser, setUserAvatar } from '../../utils/store.js'
 
@@ -36,6 +37,8 @@ const newName = ref('')
 const visibleUsers = computed(() => (users.value.list || []).filter(u => String(u.name||'') !== 'Guest'))
 
 onMounted(() => { try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}; ensureInit(); users.value = getUsers() })
+
+onShow(() => { try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {} })
 
 function refresh(){ users.value = getUsers() }
 function create(){ addUser(newName.value.trim()||undefined); newName.value=''; refresh() }

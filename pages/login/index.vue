@@ -100,8 +100,9 @@ const sortedUsers = computed(() => {
 
 function refresh() { safeLoad() }
 function go(url){
+  // 登录流程进入首页：使用 reLaunch 清空栈，避免出现系统返回按钮
   try { uni.reLaunch({ url }) }
-  catch(e1){ try { uni.navigateTo({ url }) } catch(_) { try { uni.switchTab({ url }) } catch(_) {} } }
+  catch(_) { try { uni.switchTab({ url }) } catch(_) {} }
 }
 // function goBack() { try { uni.navigateBack() } catch(e) { go('/pages/index/index') } }
 function choose(u) { switchUser(u.id); touchLastPlayed(u.id); go('/pages/index/index') }

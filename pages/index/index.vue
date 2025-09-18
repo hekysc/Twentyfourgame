@@ -395,7 +395,7 @@ onMounted(() => {
   startHandTimer()
 })
 
-onShow(() => { loadSession(); startHandTimer() })
+onShow(() => { loadSession(); startHandTimer(); try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {} })
 onHide(() => { saveSession(); stopHandTimer() })
 onUnmounted(() => { stopHandTimer() })
 

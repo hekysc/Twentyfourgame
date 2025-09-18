@@ -17,7 +17,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const currentPath = ref('')
 const wrapStyle = ref('')
@@ -32,7 +32,12 @@ onMounted(() => {
     const hb = (sys && sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0
     wrapStyle.value = `padding-bottom:${hb ? hb + 'px' : 'env(safe-area-inset-bottom)'}`
   } catch (_) {}
+  // 监听全局路由同步事件，确保返回/手势返回后高亮状态更新
+  try { uni.$off && uni.$off('tabbar:update', updatePath) } catch(_) {}
+  try { uni.$on && uni.$on('tabbar:update', updatePath) } catch(_) {}
 })
+
+onUnmounted(() => { try { uni.$off && uni.$off('tabbar:update', updatePath) } catch(_) {} })
 
 function updatePath(){
   try {
@@ -174,4 +179,3 @@ function go(url){
   color: #0953e9; /* 选中为主色 */
 }
 </style>
-
