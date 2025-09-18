@@ -48,17 +48,20 @@
       </view>
     </view>
 
-    <view v-if="selectedUserId" class="section">
+    <view v-if="selectedUserId" class="section title">
+      <view class="user-picker" style="display:flex; align-items:center; gap:8rpx;">
+        <!-- <text style="color:#6b7280; font-size:26rpx;">查看</text> -->
+        <picker :range="userOptions" range-key="name" @change="onUserChange">
+          <view class="picker-trigger">{{ selectedUserLabel }}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view v-if="selectedUserId" class="section">    
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap: wrap;">
         <text class="title">📈个人趋势</text>
-        <view class="user-picker" style="display:flex; align-items:center; gap:8rpx;">
-          <text style="color:#6b7280; font-size:26rpx;">查看</text>
-          <picker :range="userOptions" range-key="name" @change="onUserChange">
-            <view class="picker-trigger">{{ selectedUserLabel }}</view>
-          </picker>
-        </view>
-        
       </view>
+
       <view class="trend" style="margin-top:12rpx; height:160rpx; display:flex; align-items:flex-end; gap:6rpx;">
         <view v-for="(d,i) in trendBars" :key="i" class="bar"
               :style="{ height: (d.height||4) + 'rpx', background: d.color }"></view>
@@ -840,6 +843,7 @@ function navigateTab(url){
 
 <style scoped>
 .section{ background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
+.section.title{ background:none; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
 .title{ font-size:32rpx; font-weight:800 }
 .table { 
   margin-top: 12rpx; 
