@@ -150,6 +150,8 @@ const hintWasUsed = ref(false)
 const attemptCount = ref(0)
 const lastSuccessMs = ref(null)
 const SESSION_KEY = 'tf24_game_session_v1'
+const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
+const settledResult = ref(null);         // 'success' | 'fail' | null
 
 // —— 左右滑动切换 Tab ——
 const swipeTracking = ref(false)
@@ -534,85 +536,132 @@ function isExprComplete() {
   return bal === 0
 }
 
-function check() {
-  const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0)
-  errorValueText.value = ''
-  if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return }
-  if (!isExprComplete()) { feedback.value = '表达式错误'; feedbackIsError.value = true; return }
+function resetHandStateForNext() {
+  handSettled.value = false;
+  settledResult.value = null;
+  // 你已有的重置：handRecorded、attemptCount、hintWasUsed、errorValueText 等
+  handRecorded.value = false;  // 若你还在别处用到它，这里也清掉
+  attemptCount.value = 0;
+  hintWasUsed.value = false;
+  errorValueText.value = '';
+  // handStartTs 在发新题时重置
+}
 
-  // 新增：检查是否已经记录过此手牌的成绩
-  if (handRecorded.value) {
-  feedback.value = '此手牌已提交过，结果不再计入统计';
-  feedbackIsError.value = true;
-  return;
+function check() {
+  // 基础校验
+  const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0);
+  errorValueText.value = '';
+  if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return; }
+  if (!isExprComplete()) { feedback.value = '表达式错误'; feedbackIsError.value = true; return; }
+
+  const s = expr.value;
+  const v = evaluateExprToFraction(s);
+  const ok = (v && v.equalsInt && v.equalsInt(24));
+
+  // —— 首次结算（本手还未结算过）——
+  if (!handSettled.value) {
+    // 标记本手已结算
+    handSettled.value = true;
+    settledResult.value = ok ? 'success' : 'fail';
+
+    // 计“完成的手数”仅在首次结算时 +1
+    handsPlayed.value += 1;
+
+    if (ok) {
+      // 首次成功：+1 成功，只记一次
+      successCount.value += 1;
+      try {
+        const stats = computeExprStats();
+        pushRound({
+          success: true,
+          timeMs: Date.now() - (handStartTs.value || Date.now()),
+          hintUsed: !!hintWasUsed.value,
+          retries: Math.max(0, (attemptCount.value || 1) - 1),
+          ops: stats.ops,
+          exprLen: stats.exprLen,
+          maxDepth: stats.maxDepth,
+          faceUseHigh: !!faceUseHigh.value,
+          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+          expr: s,
+        });
+        updateLastSuccess();
+      } catch (_) {}
+      feedback.value = '恭喜，得到 24！';
+      feedbackIsError.value = false;
+
+      // 成功动画并自动下一题
+      try {
+        successAnimating.value = true;
+        setTimeout(() => { successAnimating.value = false; nextHand(); }, 500);
+      } catch (_) { nextHand(); }
+
+    } else {
+      // 首次失败：+1 失败，只记一次
+      failCount.value += 1;
+      try {
+        const stats = computeExprStats();
+        pushRound({
+          success: false,
+          timeMs: Date.now() - (handStartTs.value || Date.now()),
+          hintUsed: !!hintWasUsed.value,
+          retries: attemptCount.value || 0,
+          ops: stats.ops,
+          exprLen: stats.exprLen,
+          maxDepth: stats.maxDepth,
+          faceUseHigh: !!faceUseHigh.value,
+          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+          expr: s,
+        });
+      } catch (_) {}
+      feedback.value = '计算错误（本手已计为失败，可继续尝试，不再计数）';
+      feedbackIsError.value = true;
+
+      try {
+        if (v && typeof v.toString === 'function') {
+          errorValueText.value = '结果：' + v.toString();
+        }
+      } catch (_) { errorValueText.value = ''; }
+
+      // 播放失败动画但不换题
+      try {
+        errorAnimating.value = true;
+        setTimeout(() => { errorAnimating.value = false; }, 500);
+      } catch (_) {}
+    }
+
+    try { saveSession(); } catch(_) {}
+    return;
   }
 
-  const s = expr.value
-  const v = evaluateExprToFraction(s)
-  const ok = (v && v.equalsInt && v.equalsInt(24))
-  feedback.value = ok ? '恭喜，得到 24！' : '计算错误'
-  feedbackIsError.value = !ok
+  // —— 非首次结算（本手已结算过）——
+  // 不再计数、不再 pushRound，只做交互与过渡
+  if (ok) {
+    feedback.value = settledResult.value === 'fail'
+      ? '恭喜，这次算对了！（本手已计为失败，不再计数，将切到下一手）'
+      : '本手已结算为成功，不再重复计数';
+    feedbackIsError.value = (settledResult.value !== 'success');
 
-  // 标记为已记录，确保同一手牌只记录一次
-  handRecorded.value = true
+    // 播放成功动画；若先前记为失败，这里允许过关并换题，但不计数
+    try {
+      successAnimating.value = true;
+      setTimeout(() => { successAnimating.value = false; nextHand(); }, 500);
+    } catch (_) { nextHand(); }
 
-  // 统计记录移至首次结算时写入（避免重复记账）
-  if (ok && !handRecorded.value) {
-    handRecorded.value = true
-    handsPlayed.value += 1
-    successCount.value += 1
-    try {
-      const stats = computeExprStats()
-      pushRound({
-        success: true,
-        timeMs: Date.now() - (handStartTs.value || Date.now()),
-        hintUsed: !!hintWasUsed.value,
-        retries: Math.max(0, (attemptCount.value || 1) - 1),
-        ops: stats.ops,
-        exprLen: stats.exprLen,
-        maxDepth: stats.maxDepth,
-        faceUseHigh: !!faceUseHigh.value,
-        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-        expr: s,
-      })
-      updateLastSuccess()
-    } catch (_) {}
-    // 成功动画并自动下一题（0.5s）
-    try {
-      successAnimating.value = true
-      setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
-    } catch (_) { nextHand() }
-  } else if (!ok) {
+  } else {
+    feedback.value = '计算错误（本手已结算，不再计数）';
+    feedbackIsError.value = true;
     try {
       if (v && typeof v.toString === 'function') {
-        errorValueText.value = '结果：' + v.toString()
+        errorValueText.value = '结果：' + v.toString();
       }
-    } catch (_) { errorValueText.value = '' }
-    // 计为失败但不换题；允许继续尝试成功
-    handsPlayed.value += 1
-    failCount.value += 1
+    } catch (_) { errorValueText.value = ''; }
     try {
-      const stats = computeExprStats()
-      // failCount.value += 1
-      pushRound({
-        success: false,
-        timeMs: Date.now() - (handStartTs.value || Date.now()),
-        hintUsed: !!hintWasUsed.value,
-        retries: attemptCount.value || 0,
-        ops: stats.ops,
-        exprLen: stats.exprLen,
-        maxDepth: stats.maxDepth,
-        faceUseHigh: !!faceUseHigh.value,
-        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-        expr: s,
-      })
-    } catch (_) { /* noop */ }
-    try {
-      errorAnimating.value = true
-      setTimeout(() => { errorAnimating.value = false }, 500)
+      errorAnimating.value = true;
+      setTimeout(() => { errorAnimating.value = false; }, 500);
     } catch (_) {}
   }
-  try { saveSession() } catch(_) {}
+
+  try { saveSession(); } catch(_) {}
 }
 
 function showSolution() {
