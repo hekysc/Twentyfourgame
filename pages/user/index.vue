@@ -117,28 +117,7 @@ function swipeEnd(){
   }
 }
 function navigateTab(url){
-  const done = () => {}
-  if (uni && typeof uni.switchTab === 'function') {
-    uni.switchTab({ url, success: done, fail(){
-      if (typeof uni.navigateTo === 'function') {
-        uni.navigateTo({ url, success: done, fail(){
-          if (typeof uni.reLaunch === 'function') {
-            uni.reLaunch({ url, success: done, fail: done })
-          } else { done() }
-        } })
-      } else if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url, success: done, fail: done })
-      } else { done() }
-    } })
-  } else if (typeof uni.navigateTo === 'function') {
-    uni.navigateTo({ url, success: done, fail(){
-      if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url, success: done, fail: done })
-      } else { done() }
-    } })
-  } else if (typeof uni.reLaunch === 'function') {
-    uni.reLaunch({ url, success: done, fail: done })
-  }
+  try { uni.switchTab && uni.switchTab({ url }) } catch (_) {}
 }
 </script>
 

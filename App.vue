@@ -1,6 +1,15 @@
 <script>
 export default {
-  onLaunch() {},
+  onLaunch() {
+    try {
+      // 仅 App 端支持预加载，H5 忽略
+      // #ifdef APP-PLUS
+      uni.preloadPage && uni.preloadPage({ url: '/pages/index/index' })
+      uni.preloadPage && uni.preloadPage({ url: '/pages/stats/index' })
+      uni.preloadPage && uni.preloadPage({ url: '/pages/user/index' })
+      // #endif
+    } catch (e) {}
+  },
   onShow() {},
   onHide() {}
 }
@@ -12,4 +21,3 @@ page {
   background-color: #f8f8f8;
 }
 </style>
-

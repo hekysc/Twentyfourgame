@@ -1,6 +1,5 @@
 ﻿<template>
-  <view class="page col" :class="{ booted }" style="padding: 24rpx; gap: 16rpx; position: relative;"
-        @touchstart="swipeStart" @touchmove="swipeMove" @touchend="swipeEnd">
+  <view class="page col" :class="{ booted }" style="padding: 24rpx; gap: 16rpx; position: relative;">
 
     <!-- 顶部：当前用户与切换 -->
     <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
@@ -152,76 +151,6 @@ const lastSuccessMs = ref(null)
 const SESSION_KEY = 'tf24_game_session_v1'
 const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
 const settledResult = ref(null);         // 'success' | 'fail' | null
-
-// —— 左右滑动切换 Tab ——
-const swipeTracking = ref(false)
-const swipeStartX = ref(0)
-const swipeStartY = ref(0)
-const swipeDX = ref(0)
-const swipeDY = ref(0)
-
-function swipeStart(e){
-  try {
-    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-    if (!t) return
-    swipeTracking.value = true
-    swipeStartX.value = t.clientX || t.pageX || 0
-    swipeStartY.value = t.clientY || t.pageY || 0
-    swipeDX.value = 0
-    swipeDY.value = 0
-  } catch(_) {}
-}
-function swipeMove(e){
-  if (!swipeTracking.value) return
-  try {
-    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-    if (!t) return
-    const x = t.clientX || t.pageX || 0
-    const y = t.clientY || t.pageY || 0
-    swipeDX.value = x - swipeStartX.value
-    swipeDY.value = y - swipeStartY.value
-  } catch(_) {}
-}
-function swipeEnd(){
-  if (!swipeTracking.value) return
-  swipeTracking.value = false
-  const dx = swipeDX.value
-  const dy = swipeDY.value
-  const absX = Math.abs(dx)
-  const absY = Math.abs(dy)
-  // 水平主导且超过阈值时触发，避免与竖向滚动冲突
-  if (absX > 60 && absX > absY * 1.5) {
-    if (dx < 0) {
-      navigateTab('/pages/user/index')
-    } else {
-      navigateTab('/pages/stats/index')
-    }
-  }
-}
-function navigateTab(url){
-  const done = () => {}
-  if (uni && typeof uni.switchTab === 'function') {
-    uni.switchTab({ url, success: done, fail(){
-      if (typeof uni.navigateTo === 'function') {
-        uni.navigateTo({ url, success: done, fail(){
-          if (typeof uni.reLaunch === 'function') {
-            uni.reLaunch({ url, success: done, fail: done })
-          } else { done() }
-        } })
-      } else if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url, success: done, fail: done })
-      } else { done() }
-    } })
-  } else if (typeof uni.navigateTo === 'function') {
-    uni.navigateTo({ url, success: done, fail(){
-      if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url, success: done, fail: done })
-      } else { done() }
-    } })
-  } else if (typeof uni.reLaunch === 'function') {
-    uni.reLaunch({ url, success: done, fail: done })
-  }
-}
 
 function saveSession() {
   try {
