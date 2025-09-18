@@ -106,7 +106,7 @@
         <text class="title">最近战绩</text>
       </view>
       <view class="rounds">
-        <view v-for="r in recentRounds" :key="r.id" class="round-item compact3">
+        <view v-for="r in (recentRounds || []).slice().reverse()" :key="r.id" class="round-item compact3">
           <text class="r-time">{{ fmtTs(r.ts) }}</text>
           <text class="r-result" :class="{ ok: r.success, fail: !r.success }">{{ r.success ? '成功' : '失败' }}</text>
           <text class="r-timeMs">{{ (r.timeMs != null && Number.isFinite(r.timeMs)) ? ((r.timeMs/1000).toFixed(1) + 's') : '-' }}</text>
