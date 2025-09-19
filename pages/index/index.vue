@@ -7,6 +7,11 @@
       <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
     </view>
 
+    <view class="mode-switch">
+      <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
+      <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
+    </view>
+
     <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
       <view id="statsRow" class="card section stats-compact-table stats-card">
         <view class="thead">
@@ -35,70 +40,106 @@
         </view>
       </view>
     </view>
-
-    <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-    <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
-      <view v-for="(card, idx) in cards" :key="idx"
-            class="playing-card"
-            :class="{ used: (usedByCard[idx]||0) > 0 }"
-            @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-            @touchmove.stop.prevent="onDrag($event)"
-            @touchend.stop.prevent="endDrag()">
-        <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
-      </view>
-    </view>
-
-    <!-- 运算符候选区：两行布局 -->
-    <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
-      <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
-              @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+    <template v-if="mode === 'pro'">
+      <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
+      <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
+        <view v-for="(card, idx) in cards" :key="idx"
+              class="playing-card"
+              :class="{ used: (usedByCard[idx]||0) > 0 }"
+              @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
               @touchmove.stop.prevent="onDrag($event)"
-              @touchend.stop.prevent="endDrag()">{{ op }}</button>
-    </view>
-    <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
-      <view class="ops-left">
-        <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+              @touchend.stop.prevent="endDrag()">
+          <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
+        </view>
+      </view>
+
+      <!-- 运算符候选区：两行布局 -->
+      <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
+        <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
                 @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                 @touchmove.stop.prevent="onDrag($event)"
                 @touchend.stop.prevent="endDrag()">{{ op }}</button>
       </view>
-      <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
-    </view>
-
-    <!-- 拖拽中的浮层 -->
-    <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
-
-    <!-- 表达式卡片容器（高度由脚本计算） -->
-    <view class="expr-card card section">
-      <!-- <view class="expr-title">当前表达式：<text class="status-text">{{ currentText ? currentText : '未完成' }}</text></view> -->
-      <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
-        <!-- <view v-if="tokens.length === 0" class="expr-placeholder">将卡牌和运算符拖到这里</view> -->
-        <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center' }">
-          <block v-for="(t, i) in tokens" :key="i">
-            <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-            <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                  @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+      <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
+        <view class="ops-left">
+          <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                  @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                   @touchmove.stop.prevent="onDrag($event)"
-                  @touchend.stop.prevent="endDrag()">
-              <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S' })" mode="heightFix"/>
-              <text v-else class="tok-op-text">{{ t.value }}</text>
-            </view>
-          </block>
-          <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                  @touchend.stop.prevent="endDrag()">{{ op }}</button>
+        </view>
+        <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+      </view>
+
+      <!-- 拖拽中的浮层 -->
+      <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
+
+      <!-- 表达式卡片容器（高度由脚本计算） -->
+      <view class="expr-card card section">
+        <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
+          <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
+            <block v-for="(t, i) in tokens" :key="i">
+              <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
+              <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
+                    @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                    @touchmove.stop.prevent="onDrag($event)"
+                    @touchend.stop.prevent="endDrag()">
+                <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S'})" mode="heightFix"/>
+                <text v-else class="tok-op-text">{{ t.value }}</text>
+              </view>
+            </block>
+            <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+          </view>
         </view>
       </view>
-    </view>
+    </template>
+    <template v-else>
+      <view class="basic-mode">
+        <view class="basic-board">
+          <view class="basic-column">
+            <view v-for="i in [0, 2]" :key="'basic-left-' + i" class="basic-card-wrapper">
+              <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
+                <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
+                <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
+                  <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view class="basic-ops">
+            <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
+            <button class="btn btn-secondary mode-btn basic-face-toggle" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+          </view>
+          <view class="basic-column">
+            <view v-for="i in [1, 3]" :key="'basic-right-' + i" class="basic-card-wrapper">
+              <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
+                <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
+                <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
+                  <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view v-if="basicDisplayExpression" class="basic-expression-card">
+          <text class="basic-expression-text">{{ basicDisplayExpression }}</text>
+        </view>
+      </view>
+    </template>
 
     <!-- 轻提示文案 -->
-    <text id="hintText" class="hint-text" :class="{ error: feedbackIsError }">{{ feedback || '请用四张牌和运算符算出 24' }}</text>
+    <text id="hintText" class="hint-text" :class="{ error: feedbackIsError }">{{ feedback || defaultFeedbackFor(mode) }}</text>
 
-    <!-- 提交：占满一行宽度 -->
-    <view id="submitRow">
+    <view v-if="mode === 'pro'" id="submitRow">
       <button class="btn btn-primary" style="width:100%" @click="check">提交答案</button>
     </view>
 
-    <!-- 提示 / 换题：位于提交区下方 -->
-    <view id="failRow" class="pair-grid">
+    <view v-if="mode === 'pro'" id="failRow" class="pair-grid">
+      <button class="btn btn-secondary" @click="showSolution">提示</button>
+      <button class="btn btn-secondary" @click="skipHand">下一题</button>
+    </view>
+    <view v-else class="basic-actions">
+      <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
+      <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
       <button class="btn btn-secondary" @click="showSolution">提示</button>
       <button class="btn btn-secondary" @click="skipHand">下一题</button>
     </view>
@@ -122,7 +163,7 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
-import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
+import { evaluateExprToFraction, solve24, Fraction } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
@@ -130,6 +171,12 @@ const solution = ref(null)
 const feedback = ref('')
 const usedByCard = ref([0,0,0,0])
 const tokens = ref([])
+const mode = ref('pro')
+const basicSlots = ref([])
+const basicSelection = ref({ first: null, operator: null })
+const basicHistory = ref([])
+const basicExpression = ref('')
+const basicDisplayExpression = ref('')
 const faceUseHigh = ref(false)
 const handRecorded = ref(false)
 const exprZoneHeight = ref(200)
@@ -183,6 +230,7 @@ function loadSession() {
     if ((data.cards || []).length === 4) {
       deck.value = data.deck
       cards.value = data.cards
+      resetBasicStateFromCards()
       tokens.value = Array.isArray(data.tokens) ? data.tokens : []
       usedByCard.value = Array.isArray(data.usedByCard) ? data.usedByCard : [0,0,0,0]
       faceUseHigh.value = !!data.faceUseHigh
@@ -258,6 +306,309 @@ const placeholderSizeClass = computed(() => {
   if (dt.type === 'tok') return (/^(10|11|12|13|[1-9])$/).test(dt.value) ? 'num' : 'op'
   return 'op'
 })
+
+function defaultFeedbackFor(m) {
+  return m === 'basic' ? '请选择两张牌和运算符进行计算' : '拖入 + - × ÷ ( ) 组成 24';
+}
+
+function setDefaultFeedback(targetMode = mode.value) {
+  feedback.value = defaultFeedbackFor(targetMode);
+  feedbackIsError.value = false;
+}
+
+function basicCardClass(idx) {
+  const slot = basicSlots.value[idx]
+  return {
+    hidden: !slot || !slot.alive,
+    selected: basicSelection.value.first === idx,
+    result: !!(slot && slot.alive && slot.source === 'value'),
+  }
+}
+
+function displayLabelForBasic(card) {
+  if (!card) return ''
+  const rank = card.rank
+  const mapped = evalRank(rank)
+  if ((rank === 11 || rank === 12 || rank === 13) && !faceUseHigh.value) {
+    return String(mapped)
+  }
+  return labelFor(rank)
+}
+
+function formatFractionValue(frac) {
+  if (!frac) return ''
+  return frac.d === 1 ? String(frac.n) : `${frac.n}/${frac.d}`
+}
+
+function stripOuterParens(str) {
+  if (!str) return ''
+  let text = str.trim()
+  while (text.startsWith('(') && text.endsWith(')')) {
+    let depth = 0
+    let balanced = true
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i]
+      if (ch === '(') depth++
+      else if (ch === ')') {
+        depth--
+        if (depth < 0) { balanced = false; break }
+        if (depth === 0 && i < text.length - 1) { balanced = false; break }
+      }
+    }
+    if (!balanced || depth !== 0) break
+    text = text.slice(1, -1).trim()
+  }
+  return text
+}
+
+function formatBasicDisplayExpression(expr, value) {
+  const trimmed = stripOuterParens(expr || '')
+  if (!trimmed) return ''
+  const valText = value ? formatFractionValue(value) : ''
+  return valText ? `${trimmed}=${valText}` : trimmed
+}
+
+function cloneBasicSlots(slots) {
+  return (slots || []).map(slot => {
+    if (!slot) return null
+    return {
+      id: slot.id,
+      alive: slot.alive,
+      value: slot.value ? { n: slot.value.n, d: slot.value.d } : null,
+      expr: slot.expr,
+      displayExpr: slot.displayExpr,
+      label: slot.label,
+      card: slot.card ? { rank: slot.card.rank, suit: slot.card.suit } : null,
+      source: slot.source,
+    }
+  })
+}
+
+function statsFromExpressionString(expression) {
+  if (!expression) return { ops: [], exprLen: 0, maxDepth: 0 }
+  const ops = []
+  let exprLen = 0
+  let depth = 0
+  let maxDepth = 0
+  const tokens = expression.match(/10|11|12|13|[1-9]|[()+\-×÷]/g) || []
+  for (const tok of tokens) {
+    exprLen += 1
+    if (tok === '(') {
+      depth += 1
+      if (depth > maxDepth) maxDepth = depth
+    } else if (tok === ')') {
+      depth = Math.max(0, depth - 1)
+    } else if ('+-×÷'.includes(tok)) {
+      ops.push(tok)
+    }
+  }
+  return { ops, exprLen, maxDepth }
+}
+
+function resetBasicStateFromCards() {
+  const nextSlots = []
+  const srcCards = cards.value || []
+  for (let i = 0; i < 4; i++) {
+    const card = srcCards[i]
+    if (card) {
+      const mapped = evalRank(card.rank)
+      const value = new Fraction(mapped, 1)
+      nextSlots.push({
+        id: i,
+        alive: true,
+        value,
+        expr: String(mapped),
+        displayExpr: displayLabelForBasic(card),
+        label: formatFractionValue(value),
+        card: { rank: card.rank, suit: card.suit },
+        source: 'card',
+      })
+    } else {
+      nextSlots.push({
+        id: i,
+        alive: false,
+        value: null,
+        expr: '',
+        displayExpr: '',
+        label: '',
+        card: null,
+        source: 'card',
+      })
+    }
+  }
+  basicSlots.value = nextSlots
+  basicSelection.value = { first: null, operator: null }
+  basicHistory.value = []
+  basicExpression.value = ''
+  basicDisplayExpression.value = ''
+  if (mode.value === 'basic' && !handSettled.value) setDefaultFeedback('basic')
+}
+
+function handleBasicOperator(op) {
+  if (mode.value !== 'basic' || handSettled.value) return
+  if (basicSelection.value.first === null) {
+    feedback.value = '请先选择第一张牌'
+    feedbackIsError.value = true
+    return
+  }
+  if (basicSelection.value.operator === op) {
+    basicSelection.value.operator = null
+    feedback.value = '已取消运算符选择'
+    feedbackIsError.value = false
+    return
+  }
+  basicSelection.value.operator = op
+  feedback.value = '请选择第二张牌'
+  feedbackIsError.value = false
+}
+
+function handleBasicCardTap(idx) {
+  if (mode.value !== 'basic' || handSettled.value) return
+  const slot = basicSlots.value[idx]
+  if (!slot || !slot.alive) return
+  const selection = basicSelection.value
+  if (selection.operator && selection.first !== null) {
+    if (selection.first === idx) {
+      basicSelection.value = { first: null, operator: null }
+      feedback.value = defaultFeedbackFor('basic')
+      feedbackIsError.value = false
+      return
+    }
+    applyBasicCombination(selection.first, idx, selection.operator)
+    return
+  }
+  if (selection.first === idx) {
+    basicSelection.value = { first: null, operator: null }
+    feedback.value = defaultFeedbackFor('basic')
+    feedbackIsError.value = false
+    return
+  }
+  basicSelection.value = { first: idx, operator: null }
+  feedback.value = '请选择运算符'
+  feedbackIsError.value = false
+}
+
+function computeFractionOperation(a, b, op) {
+  if (!a || !b) return null
+  if (op === '+') return a.plus(b)
+  if (op === '-') return a.minus(b)
+  if (op === '×') return a.times(b)
+  if (op === '÷') {
+    if (b.n === 0) throw new Error('divide-by-zero')
+    return a.div(b)
+  }
+  return null
+}
+
+function applyBasicCombination(firstIdx, secondIdx, op) {
+  if (firstIdx === secondIdx) {
+    feedback.value = '请选择不同的两张牌'
+    feedbackIsError.value = true
+    return
+  }
+  const slots = basicSlots.value.slice()
+  const first = slots[firstIdx]
+  const second = slots[secondIdx]
+  if (!first || !second || !first.alive || !second.alive) return
+  let result
+  try {
+    result = computeFractionOperation(first.value, second.value, op)
+  } catch (_) {
+    feedback.value = '无法进行该运算'
+    feedbackIsError.value = true
+    return
+  }
+  if (!result) {
+    feedback.value = '无法进行该运算'
+    feedbackIsError.value = true
+    return
+  }
+  basicHistory.value = [...basicHistory.value, {
+    slots: cloneBasicSlots(slots),
+    expression: basicExpression.value,
+    displayExpression: basicDisplayExpression.value,
+  }]
+  const newExpr = `(${first.expr}${op}${second.expr})`
+  const newDisplayExpr = `(${first.displayExpr}${op}${second.displayExpr})`
+  const updated = slots.slice()
+  updated[firstIdx] = { ...first, alive: false }
+  updated[secondIdx] = {
+    id: second.id,
+    alive: true,
+    value: result,
+    expr: newExpr,
+    displayExpr: newDisplayExpr,
+    label: formatFractionValue(result),
+    card: null,
+    source: 'value',
+  }
+  basicSlots.value = updated
+  basicSelection.value = { first: null, operator: null }
+  basicExpression.value = newExpr
+  basicDisplayExpression.value = formatBasicDisplayExpression(newDisplayExpr, result)
+  const alive = updated.filter(s => s && s.alive)
+  if (alive.length === 1) {
+    if (result.equalsInt && result.equalsInt(24)) {
+      const exprForRecord = stripOuterParens(newExpr)
+      settleHandResult({
+        ok: true,
+        expression: exprForRecord,
+        valueFraction: result,
+        stats: statsFromExpressionString(exprForRecord),
+        origin: 'basic',
+      })
+    } else {
+      feedback.value = `当前结果：${formatFractionValue(result)}，还未达到 24`
+      feedbackIsError.value = true
+    }
+  } else {
+    feedback.value = '请选择下一步操作'
+    feedbackIsError.value = false
+  }
+  errorValueText.value = ''
+  try { saveSession() } catch (_) {}
+}
+
+function undoBasicStep() {
+  if (!basicHistory.value.length) {
+    if (mode.value === 'basic') {
+      feedback.value = '没有可撤销的步骤'
+      feedbackIsError.value = true
+    }
+    return
+  }
+  const history = basicHistory.value.slice()
+  const snapshot = history.pop()
+  basicHistory.value = history
+  basicSlots.value = (snapshot.slots || []).map(slot => {
+    if (!slot) return null
+    return {
+      id: slot.id,
+      alive: slot.alive,
+      value: slot.value ? new Fraction(slot.value.n, slot.value.d) : null,
+      expr: slot.expr,
+      displayExpr: slot.displayExpr,
+      label: slot.label,
+      card: slot.card ? { rank: slot.card.rank, suit: slot.card.suit } : null,
+      source: slot.source,
+    }
+  })
+  basicExpression.value = snapshot.expression || ''
+  basicDisplayExpression.value = snapshot.displayExpression || ''
+  basicSelection.value = { first: null, operator: null }
+  if (mode.value === 'basic') {
+    feedback.value = '已撤销，选择下一步'
+    feedbackIsError.value = false
+  }
+  errorValueText.value = ''
+  try { saveSession() } catch (_) {}
+}
+
+function resetBasicBoard() {
+  resetBasicStateFromCards()
+  errorValueText.value = ''
+  try { saveSession() } catch (_) {}
+}
 
 const currentText = computed(() => {
   attemptCount.value += 1
@@ -353,10 +704,12 @@ function initDeck() {
       }
       return
     }
+  resetHandStateForNext()
   const ids = pickIdx.ids.sort((a,b)=>b-a)
   const cs = []
   for (const i of ids) { cs.unshift(deck.value[i]); deck.value.splice(i,1) }
   cards.value = cs
+  resetBasicStateFromCards()
   solution.value = pickIdx.sol
   tokens.value = []
   usedByCard.value = [0,0,0,0]
@@ -364,7 +717,7 @@ function initDeck() {
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
-  feedback.value = '拖入 + - × ÷ ( ) 组成 24'
+  setDefaultFeedback()
   nextTick(() => recomputeExprHeight())
   try { saveSession() } catch(_) {}
 }
@@ -486,8 +839,104 @@ function resetHandStateForNext() {
   // handStartTs 在发新题时重置
 }
 
+function settleHandResult({ ok, expression, valueFraction, stats, origin }) {
+  const exprStr = expression || ''
+  const statsData = stats || statsFromExpressionString(exprStr)
+  const value = valueFraction || (exprStr ? evaluateExprToFraction(exprStr) : null)
+  const elapsed = Date.now() - (handStartTs.value || Date.now())
+  const retriesSuccess = origin === 'pro' ? Math.max(0, (attemptCount.value || 1) - 1) : 0
+  const retriesFail = origin === 'pro' ? (attemptCount.value || 0) : 0
+
+  if (!handSettled.value) {
+    handSettled.value = true
+    settledResult.value = ok ? 'success' : 'fail'
+    handsPlayed.value += 1
+
+    if (ok) {
+      successCount.value += 1
+      try {
+        pushRound({
+          success: true,
+          timeMs: elapsed,
+          hintUsed: !!hintWasUsed.value,
+          retries: retriesSuccess,
+          ops: statsData.ops,
+          exprLen: statsData.exprLen,
+          maxDepth: statsData.maxDepth,
+          faceUseHigh: !!faceUseHigh.value,
+          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+          expr: exprStr,
+        })
+        updateLastSuccess()
+      } catch (_) {}
+      feedback.value = origin === 'basic' ? '恭喜，计算得到 24！' : '恭喜，得到 24！'
+      feedbackIsError.value = false
+      errorValueText.value = ''
+      try {
+        successAnimating.value = true
+        setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+      } catch (_) { nextHand() }
+    } else {
+      failCount.value += 1
+      try {
+        pushRound({
+          success: false,
+          timeMs: elapsed,
+          hintUsed: !!hintWasUsed.value,
+          retries: retriesFail,
+          ops: statsData.ops,
+          exprLen: statsData.exprLen,
+          maxDepth: statsData.maxDepth,
+          faceUseHigh: !!faceUseHigh.value,
+          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+          expr: exprStr,
+        })
+      } catch (_) {}
+      feedback.value = origin === 'basic' ? '计算结果不是 24，可尝试后退或重置' : '计算错误（本手已计为失败，可继续尝试，不再计数）'
+      feedbackIsError.value = true
+      try {
+        if (value && typeof value.toString === 'function') {
+          errorValueText.value = '结果：' + value.toString()
+        } else errorValueText.value = ''
+      } catch (_) { errorValueText.value = '' }
+      try {
+        errorAnimating.value = true
+        setTimeout(() => { errorAnimating.value = false }, 500)
+      } catch (_) {}
+    }
+    try { saveSession() } catch (_) {}
+    return
+  }
+
+  if (ok) {
+    feedback.value = settledResult.value === 'fail'
+      ? (origin === 'basic'
+        ? '这次算对了！（本手已计为失败，即将进入下一题）'
+        : '恭喜，这次算对了！（本手已计为失败，不再计数，将切到下一手）')
+      : '本手已结算为成功，不再重复计数'
+    feedbackIsError.value = settledResult.value !== 'success'
+    errorValueText.value = ''
+    try {
+      successAnimating.value = true
+      setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+    } catch (_) { nextHand() }
+  } else {
+    feedback.value = '计算错误（本手已结算，不再计数）'
+    feedbackIsError.value = true
+    try {
+      if (value && typeof value.toString === 'function') {
+        errorValueText.value = '结果：' + value.toString()
+      } else errorValueText.value = ''
+    } catch (_) { errorValueText.value = '' }
+    try {
+      errorAnimating.value = true
+      setTimeout(() => { errorAnimating.value = false }, 500)
+    } catch (_) {}
+  }
+  try { saveSession() } catch (_) {}
+}
+
 function check() {
-  // 基础校验
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0);
   errorValueText.value = '';
   if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return; }
@@ -496,111 +945,13 @@ function check() {
   const s = expr.value;
   const v = evaluateExprToFraction(s);
   const ok = (v && v.equalsInt && v.equalsInt(24));
-
-  // —— 首次结算（本手还未结算过）——
-  if (!handSettled.value) {
-    // 标记本手已结算
-    handSettled.value = true;
-    settledResult.value = ok ? 'success' : 'fail';
-
-    // 计“完成的手数”仅在首次结算时 +1
-    handsPlayed.value += 1;
-
-    if (ok) {
-      // 首次成功：+1 成功，只记一次
-      successCount.value += 1;
-      try {
-        const stats = computeExprStats();
-        pushRound({
-          success: true,
-          timeMs: Date.now() - (handStartTs.value || Date.now()),
-          hintUsed: !!hintWasUsed.value,
-          retries: Math.max(0, (attemptCount.value || 1) - 1),
-          ops: stats.ops,
-          exprLen: stats.exprLen,
-          maxDepth: stats.maxDepth,
-          faceUseHigh: !!faceUseHigh.value,
-          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-          expr: s,
-        });
-        updateLastSuccess();
-      } catch (_) {}
-      feedback.value = '恭喜，得到 24！';
-      feedbackIsError.value = false;
-
-      // 成功动画并自动下一题
-      try {
-        successAnimating.value = true;
-        setTimeout(() => { successAnimating.value = false; nextHand(); }, 500);
-      } catch (_) { nextHand(); }
-
-    } else {
-      // 首次失败：+1 失败，只记一次
-      failCount.value += 1;
-      try {
-        const stats = computeExprStats();
-        pushRound({
-          success: false,
-          timeMs: Date.now() - (handStartTs.value || Date.now()),
-          hintUsed: !!hintWasUsed.value,
-          retries: attemptCount.value || 0,
-          ops: stats.ops,
-          exprLen: stats.exprLen,
-          maxDepth: stats.maxDepth,
-          faceUseHigh: !!faceUseHigh.value,
-          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-          expr: s,
-        });
-      } catch (_) {}
-      feedback.value = '计算错误（本手已计为失败，可继续尝试，不再计数）';
-      feedbackIsError.value = true;
-
-      try {
-        if (v && typeof v.toString === 'function') {
-          errorValueText.value = '结果：' + v.toString();
-        }
-      } catch (_) { errorValueText.value = ''; }
-
-      // 播放失败动画但不换题
-      try {
-        errorAnimating.value = true;
-        setTimeout(() => { errorAnimating.value = false; }, 500);
-      } catch (_) {}
-    }
-
-    try { saveSession(); } catch(_) {}
-    return;
-  }
-
-  // —— 非首次结算（本手已结算过）——
-  // 不再计数、不再 pushRound，只做交互与过渡
-  if (ok) {
-    feedback.value = settledResult.value === 'fail'
-      ? '恭喜，这次算对了！（本手已计为失败，不再计数，将切到下一手）'
-      : '本手已结算为成功，不再重复计数';
-    feedbackIsError.value = (settledResult.value !== 'success');
-
-    // 播放成功动画；若先前记为失败，这里允许过关并换题，但不计数
-    try {
-      successAnimating.value = true;
-      setTimeout(() => { successAnimating.value = false; nextHand(); }, 500);
-    } catch (_) { nextHand(); }
-
-  } else {
-    feedback.value = '计算错误（本手已结算，不再计数）';
-    feedbackIsError.value = true;
-    try {
-      if (v && typeof v.toString === 'function') {
-        errorValueText.value = '结果：' + v.toString();
-      }
-    } catch (_) { errorValueText.value = ''; }
-    try {
-      errorAnimating.value = true;
-      setTimeout(() => { errorAnimating.value = false; }, 500);
-    } catch (_) {}
-  }
-
-  try { saveSession(); } catch(_) {}
+  settleHandResult({
+    ok,
+    expression: s,
+    valueFraction: v,
+    stats: computeExprStats(),
+    origin: 'pro',
+  })
 }
 
 function showSolution() {
@@ -826,6 +1177,27 @@ function updateExprScale() {
   })
 }
 
+watch(mode, (m) => {
+  if (m === 'basic') {
+    exprZoneHeight.value = 70
+    if (!basicSlots.value.length) resetBasicStateFromCards()
+    if (!basicHistory.value.length && !basicDisplayExpression.value && !handSettled.value) {
+      setDefaultFeedback('basic')
+    }
+  } else {
+    if (!handSettled.value && tokens.value.length === 0) setDefaultFeedback('pro')
+    nextTick(() => { updateExprScale(); recomputeExprHeight() })
+  }
+})
+
+watch(cards, () => {
+  resetBasicStateFromCards()
+})
+
+watch(faceUseHigh, () => {
+  resetBasicStateFromCards()
+})
+
 watch(tokens, () => updateExprScale())
 
 function calcInsertIndex(x, y) {
@@ -866,6 +1238,10 @@ function updateVHVar() {
 
 // 表达式区域高度：页面高度扣除（提示、运算符两行、提交/清空、提示/换题）后的剩余；至少 120
 function recomputeExprHeight() {
+  if (mode.value !== 'pro') {
+    exprZoneHeight.value = 70
+    return
+  }
   const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
   const winH = sys.windowHeight || sys.screenHeight || 0
   if (winH && winH < 640) opsDensity.value = 'tight'
@@ -890,9 +1266,8 @@ function recomputeExprHeight() {
        // 閫傚綋鐣欑櫧 12px
        let avail = winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12
        if (!isFinite(avail) || avail <= 0) avail = 120
-      //  exprZoneHeight.value = Math.max(120, Math.floor(avail))
-       exprZoneHeight.value = 70
-     })
+       exprZoneHeight.value = Math.max(120, Math.floor(avail))
+    })
   })
 }
 
@@ -962,11 +1337,14 @@ function onSessionOver() {
 .ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .mode-btn { width: 100%; white-space: nowrap; }
+.mode-switch { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; margin: 8rpx 0 16rpx; }
+.mode-switch-btn { width:100%; }
+.mode-switch-btn.active { background:#145751; color:#fff; }
 
-.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; } 
-.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;} 
-.btn-primary { background:#145751; color:#fff; } 
-/* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */ 
+.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}
+.btn-primary { background:#145751; color:#fff; }
+/* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */
 
 /* 成功动画覆盖层 */
 .success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
@@ -1014,8 +1392,28 @@ function onSessionOver() {
 .stat-label.ok, .stat-value.ok { color:#16a34a; font-weight:700 }
 .stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
 .stat-value { font-weight:700; color:#111827; font-size:28rpx; }
- 
+
 .btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
+
+.basic-mode { display:flex; flex-direction:column; gap:24rpx; }
+.basic-board { display:flex; gap:24rpx; align-items:stretch; justify-content:center; }
+.basic-column { display:flex; flex-direction:column; gap:24rpx; flex:1; }
+.basic-card-wrapper { flex:1; }
+.basic-card { background:#fff; border-radius:24rpx; box-shadow:0 12rpx 28rpx rgba(15,23,42,.12); border:2rpx solid transparent; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; min-height:320rpx; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.basic-card.hidden { visibility:hidden; pointer-events:none; }
+.basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
+.basic-card.result { background:#fef3c7; }
+.basic-card-img { width:100%; height:100%; object-fit:contain; }
+.basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
+.basic-card-value-text { font-size:72rpx; font-weight:700; color:#1f2937; }
+.basic-ops { display:flex; flex-direction:column; gap:20rpx; align-items:stretch; justify-content:center; flex:0 0 160rpx; }
+.basic-ops .btn-operator { height:110rpx; font-size:64rpx; }
+.basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
+.basic-face-toggle { margin-top:12rpx; }
+.basic-expression-card { background:#fff; border-radius:18rpx; border:2rpx solid #e5e7eb; box-shadow:0 8rpx 24rpx rgba(15,23,42,.08); padding:24rpx; text-align:center; }
+.basic-expression-text { font-size:36rpx; font-weight:700; color:#111827; }
+.basic-actions { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
+.basic-actions .btn[disabled] { opacity:.6; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
