@@ -474,7 +474,7 @@ const filteredRounds = computed(() => {
 })
 const recentRounds = computed(() => {
   const sorted = filteredRounds.value.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))
-  return sorted.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] }))
+  return sorted.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] })).reverse()
 })
 
 const trendBars = computed(() => {
