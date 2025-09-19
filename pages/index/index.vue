@@ -8,8 +8,8 @@
     </view>
 
     <view class="mode-switch">
-      <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
       <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
+      <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
     </view>
 
     <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
@@ -171,7 +171,7 @@ const solution = ref(null)
 const feedback = ref('')
 const usedByCard = ref([0,0,0,0])
 const tokens = ref([])
-const mode = ref('pro')
+const mode = ref('basic')
 const basicSlots = ref([])
 const basicSelection = ref({ first: null, operator: null })
 const basicHistory = ref([])
@@ -1409,7 +1409,7 @@ function onSessionOver() {
 .basic-ops { display:flex; flex-direction:column; gap:20rpx; align-items:stretch; justify-content:center; flex:0 0 160rpx; }
 .basic-ops .btn-operator { height:110rpx; font-size:64rpx; }
 .basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
-.basic-face-toggle { margin-top:12rpx; }
+.basic-face-toggle { margin-top:12rpx; white-space:normal;word-break: break-all;}
 .basic-expression-card { background:#fff; border-radius:18rpx; border:2rpx solid #e5e7eb; box-shadow:0 8rpx 24rpx rgba(15,23,42,.08); padding:24rpx; text-align:center; }
 .basic-expression-text { font-size:36rpx; font-weight:700; color:#111827; }
 .basic-actions { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
