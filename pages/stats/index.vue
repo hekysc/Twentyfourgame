@@ -472,7 +472,10 @@ const filteredRounds = computed(() => {
   const cutoff = calcCutoffMs()
   return list.filter(r => (!cutoff || (r.ts||0) >= cutoff))
 })
-const recentRounds = computed(() => filteredRounds.value.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] })))
+const recentRounds = computed(() => {
+  const sorted = filteredRounds.value.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))
+  return sorted.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] }))
+})
 
 const trendBars = computed(() => {
   // 取天级分布：基于 rounds 计算（更精确地考虑筛选）
