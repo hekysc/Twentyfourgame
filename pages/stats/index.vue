@@ -62,11 +62,33 @@
         <text class="title">📈个人趋势</text>
       </view>
 
-      <view class="trend" style="margin-top:12rpx; height:160rpx; display:flex; align-items:flex-end; gap:6rpx;">
-        <view v-for="(d,i) in trendBars" :key="i" class="bar"
-              :style="{ height: (d.height||4) + 'rpx', background: d.color }"></view>
+      <view class="trend-chart" style="margin-top:12rpx;">
+        <view class="trend-chart-inner"
+              :style="{ width: trendSeries.width ? (trendSeries.width + 'rpx') : '100%', height: trendSeries.chartHeight + 'rpx' }">
+          <view class="trend-bars"
+                :style="{ gap: trendSeries.gap + 'rpx', width: trendSeries.width ? (trendSeries.width + 'rpx') : '100%' }">
+            <view v-for="(d,i) in trendSeries.items" :key="d.label || i" class="trend-item"
+                  :style="{ width: trendSeries.barWidth + 'rpx' }">
+              <view class="bar" :style="{ height: d.totalHeight + 'rpx' }">
+                <view class="bar-fail" :style="{ height: d.failHeight + 'rpx' }"></view>
+                <view class="bar-success" :style="{ height: d.successHeight + 'rpx' }"></view>
+              </view>
+            </view>
+          </view>
+          <view class="trend-line">
+            <view v-for="(seg,i) in trendSeries.lineSegments" :key="'seg-'+i" class="line-segment"
+                  :style="{ left: seg.left + 'rpx', bottom: seg.bottom + 'rpx', width: seg.length + 'rpx', transform: `translateY(-1rpx) rotate(${seg.angle}deg)` }"></view>
+            <view v-for="(d,i) in trendSeries.items" :key="'pt-'+i" class="line-point"
+                  :style="{ left: d.lineX + 'rpx', bottom: d.lineY + 'rpx' }"></view>
+          </view>
+        </view>
+        <view class="trend-labels"
+              :style="{ gap: trendSeries.gap + 'rpx', width: trendSeries.width ? (trendSeries.width + 'rpx') : '100%' }">
+          <text v-for="(d,i) in trendSeries.items" :key="'label-'+i" class="bar-label"
+                :style="{ width: trendSeries.barWidth + 'rpx' }">{{ d.shortLabel }}</text>
+        </view>
       </view>
-      <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=成功占比，灰色=无数据</view>
+      <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=胜利局数，红色=失败局数，蓝色折线=胜率</view>
       <!-- <view class="table" style="margin-top:12rpx;">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
           <text class="th">窗口</text>
@@ -355,7 +377,6 @@ import MicroSpark from '../../components/MicroSpark.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
 import {
-  computeTrendBars,
   computeOverviewRows,
   computeNearMisses,
   summarizeNearMisses,
@@ -477,30 +498,97 @@ const recentRounds = computed(() => {
   return sorted.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] })).reverse()
 })
 
-const trendBars = computed(() => {
-  // 取天级分布：基于 rounds 计算（更精确地考虑筛选）
+const TREND_BAR_HEIGHT = 160
+const TREND_BAR_WIDTH = 24
+const TREND_BAR_GAP = 12
+const DAY_MS = 86400000
+
+function formatDayKey(ms){
+  const d = new Date(ms)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+function shortLabel(key){
+  return key ? key.slice(5).replace('-', '/') : ''
+}
+
+const trendSeries = computed(() => {
   const rounds = filteredRounds.value
   const byDay = new Map()
   for (const r of rounds) {
-    const key = new Date(r.ts||0).toISOString().slice(0,10)
-    const cur = byDay.get(key) || { total:0, success:0 }
-    cur.total += 1; if (r.success) cur.success += 1
+    const key = formatDayKey(r.ts || 0)
+    const cur = byDay.get(key) || { total: 0, success: 0 }
+    cur.total += 1
+    if (r.success) cur.success += 1
     byDay.set(key, cur)
   }
-  let days = Array.from(byDay.entries()).sort((a,b)=> a[0]<b[0]? -1: 1)
-  if (overviewRange.value>0) {
-    const cutoff = calcCutoffMs()
-    days = days.filter(([k]) => new Date(k+'T00:00:00Z').getTime() >= cutoff)
+
+  const todayMs = startOfTodayMs()
+  const todayKey = formatDayKey(todayMs)
+  let keys = []
+  if (overviewRange.value > 0) {
+    const span = Number(overviewRange.value) || 1
+    const startMs = todayMs - (span - 1) * DAY_MS
+    for (let ms = startMs; ms <= todayMs; ms += DAY_MS) {
+      keys.push(formatDayKey(ms))
+    }
+  } else {
+    keys = Array.from(byDay.keys())
+    if (!keys.includes(todayKey)) keys.push(todayKey)
+    keys.sort()
+    if (keys.length > 30) keys = keys.slice(-30)
   }
-  // 至多展示 30 根柱
-  days = days.slice(-30)
-  const maxTotal = Math.max(1, ...days.map(([,v])=>v.total))
-  return days.map(([k,v])=>{
-    const h = Math.max(4, Math.round(120 * (v.total/maxTotal)))
-    const rate = v.total ? (v.success / v.total) : 0
-    const color = v.total ? '#16a34a' : '#e5e7eb'
-    return { label: k, height: Math.max(6, Math.round(h*rate)), color }
+
+  const seriesData = keys.map(key => {
+    const entry = byDay.get(key) || { total: 0, success: 0 }
+    const total = entry.total || 0
+    const success = entry.success || 0
+    const winRate = total ? (success / total) : 0
+    return { key, total, success, winRate }
   })
+
+  const maxTotal = Math.max(1, ...seriesData.map(item => item.total))
+
+  const items = seriesData.map((item, index) => {
+    const totalHeight = item.total ? Math.max(4, Math.round((item.total / maxTotal) * TREND_BAR_HEIGHT)) : 0
+    const successHeight = item.total ? Math.round(totalHeight * item.winRate) : 0
+    const failHeight = Math.max(0, totalHeight - successHeight)
+    const lineY = Math.round(Math.min(1, Math.max(0, item.winRate)) * TREND_BAR_HEIGHT)
+    const lineX = index * (TREND_BAR_WIDTH + TREND_BAR_GAP) + TREND_BAR_WIDTH / 2
+    return {
+      label: item.key,
+      shortLabel: shortLabel(item.key),
+      totalHeight,
+      successHeight,
+      failHeight,
+      lineX,
+      lineY,
+    }
+  })
+
+  const lineSegments = []
+  for (let i = 1; i < items.length; i += 1) {
+    const prev = items[i - 1]
+    const cur = items[i]
+    const dx = cur.lineX - prev.lineX
+    const dy = cur.lineY - prev.lineY
+    const length = Math.hypot(dx, dy)
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+    lineSegments.push({ left: prev.lineX, bottom: prev.lineY, length: Number(length.toFixed(2)), angle })
+  }
+
+  const width = items.length ? (items.length * (TREND_BAR_WIDTH + TREND_BAR_GAP) - TREND_BAR_GAP) : 0
+
+  return {
+    items,
+    lineSegments,
+    barWidth: TREND_BAR_WIDTH,
+    gap: TREND_BAR_GAP,
+    chartHeight: TREND_BAR_HEIGHT,
+    width,
+  }
 })
 // 玩家总览：按筛选范围/提示/面牌统计并按胜率排序
 const overviewRows = computed(() => computeOverviewRows(rows.value, userExtMap.value, calcCutoffMs()))
@@ -925,7 +1013,18 @@ function navigateTab(url){
 .seg{ display:flex; background:#f1f5f9; border-radius:12rpx; overflow:hidden }
 .seg-btn{ padding:10rpx 16rpx; background:transparent; border:none }
 .seg-btn.active{ background:#fff; font-weight:700 }
-.trend .bar{ width:18rpx; border-radius:8rpx; background:#e5e7eb }
+.trend-chart{ width:100%; overflow-x:auto; }
+.trend-chart-inner{ position:relative; }
+.trend-bars{ display:flex; align-items:flex-end; height:100%; }
+.trend-item{ display:flex; justify-content:center; align-items:flex-end; height:100%; }
+.trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:12rpx 12rpx 0 0; overflow:hidden; background:#f1f5f9; }
+.trend-item .bar-fail{ width:100%; background:#dc2626; }
+.trend-item .bar-success{ width:100%; background:#16a34a; }
+.trend-line{ position:absolute; left:0; bottom:0; width:100%; height:100%; pointer-events:none; }
+.trend-line .line-segment{ position:absolute; height:2rpx; background:#0ea5e9; transform-origin:left center; border-radius:2rpx; }
+.trend-line .line-point{ position:absolute; width:10rpx; height:10rpx; border-radius:50%; background:#0ea5e9; border:2rpx solid #fff; box-shadow:0 0 4rpx rgba(14,165,233,0.4); transform:translate(-50%, -50%); }
+.trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx; }
+.trend-labels .bar-label{ text-align:center; color:#64748b; font-size:22rpx; white-space:nowrap; }
 .rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
 .round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
 .round-item.compact3{ grid-template-columns: 200rpx 120rpx 160rpx }
