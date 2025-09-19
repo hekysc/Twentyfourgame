@@ -82,7 +82,7 @@
                   :style="{ left: d.lineX + 'rpx', bottom: d.lineY + 'rpx' }"></view>
           </view>
         </view>
-        <view class="trend-labels"
+        <view class="trend-labels" :class="{ rotate: rotateDates }"
               :style="{ gap: trendSeries.gap + 'rpx', width: trendSeries.width ? (trendSeries.width + 'rpx') : '100%' }">
           <text v-for="(d,i) in trendSeries.items" :key="'label-'+i" class="bar-label"
                 :style="{ width: trendSeries.barWidth + 'rpx' }">{{ d.shortLabel }}</text>
@@ -408,6 +408,13 @@ const userMap = computed(() => {
 })
 // 单用户兼容：保留 ext 但内部来源于 userExtMap
 const ext = ref({ totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} })
+// 日期标签旋转：当数据点较多时自动竖排，避免重叠
+const rotateDates = computed(() => {
+  try {
+    const n = trendSeries.value?.items?.length || 0
+    return n >= 1  // 当有7个或更多数据点时旋转
+  } catch (_) { return false }
+})
 
 onMounted(() => {
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
@@ -1025,6 +1032,16 @@ function navigateTab(url){
 .trend-line .line-point{ position:absolute; width:10rpx; height:10rpx; border-radius:50%; background:#0ea5e9; border:2rpx solid #fff; box-shadow:0 0 4rpx rgba(14,165,233,0.4); transform:translate(-50%, -50%); }
 .trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx; }
 .trend-labels .bar-label{ text-align:center; color:#64748b; font-size:22rpx; white-space:nowrap; }
+.trend-labels.rotate { 
+  min-height: 60rpx; 
+  align-items: flex-end; 
+}
+.trend-labels.rotate .bar-label { 
+  display: inline-block;        /* 让 transform 生效 */
+  transform: rotate(-90deg);    /* 顺时针或逆时针旋转 */
+  transform-origin: center center;  /* 旋转参考点，可以根据需求改为 left bottom 等 */
+  white-space: nowrap;
+}
 .rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
 .round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
 .round-item.compact3{ grid-template-columns: 200rpx 120rpx 160rpx }
