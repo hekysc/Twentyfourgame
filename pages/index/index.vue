@@ -168,6 +168,7 @@ function saveSession() {
       successCount: successCount.value || 0,
       failCount: failCount.value || 0,
       feedback: feedback.value || '',
+      solution: solution.value || null, // persisted solution to avoid "暂无提示" after restore
     }
     uni.setStorageSync(SESSION_KEY, JSON.stringify(data))
   } catch (_) { /* noop */ }
@@ -193,6 +194,15 @@ function loadSession() {
       successCount.value = data.successCount || 0
       failCount.value = data.failCount || 0
       feedback.value = data.feedback || ''
+      // 恢复 solution（向后兼容老会话）
+      solution.value = data.solution || null
+      // 如果没有 solution，则基于当前 cards 即时计算一份（兜底）
+      if (!solution.value) {
+        try {
+          const mapped = (cards.value || []).map(c => evalRank(c.rank))
+          solution.value = mapped.length === 4 ? solve24(mapped) : null
+        } catch (_) { solution.value = null }
+      }
       nextTick(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
       return true
     }
@@ -595,6 +605,15 @@ function check() {
 
 function showSolution() {
   hintWasUsed.value = true
+
+  // 兜底：若 solution 为空，尝试即时计算一份
+  if (!solution.value) {
+    try {
+      const mapped = (cards.value || []).map(c => evalRank(c.rank))
+      solution.value = mapped.length === 4 ? solve24(mapped) : null
+    } catch (_) { solution.value = null }
+  }
+
   if (!handRecorded.value) {
     handRecorded.value = true
     handsPlayed.value += 1
