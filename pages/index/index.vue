@@ -163,8 +163,22 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
-import { evaluateExprToFraction, solve24, Fraction } from '../../utils/solver.js'
+import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
+import {
+  tokensToExpression,
+  formatMs,
+  formatMsShort,
+  cardImagePath,
+  labelForRank,
+  mapCardRank,
+  computeExprStats,
+  isExpressionComplete,
+  statsFromExpressionString,
+  formatFractionValue,
+} from '../../utils/calc.js'
+import { createBasicState, combineBasicSlots, undoBasicHistory } from '../../core/basic-mode.js'
+import { drawSolvableHand, newDeck } from '../../core/game-engine.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
@@ -198,6 +212,10 @@ const lastSuccessMs = ref(null)
 const SESSION_KEY = 'tf24_game_session_v1'
 const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
 const settledResult = ref(null);         // 'success' | 'fail' | null
+
+const fmtMs = formatMs
+const fmtMs1 = formatMsShort
+const cardImage = cardImagePath
 
 function saveSession() {
   try {
@@ -247,7 +265,7 @@ function loadSession() {
       // 如果没有 solution，则基于当前 cards 即时计算一份（兜底）
       if (!solution.value) {
         try {
-          const mapped = (cards.value || []).map(c => evalRank(c.rank))
+          const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
           solution.value = mapped.length === 4 ? solve24(mapped) : null
         } catch (_) { solution.value = null }
       }
@@ -286,7 +304,7 @@ const { proxy } = getCurrentInstance()
 
 const booted = ref(false)
 
-const expr = computed(() => tokens.value.map(x => x.type==='num' ? String(evalRank(x.rank ?? +x.value)) : x.value).join(''))
+const expr = computed(() => tokensToExpression(tokens.value, faceUseHigh.value))
 const ghostStyle = computed(() => `left:${drag.value.x}px; top:${drag.value.y}px;`)
 const exprScale = ref(1)
 const opsDensity = ref('normal') // normal | compact | tight
@@ -294,8 +312,8 @@ const opsDensityClass = computed(() => opsDensity.value === 'tight' ? 'ops-tight
 const ghostText = computed(() => {
   const t = drag.value.token
   if (!t) return ''
-  if (t.type === 'num') return labelFor(t.rank || +t.value)
-  if (t.type === 'tok') return /^(10|11|12|13|[1-9])$/.test(t.value) ? labelFor(+t.value) : t.value
+  if (t.type === 'num') return labelForRank(t.rank || +t.value)
+  if (t.type === 'tok') return /^(10|11|12|13|[1-9])$/.test(t.value) ? labelForRank(+t.value) : t.value
   return t.value || ''
 })
 const placeholderSizeClass = computed(() => {
@@ -325,122 +343,14 @@ function basicCardClass(idx) {
   }
 }
 
-function displayLabelForBasic(card) {
-  if (!card) return ''
-  const rank = card.rank
-  const mapped = evalRank(rank)
-  if ((rank === 11 || rank === 12 || rank === 13) && !faceUseHigh.value) {
-    return String(mapped)
-  }
-  return labelFor(rank)
-}
-
-function formatFractionValue(frac) {
-  if (!frac) return ''
-  return frac.d === 1 ? String(frac.n) : `${frac.n}/${frac.d}`
-}
-
-function stripOuterParens(str) {
-  if (!str) return ''
-  let text = str.trim()
-  while (text.startsWith('(') && text.endsWith(')')) {
-    let depth = 0
-    let balanced = true
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i]
-      if (ch === '(') depth++
-      else if (ch === ')') {
-        depth--
-        if (depth < 0) { balanced = false; break }
-        if (depth === 0 && i < text.length - 1) { balanced = false; break }
-      }
-    }
-    if (!balanced || depth !== 0) break
-    text = text.slice(1, -1).trim()
-  }
-  return text
-}
-
-function formatBasicDisplayExpression(expr, value) {
-  const trimmed = stripOuterParens(expr || '')
-  if (!trimmed) return ''
-  const valText = value ? formatFractionValue(value) : ''
-  return valText ? `${trimmed}=${valText}` : trimmed
-}
-
-function cloneBasicSlots(slots) {
-  return (slots || []).map(slot => {
-    if (!slot) return null
-    return {
-      id: slot.id,
-      alive: slot.alive,
-      value: slot.value ? { n: slot.value.n, d: slot.value.d } : null,
-      expr: slot.expr,
-      displayExpr: slot.displayExpr,
-      label: slot.label,
-      card: slot.card ? { rank: slot.card.rank, suit: slot.card.suit } : null,
-      source: slot.source,
-    }
-  })
-}
-
-function statsFromExpressionString(expression) {
-  if (!expression) return { ops: [], exprLen: 0, maxDepth: 0 }
-  const ops = []
-  let exprLen = 0
-  let depth = 0
-  let maxDepth = 0
-  const tokens = expression.match(/10|11|12|13|[1-9]|[()+\-×÷]/g) || []
-  for (const tok of tokens) {
-    exprLen += 1
-    if (tok === '(') {
-      depth += 1
-      if (depth > maxDepth) maxDepth = depth
-    } else if (tok === ')') {
-      depth = Math.max(0, depth - 1)
-    } else if ('+-×÷'.includes(tok)) {
-      ops.push(tok)
-    }
-  }
-  return { ops, exprLen, maxDepth }
-}
 
 function resetBasicStateFromCards() {
-  const nextSlots = []
-  const srcCards = cards.value || []
-  for (let i = 0; i < 4; i++) {
-    const card = srcCards[i]
-    if (card) {
-      const mapped = evalRank(card.rank)
-      const value = new Fraction(mapped, 1)
-      nextSlots.push({
-        id: i,
-        alive: true,
-        value,
-        expr: String(mapped),
-        displayExpr: displayLabelForBasic(card),
-        label: formatFractionValue(value),
-        card: { rank: card.rank, suit: card.suit },
-        source: 'card',
-      })
-    } else {
-      nextSlots.push({
-        id: i,
-        alive: false,
-        value: null,
-        expr: '',
-        displayExpr: '',
-        label: '',
-        card: null,
-        source: 'card',
-      })
-    }
-  }
-  basicSlots.value = nextSlots
+  const base = createBasicState(cards.value || [], faceUseHigh.value)
+  basicSlots.value = base.slots
   basicSelection.value = { first: null, operator: null }
   basicHistory.value = []
-  basicExpression.value = ''
-  basicDisplayExpression.value = ''
+  basicExpression.value = base.expression
+  basicDisplayExpression.value = base.displayExpression
   if (mode.value === 'basic' && !handSettled.value) setDefaultFeedback('basic')
 }
 
@@ -488,113 +398,70 @@ function handleBasicCardTap(idx) {
   feedbackIsError.value = false
 }
 
-function computeFractionOperation(a, b, op) {
-  if (!a || !b) return null
-  if (op === '+') return a.plus(b)
-  if (op === '-') return a.minus(b)
-  if (op === '×') return a.times(b)
-  if (op === '÷') {
-    if (b.n === 0) throw new Error('divide-by-zero')
-    return a.div(b)
-  }
-  return null
-}
-
 function applyBasicCombination(firstIdx, secondIdx, op) {
-  if (firstIdx === secondIdx) {
-    feedback.value = '请选择不同的两张牌'
-    feedbackIsError.value = true
-    return
-  }
-  const slots = basicSlots.value.slice()
-  const first = slots[firstIdx]
-  const second = slots[secondIdx]
-  if (!first || !second || !first.alive || !second.alive) return
-  let result
-  try {
-    result = computeFractionOperation(first.value, second.value, op)
-  } catch (_) {
-    feedback.value = '无法进行该运算'
-    feedbackIsError.value = true
-    return
-  }
-  if (!result) {
-    feedback.value = '无法进行该运算'
-    feedbackIsError.value = true
-    return
-  }
-  basicHistory.value = [...basicHistory.value, {
-    slots: cloneBasicSlots(slots),
+  const res = combineBasicSlots({
+    slots: basicSlots.value,
+    history: basicHistory.value,
     expression: basicExpression.value,
     displayExpression: basicDisplayExpression.value,
-  }]
-  const newExpr = `(${first.expr}${op}${second.expr})`
-  const newDisplayExpr = `(${first.displayExpr}${op}${second.displayExpr})`
-  const updated = slots.slice()
-  updated[firstIdx] = { ...first, alive: false }
-  updated[secondIdx] = {
-    id: second.id,
-    alive: true,
-    value: result,
-    expr: newExpr,
-    displayExpr: newDisplayExpr,
-    label: formatFractionValue(result),
-    card: null,
-    source: 'value',
+  }, firstIdx, secondIdx, op)
+
+  if (!res.ok) {
+    if (res.err === 'SAME_INDEX') {
+      feedback.value = '请选择不同的两张牌'
+    } else if (res.err === 'DIVIDE_BY_ZERO') {
+      feedback.value = '无法进行该运算'
+    } else if (res.err === 'INACTIVE_SLOT') {
+      feedback.value = '请选择有效的牌'
+    } else {
+      feedback.value = '无法进行该运算'
+    }
+    feedbackIsError.value = true
+    return
   }
-  basicSlots.value = updated
+
+  const data = res.data
+  basicSlots.value = data.slots
+  basicHistory.value = data.history
+  basicExpression.value = data.expression
+  basicDisplayExpression.value = data.displayExpression
   basicSelection.value = { first: null, operator: null }
-  basicExpression.value = newExpr
-  basicDisplayExpression.value = formatBasicDisplayExpression(newDisplayExpr, result)
-  const alive = updated.filter(s => s && s.alive)
-  if (alive.length === 1) {
-    if (result.equalsInt && result.equalsInt(24)) {
-      const exprForRecord = stripOuterParens(newExpr)
+  errorValueText.value = ''
+
+  if (data.aliveCount === 1) {
+    if (data.isSolved) {
       settleHandResult({
         ok: true,
-        expression: exprForRecord,
-        valueFraction: result,
-        stats: statsFromExpressionString(exprForRecord),
+        expression: data.exprForRecord,
+        valueFraction: data.result,
+        stats: data.stats,
         origin: 'basic',
       })
     } else {
-      feedback.value = `当前结果：${formatFractionValue(result)}，还未达到 24`
+      feedback.value = `当前结果：${formatFractionValue(data.result)}，还未达到 24`
       feedbackIsError.value = true
     }
   } else {
     feedback.value = '请选择下一步操作'
     feedbackIsError.value = false
   }
-  errorValueText.value = ''
   try { saveSession() } catch (_) {}
 }
 
 function undoBasicStep() {
-  if (!basicHistory.value.length) {
+  const res = undoBasicHistory(basicHistory.value)
+  if (!res.ok) {
     if (mode.value === 'basic') {
       feedback.value = '没有可撤销的步骤'
       feedbackIsError.value = true
     }
     return
   }
-  const history = basicHistory.value.slice()
-  const snapshot = history.pop()
-  basicHistory.value = history
-  basicSlots.value = (snapshot.slots || []).map(slot => {
-    if (!slot) return null
-    return {
-      id: slot.id,
-      alive: slot.alive,
-      value: slot.value ? new Fraction(slot.value.n, slot.value.d) : null,
-      expr: slot.expr,
-      displayExpr: slot.displayExpr,
-      label: slot.label,
-      card: slot.card ? { rank: slot.card.rank, suit: slot.card.suit } : null,
-      source: slot.source,
-    }
-  })
-  basicExpression.value = snapshot.expression || ''
-  basicDisplayExpression.value = snapshot.displayExpression || ''
+  const data = res.data
+  basicHistory.value = data.history
+  basicSlots.value = data.slots
+  basicExpression.value = data.expression
+  basicDisplayExpression.value = data.displayExpression
   basicSelection.value = { first: null, operator: null }
   if (mode.value === 'basic') {
     feedback.value = '已撤销，选择下一步'
@@ -621,105 +488,63 @@ const currentText = computed(() => {
 function refresh() { nextHand() }
 
 function initDeck() {
-  const suits = ['S','H','D','C']
-  const arr = []
-  for (const s of suits) { for (let r=1; r<=13; r++) arr.push({ rank:r, suit:s }) }
-  // shuffle
-  for (let i=arr.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]] }
-  deck.value = arr
+  deck.value = newDeck()
 }
 
-  function nextHand() {
-    if (!deck.value || deck.value.length < 4) {
-      // 整副用尽：提示是否重洗，不计入“本局结束”与统计
-      try {
-        uni.showModal({
-          title: '牌库用尽',
-          content: '余牌无解或整副用完，是否重新洗牌？',
-          confirmText: '重洗',
-          cancelText: '进入统计',
-          success: (res) => {
-            if (res.confirm) {
-              initDeck()
-              // 新一副牌开始：本副内统计清零
-              handsPlayed.value = 0
-              successCount.value = 0
-              failCount.value = 0
-              nextTick(() => nextHand())
-            } else {
-              try { uni.reLaunch({ url: '/pages/stats/index' }) }
-              catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
-            }
-          }
-        })
-      } catch (_) {
-        // 回退策略：直接重洗继续（同时清零本副内统计）
-        initDeck()
-        handsPlayed.value = 0
-        successCount.value = 0
-        failCount.value = 0
-        nextTick(() => nextHand())
-      }
-      return
-    }
-  const maxTry = Math.min(200, 1 + (deck.value.length * deck.value.length))
-  let pickIdx = null
-  for (let t=0; t<maxTry; t++) {
-    const idxs = new Set()
-    while (idxs.size < 4) idxs.add(Math.floor(Math.random() * deck.value.length))
-    const ids = Array.from(idxs)
-    const cs = ids.map(i => deck.value[i])
-    const mapped = cs.map(c => evalRank(c.rank))
-    const sol = solve24(mapped)
-    if (sol) { pickIdx = { ids, sol }; break }
+function nextHand() {
+  if (!deck.value || deck.value.length < 4) {
+    promptDeckReshuffle()
+    return
   }
-    if (!pickIdx) {
-      // 无可解手牌：按“用尽重洗”流程处理，不判定为本局结束
-      try {
-        uni.showModal({
-          title: '牌库用尽',
-          content: '余牌无解或整副用完，是否重新洗牌？',
-          confirmText: '重洗',
-          cancelText: '进入统计',
-          success: (res) => {
-            if (res.confirm) {
-              initDeck()
-              // 新一副牌开始：本副内统计清零
-              handsPlayed.value = 0
-              successCount.value = 0
-              failCount.value = 0
-              nextTick(() => nextHand())
-            } else {
-              try { uni.reLaunch({ url: '/pages/stats/index' }) }
-              catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
-            }
-          }
-        })
-      } catch (_) {
-        initDeck()
-        handsPlayed.value = 0
-        successCount.value = 0
-        failCount.value = 0
-        nextTick(() => nextHand())
-      }
-      return
-    }
+
+  const res = drawSolvableHand(deck.value, faceUseHigh.value, solve24)
+  if (!res.ok) {
+    promptDeckReshuffle()
+    return
+  }
+
   resetHandStateForNext()
-  const ids = pickIdx.ids.sort((a,b)=>b-a)
-  const cs = []
-  for (const i of ids) { cs.unshift(deck.value[i]); deck.value.splice(i,1) }
-  cards.value = cs
-  resetBasicStateFromCards()
-  solution.value = pickIdx.sol
+  deck.value = res.data.deck
+  cards.value = res.data.cards
+  solution.value = res.data.solution
   tokens.value = []
-  usedByCard.value = [0,0,0,0]
+  usedByCard.value = [0, 0, 0, 0]
   handRecorded.value = false
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
   setDefaultFeedback()
   nextTick(() => recomputeExprHeight())
-  try { saveSession() } catch(_) {}
+  try { saveSession() } catch (_) {}
+}
+
+function promptDeckReshuffle() {
+  try {
+    uni.showModal({
+      title: '牌库用尽',
+      content: '余牌无解或整副用完，是否重新洗牌？',
+      confirmText: '重洗',
+      cancelText: '进入统计',
+      success: (res) => {
+        if (res.confirm) {
+          initDeck()
+          handsPlayed.value = 0
+          successCount.value = 0
+          failCount.value = 0
+          nextTick(() => nextHand())
+        } else {
+          try { uni.reLaunch({ url: '/pages/stats/index' }) }
+          catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
+        }
+      },
+    })
+  } catch (_) {
+    initDeck()
+    handsPlayed.value = 0
+    successCount.value = 0
+    failCount.value = 0
+    nextTick(() => nextHand())
+  }
 }
 
 onMounted(() => {
@@ -764,20 +589,6 @@ onUnmounted(() => { stopHandTimer() })
 
 // 已移除“清空表达式”功能，避免误触清空
 
-function computeExprStats() {
-  const arr = tokens.value || []
-  const ops = []
-  let depth = 0, maxDepth = 0
-  for (const t of arr) {
-    if (t.type === 'op') {
-      if (t.value === '(') { depth++; if (depth > maxDepth) maxDepth = depth; continue }
-      if (t.value === ')') { depth = Math.max(0, depth - 1); continue }
-      if (t.value === '+' || t.value === '-' || t.value === '×' || t.value === '÷') ops.push(t.value)
-    }
-  }
-  return { exprLen: arr.length, maxDepth, ops }
-}
-
 function updateLastSuccess() {
   try {
     const cu = getCurrentUser && getCurrentUser()
@@ -786,46 +597,6 @@ function updateLastSuccess() {
     const r = (ext && Array.isArray(ext.rounds) ? ext.rounds.slice().reverse() : []).find(x => x && x.success && Number.isFinite(x.timeMs))
     lastSuccessMs.value = r ? r.timeMs : null
   } catch (_) { lastSuccessMs.value = null }
-}
-
-function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
-function fmtMs1(ms){ if (!Number.isFinite(ms)) return '-'; const s = ms/1000; if (s < 120) return s.toFixed(1)+'s'; return fmtMs(ms) }
-
-function isExprComplete() {
-  const arr = tokens.value || []
-  if (!arr.length) return false
-  let bal = 0
-  let prev = null
-  const isBin = v => (v==='+'||v==='-'||v==='×'||v==='÷')
-  for (const t of arr) {
-    if (t.type === 'op' && t.value === '(') bal++
-    else if (t.type === 'op' && t.value === ')') { bal--; if (bal < 0) return false }
-    if (!prev) {
-      if (t.type==='op' && (t.value===')' || isBin(t.value))) return false
-    } else {
-      const pa = prev.type === 'op' ? prev.value : 'num'
-      const pb = t.type === 'op' ? t.value : 'num'
-      if (isBin(pa) && isBin(pb)) return false
-
-      // 新增和修改的逻辑：检查数字和括号之间的关系
-      // 规则：数字后不能是左括号，右括号后不能是数字
-      if (prev.type === 'num' && t.type === 'op' && t.value === '(') {
-        return false;
-      }
-      if (prev.type === 'op' && prev.value === ')' && t.type === 'num') {
-        return false;
-      }
-      
-      // 新增功能：检查相邻 token 是否都是数字
-      if (prev.type === 'num' && t.type === 'num') {
-        return false;
-      }
-    }
-    prev = t
-  }
-  const last = arr[arr.length-1]
-  if (last && last.type==='op' && (last.value==='(' || isBin(last.value))) return false
-  return bal === 0
 }
 
 function resetHandStateForNext() {
@@ -940,7 +711,7 @@ function check() {
   const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0);
   errorValueText.value = '';
   if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return; }
-  if (!isExprComplete()) { feedback.value = '表达式错误'; feedbackIsError.value = true; return; }
+  if (!isExpressionComplete(tokens.value)) { feedback.value = '表达式错误'; feedbackIsError.value = true; return; }
 
   const s = expr.value;
   const v = evaluateExprToFraction(s);
@@ -949,7 +720,7 @@ function check() {
     ok,
     expression: s,
     valueFraction: v,
-    stats: computeExprStats(),
+    stats: computeExprStats(tokens.value),
     origin: 'pro',
   })
 }
@@ -960,7 +731,7 @@ function showSolution() {
   // 兜底：若 solution 为空，尝试即时计算一份
   if (!solution.value) {
     try {
-      const mapped = (cards.value || []).map(c => evalRank(c.rank))
+      const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
       solution.value = mapped.length === 4 ? solve24(mapped) : null
     } catch (_) { solution.value = null }
   }
@@ -970,7 +741,7 @@ function showSolution() {
     handsPlayed.value += 1
     failCount.value += 1
     try {
-      const stats = computeExprStats()
+      const stats = computeExprStats(tokens.value)
       pushRound({
         success: false,
         timeMs: Date.now() - (handStartTs.value || Date.now()),
@@ -997,7 +768,7 @@ function skipHand() {
     handsPlayed.value += 1
     failCount.value += 1
     try {
-      const stats = computeExprStats()
+      const stats = computeExprStats(tokens.value)
       pushRound({
         success: false,
         timeMs: Date.now() - (handStartTs.value || Date.now()),
@@ -1270,27 +1041,6 @@ function recomputeExprHeight() {
     })
   })
 }
-
-function evalRank(rank) {
-  if (rank === 1) return 1
-  if (rank === 11 || rank === 12 || rank === 13) return faceUseHigh.value ? rank : 1
-  return rank
-}
-function labelFor(n) {
-  if (n === 1) return 'A'
-  if (n === 11) return 'J'
-  if (n === 12) return 'Q'
-  if (n === 13) return 'K'
-  return String(n)
-}
-function cardImage(card) {
-  const suitMap = { 'S': 'Spade', 'H': 'Heart', 'D': 'Diamond', 'C': 'Club' }
-  const faceMap = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
-  const suitName = suitMap[card.suit] || 'Spade'
-  const rankName = faceMap[card.rank] || String(card.rank)
-  return `/static/cards/${suitName}${rankName}.png`
-}
-function randomSuit() { return ['S','H','D','C'][Math.floor(Math.random()*4)] }
 
 function onSessionOver() {
   try {
