@@ -14,7 +14,6 @@
       </view>
       <button
         class="btn btn-secondary deck-toggle-btn"
-        :class="{ active: deckSource === 'mistake' }"
         @click="toggleDeckSource"
       >{{ deckSourceLabel }}</button>
     </view>
@@ -300,7 +299,22 @@ function loadSession() {
   } catch (_) { return false }
 }
 
-const remainingCards = computed(() => (deck.value || []).length)
+const remainingCards = computed(() => {
+  if (deckSource.value === 'mistake') {
+    const uid = selectedUserId.value
+    if (!uid) return 0
+    const pool = getActivePool(uid) || []
+    if (!Array.isArray(pool) || pool.length === 0) return 0
+    const used = mistakeRunUsed.value instanceof Set ? mistakeRunUsed.value : new Set()
+    let remainingHands = 0
+    for (const item of pool) {
+      if (!item || !item.key) continue
+      if (!used.has(item.key)) remainingHands += 1
+    }
+    return remainingHands * 4
+  }
+  return Array.isArray(deck.value) ? deck.value.length : 0
+})
 const winRate = computed(() => {
   const t = successCount.value + failCount.value
   return t ? Math.round(100 * successCount.value / t) : 0
@@ -1290,8 +1304,15 @@ function onSessionOver() {
 .mode-switch { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; flex:1; }
 .mode-switch-btn { width:100%; }
 .mode-switch-btn.active { background:#145751; color:#fff; }
-.deck-toggle-btn { width:auto; padding:28rpx 36rpx; white-space:nowrap; font-weight:700; border:2rpx solid #0f766e; color:#0f766e; background:#ecfdf5; }
-.deck-toggle-btn.active { background:#145751; color:#fff; border-color:#145751; }
+.deck-toggle-btn {
+  width:auto;
+  padding:28rpx 36rpx;
+  white-space:nowrap;
+  font-weight:700;
+  border:2rpx solid #145751;
+  color:#fff;
+  background:#145751;
+}
 
 .btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}
