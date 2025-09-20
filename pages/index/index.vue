@@ -613,25 +613,21 @@ async function drawFromMistakePool() {
   const pool = getActivePool(uid) || []
   if (!Array.isArray(pool) || pool.length === 0) {
     await new Promise(resolve => {
+      const fallback = () => {
+        switchDeckSource('normal')
+        resolve(null)
+      }
       try {
         uni.showModal({
           title: '提示',
-          content: '错题本为空，先切回常规或去统计看看～',
-          cancelText: '切回常规',
-          confirmText: '去统计',
-          success: (res) => {
-            if (res && res.confirm) {
-              goStats()
-            } else {
-              switchDeckSource('normal')
-            }
-            resolve(null)
-          },
-          fail: () => resolve(null),
+          content: '无错题，切换到整副牌。',
+          confirmText: 'OK',
+          showCancel: false,
+          success: () => fallback(),
+          fail: () => fallback(),
         })
       } catch (_) {
-        switchDeckSource('normal')
-        resolve(null)
+        fallback()
       }
     })
     return null
@@ -640,25 +636,31 @@ async function drawFromMistakePool() {
   const available = pool.filter(item => item && item.key && !used.has(item.key))
   if (!available.length) {
     await new Promise(resolve => {
+      const fallback = () => {
+        restartMistakeRun()
+        resolve(null)
+      }
       try {
-        uni.showModal({
-          title: '提示',
-          content: '本轮错题已练完。要重开一轮还是去统计？',
-          cancelText: '重开一轮',
-          confirmText: '去统计',
+        uni.showActionSheet({
+          title: '本轮错题已出完',
+          itemList: ['重新出题', '切换整副', '去统计'],
           success: (res) => {
-            if (res && res.confirm) {
+            const idx = typeof res?.tapIndex === 'number' ? res.tapIndex : -1
+            if (idx === 0) {
+              restartMistakeRun()
+            } else if (idx === 1) {
+              switchDeckSource('normal')
+            } else if (idx === 2) {
               goStats()
             } else {
               restartMistakeRun()
             }
             resolve(null)
           },
-          fail: () => resolve(null),
+          fail: () => fallback(),
         })
       } catch (_) {
-        restartMistakeRun()
-        resolve(null)
+        fallback()
       }
     })
     return null
