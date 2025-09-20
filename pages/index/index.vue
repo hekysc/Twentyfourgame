@@ -83,7 +83,13 @@
 
       <!-- 表达式卡片容器（高度由脚本计算） -->
       <view class="expr-card card section">
-        <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 }" :style="{ height: exprZoneHeight + 'px' }">
+        <view
+          id="exprZone"
+          class="expr-zone"
+          :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
+          :style="{ height: exprZoneHeight + 'px' }"
+        >
+          <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
           <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
             <block v-for="(t, i) in tokens" :key="i">
               <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
@@ -134,9 +140,6 @@
       </view>
     </template>
 
-    <!-- 轻提示文案 -->
-    <text id="hintText" class="hint-text" :class="{ error: feedbackIsError }">{{ feedback || defaultFeedbackFor(mode) }}</text>
-
     <view v-if="mode === 'pro'" id="submitRow">
       <button class="btn btn-primary" style="width:100%" @click="check">提交答案</button>
     </view>
@@ -183,7 +186,6 @@ import {
   computeExprStats,
   isExpressionComplete,
   statsFromExpressionString,
-  formatFractionValue,
 } from '../../utils/calc.js'
 import { createBasicState, combineBasicSlots, undoBasicHistory } from '../../core/basic-mode.js'
 import { drawSolvableHand, newDeck } from '../../core/game-engine.js'
@@ -191,7 +193,6 @@ import { getActivePool, recordRoundResult } from '../../utils/mistakes.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
-const feedback = ref('')
 const usedByCard = ref([0,0,0,0])
 const tokens = ref([])
 const mode = ref('basic')
@@ -217,7 +218,7 @@ const failCount = ref(0)
 const sessionOver = ref(false)
 const successAnimating = ref(false)
 const errorAnimating = ref(false)
-const feedbackIsError = ref(false)
+const exprOverrideText = ref('')
 const errorValueText = ref('')
 const handStartTs = ref(Date.now())
 const nowTs = ref(Date.now())
@@ -227,6 +228,7 @@ const lastSuccessMs = ref(null)
 const SESSION_KEY = 'tf24_game_session_v1'
 const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
 const settledResult = ref(null);         // 'success' | 'fail' | null
+const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
 
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort
@@ -247,7 +249,7 @@ function saveSession() {
       handsPlayed: handsPlayed.value || 0,
       successCount: successCount.value || 0,
       failCount: failCount.value || 0,
-      feedback: feedback.value || '',
+      handFailedOnce: !!handFailedOnce.value,
       solution: solution.value || null, // persisted solution to avoid "暂无提示" after restore
       deckSource: deckSource.value || 'normal',
       mistakeRunUsed: Array.from(mistakeRunUsed.value || []),
@@ -279,7 +281,7 @@ function loadSession() {
       handsPlayed.value = data.handsPlayed || 0
       successCount.value = data.successCount || 0
       failCount.value = data.failCount || 0
-      feedback.value = data.feedback || ''
+      handFailedOnce.value = !!data.handFailedOnce
       // 恢复 solution（向后兼容老会话）
       solution.value = data.solution || null
       deckSource.value = data.deckSource === 'mistake' ? 'mistake' : 'normal'
@@ -383,13 +385,16 @@ const placeholderSizeClass = computed(() => {
   return 'op'
 })
 
-function defaultFeedbackFor(m) {
-  return m === 'basic' ? '请选择两张牌和运算符进行计算' : '拖入 + - × ÷ ( ) 组成 24';
+function clearExprOverride() {
+  if (exprOverrideText.value) exprOverrideText.value = ''
 }
 
-function setDefaultFeedback(targetMode = mode.value) {
-  feedback.value = defaultFeedbackFor(targetMode);
-  feedbackIsError.value = false;
+function showExpressionErrorToast() {
+  try {
+    if (uni && typeof uni.showToast === 'function') {
+      uni.showToast({ title: '表达式错误', icon: 'none', duration: 1000 })
+    }
+  } catch (_) {}
 }
 
 function basicCardClass(idx) {
@@ -409,25 +414,16 @@ function resetBasicStateFromCards() {
   basicHistory.value = []
   basicExpression.value = base.expression
   basicDisplayExpression.value = base.displayExpression
-  if (mode.value === 'basic' && !handSettled.value) setDefaultFeedback('basic')
 }
 
 function handleBasicOperator(op) {
   if (mode.value !== 'basic' || handSettled.value) return
-  if (basicSelection.value.first === null) {
-    feedback.value = '请先选择第一张牌'
-    feedbackIsError.value = true
-    return
-  }
+  if (basicSelection.value.first === null) return
   if (basicSelection.value.operator === op) {
     basicSelection.value.operator = null
-    feedback.value = '已取消运算符选择'
-    feedbackIsError.value = false
     return
   }
   basicSelection.value.operator = op
-  feedback.value = '请选择第二张牌'
-  feedbackIsError.value = false
 }
 
 function handleBasicCardTap(idx) {
@@ -438,8 +434,6 @@ function handleBasicCardTap(idx) {
   if (selection.operator && selection.first !== null) {
     if (selection.first === idx) {
       basicSelection.value = { first: null, operator: null }
-      feedback.value = defaultFeedbackFor('basic')
-      feedbackIsError.value = false
       return
     }
     applyBasicCombination(selection.first, idx, selection.operator)
@@ -447,13 +441,9 @@ function handleBasicCardTap(idx) {
   }
   if (selection.first === idx) {
     basicSelection.value = { first: null, operator: null }
-    feedback.value = defaultFeedbackFor('basic')
-    feedbackIsError.value = false
     return
   }
   basicSelection.value = { first: idx, operator: null }
-  feedback.value = '请选择运算符'
-  feedbackIsError.value = false
 }
 
 function applyBasicCombination(firstIdx, secondIdx, op) {
@@ -465,16 +455,7 @@ function applyBasicCombination(firstIdx, secondIdx, op) {
   }, firstIdx, secondIdx, op)
 
   if (!res.ok) {
-    if (res.err === 'SAME_INDEX') {
-      feedback.value = '请选择不同的两张牌'
-    } else if (res.err === 'DIVIDE_BY_ZERO') {
-      feedback.value = '无法进行该运算'
-    } else if (res.err === 'INACTIVE_SLOT') {
-      feedback.value = '请选择有效的牌'
-    } else {
-      feedback.value = '无法进行该运算'
-    }
-    feedbackIsError.value = true
+    basicSelection.value = { first: null, operator: null }
     return
   }
 
@@ -498,44 +479,27 @@ function applyBasicCombination(firstIdx, secondIdx, op) {
   errorValueText.value = ''
 
   if (data.aliveCount === 1) {
-    if (data.isSolved) {
-      settleHandResult({
-        ok: true,
-        expression: data.exprForRecord,
-        valueFraction: data.result,
-        stats: data.stats,
-        origin: 'basic',
-      })
-    } else {
-      feedback.value = `当前结果：${formatFractionValue(data.result)}，还未达到 24`
-      feedbackIsError.value = true
-    }
-  } else {
-    feedback.value = '请选择下一步操作'
-    feedbackIsError.value = false
+    settleHandResult({
+      ok: !!data.isSolved,
+      expression: data.exprForRecord,
+      valueFraction: data.result,
+      stats: data.stats,
+      origin: 'basic',
+      allowRetry: !data.isSolved,
+    })
   }
   try { saveSession() } catch (_) {}
 }
 
 function undoBasicStep() {
   const res = undoBasicHistory(basicHistory.value)
-  if (!res.ok) {
-    if (mode.value === 'basic') {
-      feedback.value = '没有可撤销的步骤'
-      feedbackIsError.value = true
-    }
-    return
-  }
+  if (!res.ok) return
   const data = res.data
   basicHistory.value = data.history
   basicSlots.value = data.slots
   basicExpression.value = data.expression
   basicDisplayExpression.value = data.displayExpression
   basicSelection.value = { first: null, operator: null }
-  if (mode.value === 'basic') {
-    feedback.value = '已撤销，选择下一步'
-    feedbackIsError.value = false
-  }
   errorValueText.value = ''
   try { saveSession() } catch (_) {}
 }
@@ -545,14 +509,6 @@ function resetBasicBoard() {
   errorValueText.value = ''
   try { saveSession() } catch (_) {}
 }
-
-const currentText = computed(() => {
-  attemptCount.value += 1
-  const s = expr.value
-  if (!s) return ''
-  const v = evaluateExprToFraction(s)
-  return v ? `${v.toString()}` : ''
-})
 
 function refresh() { nextHand() }
 
@@ -576,7 +532,6 @@ async function nextHand() {
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
-  setDefaultFeedback()
   nextTick(() => recomputeExprHeight())
   try { saveSession() } catch (_) {}
 }
@@ -820,124 +775,147 @@ function updateLastSuccess() {
 function resetHandStateForNext() {
   handSettled.value = false;
   settledResult.value = null;
+  handFailedOnce.value = false;
   // 你已有的重置：handRecorded、attemptCount、hintWasUsed、errorValueText 等
   handRecorded.value = false;  // 若你还在别处用到它，这里也清掉
   attemptCount.value = 0;
   hintWasUsed.value = false;
   errorValueText.value = '';
+  exprOverrideText.value = '';
   // handStartTs 在发新题时重置
 }
 
-function settleHandResult({ ok, expression, valueFraction, stats, origin }) {
+function settleHandResult({ ok, expression, valueFraction, stats, origin, allowRetry = false }) {
   const exprStr = expression || ''
   const statsData = stats || statsFromExpressionString(exprStr)
   const value = valueFraction || (exprStr ? evaluateExprToFraction(exprStr) : null)
   const elapsed = Date.now() - (handStartTs.value || Date.now())
   const retriesSuccess = origin === 'pro' ? Math.max(0, (attemptCount.value || 1) - 1) : 0
   const retriesFail = origin === 'pro' ? (attemptCount.value || 0) : 0
+  const retryableFailure = allowRetry && !ok
 
-  if (!handSettled.value) {
-    handSettled.value = true
-    settledResult.value = ok ? 'success' : 'fail'
-    handsPlayed.value += 1
-
+  const recordRound = (success) => {
     if (selectedUserId.value) {
-      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: ok }) } catch (_) {}
+      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success }) } catch (_) {}
+    }
+    try {
+      pushRound({
+        success,
+        timeMs: elapsed,
+        hintUsed: !!hintWasUsed.value,
+        retries: success ? retriesSuccess : retriesFail,
+        ops: statsData.ops,
+        exprLen: statsData.exprLen,
+        maxDepth: statsData.maxDepth,
+        faceUseHigh: !!faceUseHigh.value,
+        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+        expr: exprStr,
+      })
+      if (success) updateLastSuccess()
+    } catch (_) {}
+  }
+
+  if (ok) {
+    errorValueText.value = ''
+    if (origin === 'basic' && handFailedOnce.value) {
+      try {
+        successAnimating.value = true
+        setTimeout(() => { successAnimating.value = false }, 500)
+      } catch (_) {}
+      try { saveSession() } catch (_) {}
+      return
     }
 
-    if (ok) {
-      successCount.value += 1
-      try {
-        pushRound({
-          success: true,
-          timeMs: elapsed,
-          hintUsed: !!hintWasUsed.value,
-          retries: retriesSuccess,
-          ops: statsData.ops,
-          exprLen: statsData.exprLen,
-          maxDepth: statsData.maxDepth,
-          faceUseHigh: !!faceUseHigh.value,
-          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-          expr: exprStr,
-        })
-        updateLastSuccess()
-      } catch (_) {}
-      feedback.value = origin === 'basic' ? '恭喜，计算得到 24！' : '恭喜，得到 24！'
-      feedbackIsError.value = false
-      errorValueText.value = ''
+    if (handSettled.value) {
+      if (settledResult.value === 'success') {
+        try { saveSession() } catch (_) {}
+        return
+      }
       try {
         successAnimating.value = true
         setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
       } catch (_) { nextHand() }
-    } else {
-      failCount.value += 1
-      try {
-        pushRound({
-          success: false,
-          timeMs: elapsed,
-          hintUsed: !!hintWasUsed.value,
-          retries: retriesFail,
-          ops: statsData.ops,
-          exprLen: statsData.exprLen,
-          maxDepth: statsData.maxDepth,
-          faceUseHigh: !!faceUseHigh.value,
-          hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-          expr: exprStr,
-        })
-      } catch (_) {}
-      feedback.value = origin === 'basic' ? '计算结果不是 24，可尝试后退或重置' : '计算错误（本手已计为失败，可继续尝试，不再计数）'
-      feedbackIsError.value = true
-      try {
-        if (value && typeof value.toString === 'function') {
-          errorValueText.value = '结果：' + value.toString()
-        } else errorValueText.value = ''
-      } catch (_) { errorValueText.value = '' }
-      try {
-        errorAnimating.value = true
-        setTimeout(() => { errorAnimating.value = false }, 500)
-      } catch (_) {}
+      try { saveSession() } catch (_) {}
+      return
     }
-    try { saveSession() } catch (_) {}
-    return
-  }
 
-  if (ok) {
-    feedback.value = settledResult.value === 'fail'
-      ? (origin === 'basic'
-        ? '这次算对了！（本手已计为失败，即将进入下一题）'
-        : '恭喜，这次算对了！（本手已计为失败，不再计数，将切到下一手）')
-      : '本手已结算为成功，不再重复计数'
-    feedbackIsError.value = settledResult.value !== 'success'
-    errorValueText.value = ''
+    handSettled.value = true
+    settledResult.value = 'success'
+    handRecorded.value = true
+    handsPlayed.value += 1
+    successCount.value += 1
+    recordRound(true)
     try {
       successAnimating.value = true
       setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
     } catch (_) { nextHand() }
-  } else {
-    feedback.value = '计算错误（本手已结算，不再计数）'
-    feedbackIsError.value = true
+    try { saveSession() } catch (_) {}
+    return
+  }
+
+  const updateErrorValue = () => {
     try {
       if (value && typeof value.toString === 'function') {
         errorValueText.value = '结果：' + value.toString()
-      } else errorValueText.value = ''
-    } catch (_) { errorValueText.value = '' }
+      } else {
+        errorValueText.value = ''
+      }
+    } catch (_) {
+      errorValueText.value = ''
+    }
+  }
+
+  if (retryableFailure) {
+    updateErrorValue()
+    if (!handFailedOnce.value) {
+      handFailedOnce.value = true
+      settledResult.value = 'fail'
+      handRecorded.value = true
+      handsPlayed.value += 1
+      failCount.value += 1
+      recordRound(false)
+    }
     try {
       errorAnimating.value = true
       setTimeout(() => { errorAnimating.value = false }, 500)
     } catch (_) {}
+    try { saveSession() } catch (_) {}
+    return
   }
+
+  updateErrorValue()
+  if (!handSettled.value) {
+    handSettled.value = true
+    settledResult.value = 'fail'
+    handRecorded.value = true
+    handsPlayed.value += 1
+    failCount.value += 1
+    recordRound(false)
+  }
+  try {
+    errorAnimating.value = true
+    setTimeout(() => { errorAnimating.value = false }, 500)
+  } catch (_) {}
   try { saveSession() } catch (_) {}
 }
 
 function check() {
-  const usedCount = usedByCard.value.reduce((a,b)=>a+(b?1:0),0);
-  errorValueText.value = '';
-  if (usedCount !== 4) { feedback.value = '请先用完四张牌再提交'; feedbackIsError.value = true; return; }
-  if (!isExpressionComplete(tokens.value)) { feedback.value = '表达式错误'; feedbackIsError.value = true; return; }
+  const usedCount = usedByCard.value.reduce((a, b) => a + (b ? 1 : 0), 0)
+  errorValueText.value = ''
+  if (usedCount !== 4 || !isExpressionComplete(tokens.value)) {
+    showExpressionErrorToast()
+    return
+  }
 
-  const s = expr.value;
-  const v = evaluateExprToFraction(s);
-  const ok = (v && v.equalsInt && v.equalsInt(24));
+  const s = expr.value
+  if (!s) {
+    showExpressionErrorToast()
+    return
+  }
+
+  attemptCount.value += 1
+  const v = evaluateExprToFraction(s)
+  const ok = (v && v.equalsInt && v.equalsInt(24))
   settleHandResult({
     ok,
     expression: s,
@@ -982,7 +960,13 @@ function showSolution() {
       try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
     }
   }
-  feedback.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
+  if (mode.value === 'basic') {
+    handFailedOnce.value = true
+    basicDisplayExpression.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
+  } else {
+    exprOverrideText.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
+  }
+  try { saveSession() } catch (_) {}
 }
 
 function toggleFaceMode() { faceUseHigh.value = !faceUseHigh.value }
@@ -1022,7 +1006,6 @@ function reshuffle() {
   successCount.value = 0
   failCount.value = 0
   handRecorded.value = false
-  feedback.value = ''
   nextTick(() => { nextHand(); saveSession() })
 }
 
@@ -1113,11 +1096,12 @@ function endDrag() {
 function tryAppendToken(token) { tryInsertTokenAt(token, tokens.value.length) }
 
 function tryInsertTokenAt(token, to) {
+  clearExprOverride()
   const clamped = Math.max(0, Math.min(to, tokens.value.length))
   if (token.type === 'num') {
     const ci = token.cardIndex
-    if (ci == null) { feedback.value = '请选择一张牌'; return }
-    if ((usedByCard.value[ci] || 0) >= 1) { feedback.value = '该牌已使用'; return }
+    if (ci == null) { return }
+    if ((usedByCard.value[ci] || 0) >= 1) { return }
     const arr = tokens.value.slice()
     arr.splice(clamped, 0, { type: 'num', value: token.value, rank: token.rank, suit: token.suit, cardIndex: ci })
     tokens.value = arr
@@ -1130,6 +1114,7 @@ function tryInsertTokenAt(token, to) {
 }
 
 function removeTokenAt(i) {
+  clearExprOverride()
   if (i < 0 || i >= tokens.value.length) return
   const t = tokens.value[i]
   if (t && t.type === 'num' && t.cardIndex != null) {
@@ -1180,11 +1165,7 @@ watch(mode, (m) => {
   if (m === 'basic') {
     exprZoneHeight.value = 70
     if (!basicSlots.value.length) resetBasicStateFromCards()
-    if (!basicHistory.value.length && !basicDisplayExpression.value && !handSettled.value) {
-      setDefaultFeedback('basic')
-    }
   } else {
-    if (!handSettled.value && tokens.value.length === 0) setDefaultFeedback('pro')
     nextTick(() => { updateExprScale(); recomputeExprHeight() })
   }
 })
@@ -1219,6 +1200,7 @@ function calcInsertIndex(x, y) {
 }
 
 function moveToken(from, to) {
+  clearExprOverride()
   if (from === to) return
   const arr = tokens.value.slice()
   const t = arr.splice(from, 1)[0]
@@ -1249,21 +1231,19 @@ function recomputeExprHeight() {
   nextTick(() => {
     const q = uni.createSelectorQuery().in(proxy)
     q.select('#exprZone').boundingClientRect()
-     .select('#hintText').boundingClientRect()
      .select('#opsRow1').boundingClientRect()
      .select('#opsRow2').boundingClientRect()
      .select('#submitRow').boundingClientRect()
      .select('#failRow').boundingClientRect()
      .exec(res => {
-       const [exprRect, hintRect, ops1Rect, ops2Rect, submitRect, failRect] = res || []
+       const [exprRect, ops1Rect, ops2Rect, submitRect, failRect] = res || []
        if (!exprRect) return
-       const hHint = (hintRect && hintRect.height) || 0
        const hOps1 = (ops1Rect && ops1Rect.height) || 0
        const hOps2 = (ops2Rect && ops2Rect.height) || 0
        const hSubmit = (submitRect && submitRect.height) || 0
        const hFail = (failRect && failRect.height) || 0
        // 閫傚綋鐣欑櫧 12px
-       let avail = winH - (exprRect.top || 0) - (hHint + hOps1 + hOps2 + hSubmit + hFail) - 12
+       let avail = winH - (exprRect.top || 0) - (hOps1 + hOps2 + hSubmit + hFail) - 12
        if (!isFinite(avail) || avail <= 0) avail = 120
        exprZoneHeight.value = Math.max(120, Math.floor(avail))
     })
@@ -1349,6 +1329,21 @@ function onSessionOver() {
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
 .expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; position:relative;}
+.expr-override {
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:0 32rpx;
+  color:#1f2937;
+  font-size:30rpx;
+  font-weight:700;
+  background:rgba(245,247,251,0.92);
+  pointer-events:none;
+  z-index:2;
+}
 .expr-zone-active { border-color:#3a7afe; }
 .expr-placeholder { color:#9ca3af; text-align:center; margin-top: 8rpx; }
 .expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
@@ -1381,10 +1376,6 @@ function onSessionOver() {
 .insert-placeholder.op { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin:2rpx; }
 .insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
 .drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
-
-/* 提示 */
-.hint-text { font-size: 28rpx; color:#6b7280; text-align:center; }
-.hint-text.error { color:#dc2626; font-weight:700 }
 
 /* 统计：单行紧凑 */
 .stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; } 
