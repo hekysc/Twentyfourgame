@@ -1320,9 +1320,11 @@ function onSessionOver() {
 .mode-switch-btn { width:100%; }
 .mode-switch-btn.active { background:#145751; color:#fff; }
 .deck-toggle-btn {
-  width:auto;
+  width:100%;
+  margin: 8rpx;
   padding:28rpx 36rpx;
-  white-space:nowrap;
+  white-space:normal;
+  word-wrap: break-word;
   font-weight:700;
   border:2rpx solid #145751;
   color:#fff;
