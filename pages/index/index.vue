@@ -12,10 +12,12 @@
         <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
         <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
       </view>
-      <button
-        class="btn btn-secondary deck-toggle-btn"
-        @click="toggleDeckSource"
-      >{{ deckSourceLabel }}</button>
+      <view>
+        <button
+          class="btn btn-secondary deck-toggle-btn"
+          @click="toggleDeckSource"
+        >{{ deckSourceLabel }}</button>
+      </view>
     </view>
 
     <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
