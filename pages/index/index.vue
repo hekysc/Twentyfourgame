@@ -7,17 +7,16 @@
       <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
     </view>
 
-    <view class="deck-source-bar">
-      <text class="deck-source-label">题库：</text>
-      <view class="deck-source-seg">
-        <button class="btn btn-secondary deck-source-btn" :class="{ active: deckSource === 'normal' }" @click="switchDeckSource('normal')">常规</button>
-        <button class="btn btn-secondary deck-source-btn" :class="{ active: deckSource === 'mistake' }" @click="switchDeckSource('mistake')">错题</button>
+    <view class="mode-bar">
+      <view class="mode-switch">
+        <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
+        <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
       </view>
-    </view>
-
-    <view class="mode-switch">
-      <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
-      <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
+      <button
+        class="btn btn-secondary deck-toggle-btn"
+        :class="{ active: deckSource === 'mistake' }"
+        @click="toggleDeckSource"
+      >{{ deckSourceLabel }}</button>
     </view>
 
     <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
@@ -206,6 +205,7 @@ const exprZoneHeight = ref(200)
 const currentUser = ref(null)
 const deck = ref([])
 const deckSource = ref('normal')
+const deckSourceLabel = computed(() => deckSource.value === 'mistake' ? '题库：错题' : '题库：整副')
 const mistakeRunUsed = ref(new Set())
 const mistakeRunStamp = ref(0)
 const currentHandSource = ref('normal')
@@ -674,6 +674,11 @@ function restartMistakeRun() {
   resetMistakeRun(Date.now())
   try { saveSession() } catch (_) {}
   nextTick(() => { if (deckSource.value === 'mistake') nextHand() })
+}
+
+function toggleDeckSource() {
+  const next = deckSource.value === 'mistake' ? 'normal' : 'mistake'
+  switchDeckSource(next)
 }
 
 function switchDeckSource(target) {
@@ -1280,15 +1285,13 @@ function onSessionOver() {
 .ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:18rpx; align-items:stretch; }
 .ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
+.mode-bar { display:flex; align-items:stretch; gap:18rpx; margin: 8rpx 0 16rpx; }
 .mode-btn { width: 100%; white-space: nowrap; }
-.mode-switch { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; margin: 8rpx 0 16rpx; }
+.mode-switch { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; flex:1; }
 .mode-switch-btn { width:100%; }
 .mode-switch-btn.active { background:#145751; color:#fff; }
-.deck-source-bar { display:flex; align-items:center; gap:12rpx; margin-top: 8rpx; }
-.deck-source-label { color:#6b7280; font-size:26rpx; font-weight:600; }
-.deck-source-seg { display:grid; grid-template-columns:repeat(2,1fr); gap:12rpx; flex:1; }
-.deck-source-btn { width:100%; }
-.deck-source-btn.active { background:#145751; color:#fff; }
+.deck-toggle-btn { width:auto; padding:28rpx 36rpx; white-space:nowrap; font-weight:700; border:2rpx solid #0f766e; color:#0f766e; background:#ecfdf5; }
+.deck-toggle-btn.active { background:#145751; color:#fff; border-color:#145751; }
 
 .btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}
