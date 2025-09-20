@@ -1327,7 +1327,7 @@ function onSessionOver() {
  
 /* 牌区 */ 
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; } 
-.playing-card { background:#fff; border-radius:16rpx; overflow:hidden; box-shadow:0 8rpx 20rpx rgba(15,23,42,.08); border:1rpx solid #e5e7eb; } 
+.playing-card { background:None; border-radius:16rpx; overflow:hidden; box-shadow:0 8rpx 20rpx rgba(15,23,42,.08); border:1rpx solid #e5e7eb; } 
 .playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; } 
 .card-img { width:100%; height:auto; display:block; } 
 
@@ -1399,7 +1399,7 @@ function onSessionOver() {
 .basic-board { display:flex; gap:24rpx; align-items:stretch; justify-content:center; }
 .basic-column { display:flex; flex-direction:column; gap:24rpx; flex:1; }
 .basic-card-wrapper { flex:1; }
-.basic-card { background:#fff; border-radius:24rpx; box-shadow:0 12rpx 28rpx rgba(15,23,42,.12); border:2rpx solid transparent; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; min-height:320rpx; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.basic-card { background:None; border-radius:8rpx; box-shadow:0 12rpx 28rpx rgba(15,23,42,.12); border:2rpx solid transparent; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; min-height:320rpx; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
 .basic-card.hidden { visibility:hidden; pointer-events:none; }
 .basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
 .basic-card.result { background:#fef3c7; }
