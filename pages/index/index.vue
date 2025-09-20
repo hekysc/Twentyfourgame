@@ -425,7 +425,18 @@ function applyBasicCombination(firstIdx, secondIdx, op) {
   basicHistory.value = data.history
   basicExpression.value = data.expression
   basicDisplayExpression.value = data.displayExpression
-  basicSelection.value = { first: null, operator: null }
+
+
+  // 找到运算结果所在的槽位
+  let resultSlotIndex = null
+  for (let i = 0; i < data.slots.length; i++) {
+    if (data.slots[i] && data.slots[i].alive && data.slots[i].source === 'value') {
+      resultSlotIndex = i
+      break
+    }
+  }
+
+  basicSelection.value = { first: resultSlotIndex, operator: null }
   errorValueText.value = ''
 
   if (data.aliveCount === 1) {
