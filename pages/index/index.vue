@@ -638,31 +638,22 @@ async function drawFromMistakePool() {
   const available = pool.filter(item => item && item.key && !used.has(item.key))
   if (!available.length) {
     await new Promise(resolve => {
-      const fallback = () => {
-        restartMistakeRun()
-        resolve(null)
-      }
+      const onConfirm = () => { restartMistakeRun(); resolve(null) }
+      const onCancel = () => { goStats(); resolve(null) }
       try {
-        uni.showActionSheet({
-          title: '本轮错题已出完',
-          itemList: ['重新出题', '切换整副', '去统计'],
+        uni.showModal({
+          title: '错题已出完',
+          content: '是否重新出题？',
+          confirmText: '重新出题',
+          cancelText: '进入统计',
           success: (res) => {
-            const idx = typeof res?.tapIndex === 'number' ? res.tapIndex : -1
-            if (idx === 0) {
-              restartMistakeRun()
-            } else if (idx === 1) {
-              switchDeckSource('normal')
-            } else if (idx === 2) {
-              goStats()
-            } else {
-              restartMistakeRun()
-            }
-            resolve(null)
+            if (res && res.confirm) onConfirm()
+            else onCancel()
           },
-          fail: () => fallback(),
+          fail: () => onConfirm(),
         })
       } catch (_) {
-        fallback()
+        onConfirm()
       }
     })
     return null
@@ -719,13 +710,13 @@ function switchDeckSource(target) {
       return
     }
     deckSource.value = 'mistake'
-    resetMistakeRun(Date.now())
+    // 不再在切换到错题库时重置错题运行集合，保留进度
     try { saveSession() } catch (_) {}
     nextTick(() => { nextHand() })
     return
   }
   deckSource.value = 'normal'
-  resetMistakeRun(0)
+  // 切换到整副时也不重置错题运行集合，便于切回后继续减少剩余
   if (!Array.isArray(deck.value) || deck.value.length < 4) initDeck()
   try { saveSession() } catch (_) {}
   nextTick(() => { nextHand() })
