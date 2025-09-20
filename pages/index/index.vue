@@ -83,7 +83,7 @@
 
       <!-- 表达式卡片容器（高度由脚本计算） -->
       <view class="expr-card card section">
-        <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active }" :style="{ height: exprZoneHeight + 'px' }">
+        <view id="exprZone" class="expr-zone" :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 }" :style="{ height: exprZoneHeight + 'px' }">
           <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
             <block v-for="(t, i) in tokens" :key="i">
               <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
@@ -638,22 +638,31 @@ async function drawFromMistakePool() {
   const available = pool.filter(item => item && item.key && !used.has(item.key))
   if (!available.length) {
     await new Promise(resolve => {
-      const onConfirm = () => { restartMistakeRun(); resolve(null) }
-      const onCancel = () => { goStats(); resolve(null) }
+      const fallback = () => {
+        restartMistakeRun()
+        resolve(null)
+      }
       try {
-        uni.showModal({
-          title: '错题已出完',
-          content: '是否重新出题？',
-          confirmText: '重新出题',
-          cancelText: '进入统计',
+        uni.showActionSheet({
+          title: '本轮错题已出完',
+          itemList: ['重新出题', '切换整副', '去统计'],
           success: (res) => {
-            if (res && res.confirm) onConfirm()
-            else onCancel()
+            const idx = typeof res?.tapIndex === 'number' ? res.tapIndex : -1
+            if (idx === 0) {
+              restartMistakeRun()
+            } else if (idx === 1) {
+              switchDeckSource('normal')
+            } else if (idx === 2) {
+              goStats()
+            } else {
+              restartMistakeRun()
+            }
+            resolve(null)
           },
-          fail: () => onConfirm(),
+          fail: () => fallback(),
         })
       } catch (_) {
-        onConfirm()
+        fallback()
       }
     })
     return null
@@ -1319,7 +1328,7 @@ function onSessionOver() {
   font-weight:700;
   border:2rpx solid #145751;
   color:#fff;
-  background:#145751;
+  background:#3d5714;
 }
 
 .btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
@@ -1339,10 +1348,28 @@ function onSessionOver() {
 .expr-card { background:#fff; padding:20rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); } 
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
-.expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; }
+.expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; position:relative;}
 .expr-zone-active { border-color:#3a7afe; }
 .expr-placeholder { color:#9ca3af; text-align:center; margin-top: 8rpx; }
 .expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
+/* 只有在 empty 状态下显示提示 */
+.expr-zone.empty::after {
+  content: "表达式区域";
+  position: absolute;
+  inset: 0;                  /* 覆盖容器，但不改变布局 */
+  display: flex;             /* 仅用于居中文案 */
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;      /* 不拦截拖拽/点击 */
+  color: #9aa3af;            /* 轻提示色 */
+  font-size: 26rpx;
+  letter-spacing: 1rpx;
+  user-select: none;
+  /* 可以按需加淡入效果（可选）
+  opacity: 1;
+  transition: opacity .18s ease;
+  */
+}
 .tok { color:#1f3a93; border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
 .tok.num { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block; }
 .tok-card-img { width:100%; height:100%; object-fit: contain; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(15,23,42,.08); }
