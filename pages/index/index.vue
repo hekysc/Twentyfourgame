@@ -7,6 +7,14 @@
       <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
     </view>
 
+    <view class="deck-source-bar">
+      <text class="deck-source-label">题库：</text>
+      <view class="deck-source-seg">
+        <button class="btn btn-secondary deck-source-btn" :class="{ active: deckSource === 'normal' }" @click="switchDeckSource('normal')">常规</button>
+        <button class="btn btn-secondary deck-source-btn" :class="{ active: deckSource === 'mistake' }" @click="switchDeckSource('mistake')">错题</button>
+      </view>
+    </view>
+
     <view class="mode-switch">
       <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
       <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
@@ -179,6 +187,7 @@ import {
 } from '../../utils/calc.js'
 import { createBasicState, combineBasicSlots, undoBasicHistory } from '../../core/basic-mode.js'
 import { drawSolvableHand, newDeck } from '../../core/game-engine.js'
+import { getActivePool, recordRoundResult } from '../../utils/mistakes.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
@@ -196,6 +205,11 @@ const handRecorded = ref(false)
 const exprZoneHeight = ref(200)
 const currentUser = ref(null)
 const deck = ref([])
+const deckSource = ref('normal')
+const mistakeRunUsed = ref(new Set())
+const mistakeRunStamp = ref(0)
+const currentHandSource = ref('normal')
+const currentMistakeKey = ref('')
 const handsPlayed = ref(0)
 const successCount = ref(0)
 const failCount = ref(0)
@@ -234,6 +248,11 @@ function saveSession() {
       failCount: failCount.value || 0,
       feedback: feedback.value || '',
       solution: solution.value || null, // persisted solution to avoid "暂无提示" after restore
+      deckSource: deckSource.value || 'normal',
+      mistakeRunUsed: Array.from(mistakeRunUsed.value || []),
+      mistakeRunStamp: mistakeRunStamp.value || 0,
+      currentHandSource: currentHandSource.value || 'normal',
+      currentMistakeKey: currentMistakeKey.value || '',
     }
     uni.setStorageSync(SESSION_KEY, JSON.stringify(data))
   } catch (_) { /* noop */ }
@@ -262,6 +281,11 @@ function loadSession() {
       feedback.value = data.feedback || ''
       // 恢复 solution（向后兼容老会话）
       solution.value = data.solution || null
+      deckSource.value = data.deckSource === 'mistake' ? 'mistake' : 'normal'
+      mistakeRunUsed.value = new Set(Array.isArray(data.mistakeRunUsed) ? data.mistakeRunUsed : [])
+      mistakeRunStamp.value = data.mistakeRunStamp || 0
+      currentHandSource.value = data.currentHandSource === 'mistake' ? 'mistake' : 'normal'
+      currentMistakeKey.value = typeof data.currentMistakeKey === 'string' ? data.currentMistakeKey : ''
       // 如果没有 solution，则基于当前 cards 即时计算一份（兜底）
       if (!solution.value) {
         try {
@@ -303,6 +327,24 @@ const lastInsertedIndex = ref(-1)
 const { proxy } = getCurrentInstance()
 
 const booted = ref(false)
+const selectedUserId = computed(() => (currentUser.value && currentUser.value.id) ? currentUser.value.id : '')
+const currentHandNums = computed(() => {
+  const arr = (cards.value || []).map(c => c.rank)
+  return arr.sort((a, b) => a - b)
+})
+
+watch(selectedUserId, (newId, oldId) => {
+  if (newId === oldId) return
+  const inMistake = deckSource.value === 'mistake'
+  resetMistakeRun(inMistake ? Date.now() : 0)
+  if (!newId && inMistake) {
+    deckSource.value = 'normal'
+    resetMistakeRun(0)
+    nextTick(() => { nextHand() })
+  } else if (inMistake && newId) {
+    nextTick(() => { nextHand() })
+  }
+})
 
 const expr = computed(() => tokensToExpression(tokens.value, faceUseHigh.value))
 const ghostStyle = computed(() => `left:${drag.value.x}px; top:${drag.value.y}px;`)
@@ -491,22 +533,16 @@ function initDeck() {
   deck.value = newDeck()
 }
 
-function nextHand() {
-  if (!deck.value || deck.value.length < 4) {
-    promptDeckReshuffle()
-    return
-  }
-
-  const res = drawSolvableHand(deck.value, faceUseHigh.value, solve24)
-  if (!res.ok) {
-    promptDeckReshuffle()
-    return
-  }
+async function nextHand() {
+  const res = await getNextDraw()
+  if (!res) return
 
   resetHandStateForNext()
-  deck.value = res.data.deck
-  cards.value = res.data.cards
-  solution.value = res.data.solution
+  if (Array.isArray(res.deck)) deck.value = res.deck
+  cards.value = Array.isArray(res.cards) ? res.cards : []
+  currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'normal'
+  currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
+  solution.value = res.solution || null
   tokens.value = []
   usedByCard.value = [0, 0, 0, 0]
   handRecorded.value = false
@@ -516,6 +552,149 @@ function nextHand() {
   setDefaultFeedback()
   nextTick(() => recomputeExprHeight())
   try { saveSession() } catch (_) {}
+}
+
+async function getNextDraw() {
+  if (deckSource.value === 'mistake') {
+    return await drawFromMistakePool()
+  }
+  return await drawFromNormalDeck()
+}
+
+async function drawFromNormalDeck() {
+  if (!Array.isArray(deck.value) || deck.value.length < 4) {
+    initDeck()
+  }
+  if (!Array.isArray(deck.value) || deck.value.length < 4) {
+    promptDeckReshuffle()
+    return null
+  }
+  const res = drawSolvableHand(deck.value, faceUseHigh.value, solve24)
+  if (!res.ok) {
+    promptDeckReshuffle()
+    return null
+  }
+  return { source: 'normal', cards: res.data.cards, deck: res.data.deck, solution: res.data.solution }
+}
+
+async function drawFromMistakePool() {
+  const uid = selectedUserId.value
+  if (!uid) {
+    try { uni.showToast && uni.showToast({ title: '请先选择用户', icon: 'none' }) } catch (_) {}
+    deckSource.value = 'normal'
+    try { saveSession() } catch (_) {}
+    return await drawFromNormalDeck()
+  }
+  const pool = getActivePool(uid) || []
+  if (!Array.isArray(pool) || pool.length === 0) {
+    await new Promise(resolve => {
+      try {
+        uni.showModal({
+          title: '提示',
+          content: '错题本为空，先切回常规或去统计看看～',
+          cancelText: '切回常规',
+          confirmText: '去统计',
+          success: (res) => {
+            if (res && res.confirm) {
+              goStats()
+            } else {
+              switchDeckSource('normal')
+            }
+            resolve(null)
+          },
+          fail: () => resolve(null),
+        })
+      } catch (_) {
+        switchDeckSource('normal')
+        resolve(null)
+      }
+    })
+    return null
+  }
+  const used = mistakeRunUsed.value instanceof Set ? mistakeRunUsed.value : new Set()
+  const available = pool.filter(item => item && item.key && !used.has(item.key))
+  if (!available.length) {
+    await new Promise(resolve => {
+      try {
+        uni.showModal({
+          title: '提示',
+          content: '本轮错题已练完。要重开一轮还是去统计？',
+          cancelText: '重开一轮',
+          confirmText: '去统计',
+          success: (res) => {
+            if (res && res.confirm) {
+              goStats()
+            } else {
+              restartMistakeRun()
+            }
+            resolve(null)
+          },
+          fail: () => resolve(null),
+        })
+      } catch (_) {
+        restartMistakeRun()
+        resolve(null)
+      }
+    })
+    return null
+  }
+  const item = available[Math.floor(Math.random() * available.length)]
+  const cardsFromNums = convertNumsToCards(Array.isArray(item?.nums) ? item.nums : [])
+  let sol = null
+  try {
+    const mapped = cardsFromNums.map(c => mapCardRank(c.rank, faceUseHigh.value))
+    sol = mapped.length === 4 ? solve24(mapped) : null
+  } catch (_) {
+    sol = null
+  }
+  const updatedSet = new Set(used)
+  updatedSet.add(item.key)
+  mistakeRunUsed.value = updatedSet
+  try { saveSession() } catch (_) {}
+  return { source: 'mistake', cards: cardsFromNums, deck: deck.value, solution: sol, mistakeKey: item.key }
+}
+
+function convertNumsToCards(nums) {
+  const suits = ['S', 'H', 'D', 'C']
+  const arr = Array.isArray(nums) ? nums : []
+  return arr.map((n, idx) => {
+    const rank = Number.isFinite(+n) ? Math.min(13, Math.max(1, Math.floor(+n))) : 1
+    const suit = suits[idx % suits.length]
+    return { rank, suit }
+  })
+}
+
+function resetMistakeRun(stamp = 0) {
+  mistakeRunUsed.value = new Set()
+  mistakeRunStamp.value = stamp
+  currentMistakeKey.value = ''
+}
+
+function restartMistakeRun() {
+  resetMistakeRun(Date.now())
+  try { saveSession() } catch (_) {}
+  nextTick(() => { if (deckSource.value === 'mistake') nextHand() })
+}
+
+function switchDeckSource(target) {
+  const next = target === 'mistake' ? 'mistake' : 'normal'
+  if (deckSource.value === next) return
+  if (next === 'mistake') {
+    if (!selectedUserId.value) {
+      try { uni.showToast && uni.showToast({ title: '请先选择用户', icon: 'none' }) } catch (_) {}
+      return
+    }
+    deckSource.value = 'mistake'
+    resetMistakeRun(Date.now())
+    try { saveSession() } catch (_) {}
+    nextTick(() => { nextHand() })
+    return
+  }
+  deckSource.value = 'normal'
+  resetMistakeRun(0)
+  if (!Array.isArray(deck.value) || deck.value.length < 4) initDeck()
+  try { saveSession() } catch (_) {}
+  nextTick(() => { nextHand() })
 }
 
 function promptDeckReshuffle() {
@@ -583,7 +762,12 @@ onMounted(() => {
   startHandTimer()
 })
 
-onShow(() => { loadSession(); startHandTimer(); try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {} })
+onShow(() => {
+  currentUser.value = getCurrentUser() || null
+  loadSession()
+  startHandTimer()
+  try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
+})
 onHide(() => { saveSession(); stopHandTimer() })
 onUnmounted(() => { stopHandTimer() })
 
@@ -622,6 +806,10 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin }) {
     handSettled.value = true
     settledResult.value = ok ? 'success' : 'fail'
     handsPlayed.value += 1
+
+    if (selectedUserId.value) {
+      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: ok }) } catch (_) {}
+    }
 
     if (ok) {
       successCount.value += 1
@@ -756,6 +944,9 @@ function showSolution() {
       })
       updateLastSuccess()
     } catch (_) {}
+    if (selectedUserId.value) {
+      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
+    }
   }
   feedback.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
 }
@@ -783,6 +974,9 @@ function skipHand() {
       })
       updateLastSuccess()
     } catch (_) {}
+    if (selectedUserId.value) {
+      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
+    }
   }
   nextHand()
 }
@@ -1090,6 +1284,11 @@ function onSessionOver() {
 .mode-switch { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; margin: 8rpx 0 16rpx; }
 .mode-switch-btn { width:100%; }
 .mode-switch-btn.active { background:#145751; color:#fff; }
+.deck-source-bar { display:flex; align-items:center; gap:12rpx; margin-top: 8rpx; }
+.deck-source-label { color:#6b7280; font-size:26rpx; font-weight:600; }
+.deck-source-seg { display:grid; grid-template-columns:repeat(2,1fr); gap:12rpx; flex:1; }
+.deck-source-btn { width:100%; }
+.deck-source-btn.active { background:#145751; color:#fff; }
 
 .btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}

@@ -139,6 +139,59 @@
       </view>
     </view>
 
+    <view v-if="selectedUserId" class="section">
+      <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
+        <text class="title">📝错题本</text>
+        <text class="mistake-tip">连续正确 5 次将自动移出活动错题本（但仍计入总错题统计）</text>
+      </view>
+      <view class="mistake-summary">
+        <view class="mistake-summary-item">
+          <text class="mistake-summary-label">错题总数</text>
+          <text class="mistake-summary-value">{{ mistakeSummary.totalWrongCount }}</text>
+        </view>
+        <view class="mistake-summary-item">
+          <text class="mistake-summary-label">遗留错题</text>
+          <text class="mistake-summary-value">{{ mistakeSummary.totalActiveCount }}</text>
+        </view>
+      </view>
+      <view class="mistake-controls">
+        <label class="mistake-filter">
+          <switch :checked="mistakeFilterActiveOnly" @change="onToggleMistakeActive" color="#145751" />
+          <text>仅看活动</text>
+        </label>
+        <view class="mistake-sort seg">
+          <button class="seg-btn" :class="{ active: mistakeSortKey==='errorRate' }" @click="setMistakeSort('errorRate')">错误率</button>
+          <button class="seg-btn" :class="{ active: mistakeSortKey==='attempts' }" @click="setMistakeSort('attempts')">次数</button>
+          <button class="seg-btn" :class="{ active: mistakeSortKey==='streak' }" @click="setMistakeSort('streak')">连对</button>
+        </view>
+      </view>
+      <view class="table mistake-table" v-if="mistakeDisplayRows.length">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'220rpx 120rpx 120rpx 120rpx 120rpx 120rpx 120rpx 200rpx' }">
+          <text class="th" style="text-align:left;">题目 key</text>
+          <text class="th">尝试</text>
+          <text class="th fail">错</text>
+          <text class="th ok">对</text>
+          <text class="th">错误率</text>
+          <text class="th">连对</text>
+          <text class="th">活动</text>
+          <text class="th">最近练习</text>
+        </view>
+        <view class="tbody">
+          <view class="tr" v-for="row in mistakeDisplayRows" :key="row.key" :style="{ display:'grid', gridTemplateColumns:'220rpx 120rpx 120rpx 120rpx 120rpx 120rpx 120rpx 200rpx' }">
+            <text class="td" style="text-align:left;">{{ row.displayKey }}</text>
+            <text class="td">{{ row.attempts }}</text>
+            <text class="td fail">{{ row.wrong }}</text>
+            <text class="td ok">{{ row.correct }}</text>
+            <text class="td">{{ row.errorRate }}%</text>
+            <text class="td">{{ row.streak }}</text>
+            <text class="td" :class="{ ok: row.active }">{{ row.active ? '是' : '否' }}</text>
+            <text class="td">{{ row.lastSeenText }}</text>
+          </view>
+        </view>
+      </view>
+      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无错题记录</view>
+    </view>
+
     <!-- 错误近似度与差一点榜 -->
     <view v-if="selectedUserId" class="section">
       <view class="row" style="justify-content:space-between; align-items:center;">
@@ -370,12 +423,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import MiniBar from '../../components/MiniBar.vue'
 import MicroSpark from '../../components/MicroSpark.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
+import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mistakes.js'
 import {
   computeOverviewRows,
   computeNearMisses,
@@ -416,6 +470,63 @@ const rotateDates = computed(() => {
   } catch (_) { return false }
 })
 
+const mistakeBook = ref({ active: {}, ledger: {} })
+const mistakeSummary = ref({ totalWrongCount: 0, totalActiveCount: 0 })
+const mistakeFilterActiveOnly = ref(false)
+const mistakeSortKey = ref('errorRate')
+
+const mistakeRows = computed(() => {
+  const book = mistakeBook.value || { active: {}, ledger: {} }
+  const ledger = book.ledger || {}
+  const activeKeys = new Set(Object.keys(book.active || {}))
+  const rows = []
+  for (const key of Object.keys(ledger)) {
+    const item = ledger[key] || {}
+    const attempts = Number.isFinite(item.attempts) ? Math.max(0, Math.floor(item.attempts)) : 0
+    const wrong = Number.isFinite(item.wrong) ? Math.max(0, Math.floor(item.wrong)) : 0
+    const correct = Number.isFinite(item.correct) ? Math.max(0, Math.floor(item.correct)) : 0
+    const totalAttempts = attempts || (wrong + correct)
+    const errorRate = totalAttempts ? Math.round((wrong / totalAttempts) * 100) : 0
+    const streak = Number.isFinite(item.streakCorrect) ? Math.max(0, Math.floor(item.streakCorrect)) : 0
+    const lastSeenTs = Number.isFinite(item.lastSeenTs) ? Math.floor(item.lastSeenTs) : 0
+    const nums = Array.isArray(item.nums) ? item.nums : (typeof key === 'string' ? key.split(',').map(n => +n || 0) : [])
+    rows.push({
+      key: item.key || key,
+      displayKey: (item.key || key || nums.join(',')),
+      nums,
+      attempts: totalAttempts,
+      wrong,
+      correct,
+      errorRate,
+      streak,
+      active: activeKeys.has(key),
+      lastSeenTs,
+      lastSeenText: lastSeenTs ? fmtTs(lastSeenTs) : '-',
+    })
+  }
+  rows.sort((a, b) => (b.lastSeenTs - a.lastSeenTs))
+  return rows
+})
+
+const mistakeDisplayRows = computed(() => {
+  let arr = mistakeRows.value.slice()
+  if (mistakeFilterActiveOnly.value) {
+    arr = arr.filter(r => r.active)
+  }
+  const sorter = mistakeSortKey.value
+  const compare = (a, b) => {
+    if (sorter === 'attempts') {
+      return (b.attempts - a.attempts) || (b.errorRate - a.errorRate) || (b.lastSeenTs - a.lastSeenTs)
+    }
+    if (sorter === 'streak') {
+      return (b.streak - a.streak) || (b.lastSeenTs - a.lastSeenTs)
+    }
+    return (b.errorRate - a.errorRate) || (b.attempts - a.attempts) || (b.lastSeenTs - a.lastSeenTs)
+  }
+  arr.sort(compare)
+  return arr
+})
+
 onMounted(() => {
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   ensureInit();
@@ -453,7 +564,32 @@ function loadExt(){
   // 兼容 ext：用于单用户场景下的直接绑定
   const uid = selectedUserId.value
   ext.value = map[uid] || { totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} }
+  loadMistakeData()
 }
+
+function loadMistakeData(){
+  const uid = selectedUserId.value
+  if (!uid) {
+    mistakeBook.value = { active: {}, ledger: {} }
+    mistakeSummary.value = { totalWrongCount: 0, totalActiveCount: 0 }
+    return
+  }
+  try {
+    mistakeBook.value = loadMistakeBook(uid)
+    mistakeSummary.value = getMistakeSummary(uid)
+  } catch (_) {
+    mistakeBook.value = { active: {}, ledger: {} }
+    mistakeSummary.value = { totalWrongCount: 0, totalActiveCount: 0 }
+  }
+}
+
+watch(selectedUserId, (uid, prev) => {
+  if (uid !== prev) {
+    mistakeFilterActiveOnly.value = false
+    mistakeSortKey.value = 'errorRate'
+  }
+  loadMistakeData()
+})
 function selectUser(uid){ 
   selectedUserId.value = uid || ''; 
   loadExt(); 
@@ -462,6 +598,14 @@ function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = user
 function setOverviewRange(d = 0){
   // 若未传参则激活“今天”；显式传 0 仍表示“全部”
   overviewRange.value = (arguments.length === 0 ? 1 : d)
+}
+
+function onToggleMistakeActive(e){
+  mistakeFilterActiveOnly.value = !!(e?.detail?.value)
+}
+
+function setMistakeSort(key){
+  mistakeSortKey.value = key
 }
 
 function startOfTodayMs(){
@@ -1053,6 +1197,16 @@ function navigateTab(url){
 .r-result.ok{ color:#16a34a; font-weight:700 }
 .r-result.fail{ color:#dc2626; font-weight:700 }
 .picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
+.mistake-summary{ margin-top:16rpx; display:flex; flex-wrap:wrap; gap:24rpx; }
+.mistake-summary-item{ background:#f8fafc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
+.mistake-summary-label{ color:#6b7280; font-size:26rpx; }
+.mistake-summary-value{ color:#111827; font-size:36rpx; font-weight:700; }
+.mistake-controls{ display:flex; align-items:center; justify-content:space-between; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
+.mistake-filter{ display:flex; align-items:center; gap:12rpx; color:#374151; font-size:26rpx; }
+.mistake-sort{ display:grid; grid-template-columns:repeat(3,1fr); gap:12rpx; flex:1; min-width:360rpx; }
+.mistake-table .td{ text-align:center; }
+.mistake-table .td:first-child{ text-align:left; }
+.mistake-tip{ color:#6b7280; font-size:24rpx; flex:1; text-align:right; }
 
 /* 表头排序：高亮当前列 */
 /* .th.active{ color:#0953e9; font-weight:800 } */
