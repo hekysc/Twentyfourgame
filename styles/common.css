@@ -1,3 +1,11 @@
+/* 主题变量 */
+:root {
+  --tf24-table-head-bg: #f8fafc;
+  --tf24-table-head-color: #334155;
+  --tf24-footer-row-height: 120rpx;
+  --tf24-footer-gap: 16rpx;
+}
+
 /* 通用卡片与标题 */
 .card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
 .section { padding:16rpx }

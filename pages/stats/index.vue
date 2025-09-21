@@ -130,7 +130,13 @@
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">最近战绩</text>
       </view>
-      <view class="rounds">
+      <view v-if="recentRounds.length" class="rounds">
+        <view class="rounds-head">
+          <text>时间</text>
+          <text>结果</text>
+          <text>用时</text>
+          <text>牌面</text>
+        </view>
         <view v-for="r in (recentRounds || []).slice().reverse()" :key="r.id" class="round-item">
           <text class="r-time">{{ fmtTs(r.ts) }}</text>
           <text class="r-result" :class="{ ok: r.success, fail: !r.success }">{{ r.success ? '成功' : '失败' }}</text>
@@ -138,6 +144,7 @@
           <text class="r-cards">{{ r.cardsText }}</text>
         </view>
       </view>
+      <view v-else class="empty-tip">暂无最近战绩</view>
     </view>
 
     <view v-if="selectedUserId" class="section">
@@ -160,161 +167,26 @@
           <switch :checked="mistakeFilterActiveOnly" @change="onToggleMistakeActive" color="#145751" />
           <text>仅看活动</text>
         </label>
-        <view class="mistake-sort seg">
-          <button class="seg-btn" :class="{ active: mistakeSortKey==='errorRate' }" @click="setMistakeSort('errorRate')">错误率</button>
-          <button class="seg-btn" :class="{ active: mistakeSortKey==='attempts' }" @click="setMistakeSort('attempts')">次数</button>
-          <button class="seg-btn" :class="{ active: mistakeSortKey==='streak' }" @click="setMistakeSort('streak')">连对</button>
-        </view>
       </view>
       <view class="table mistake-table" v-if="mistakeDisplayRows.length">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'220rpx 120rpx 120rpx 120rpx 120rpx 120rpx 120rpx 200rpx' }">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'260rpx 140rpx 140rpx 140rpx 140rpx' }">
           <text class="th" style="text-align:left;">题目 key</text>
           <text class="th">尝试</text>
           <text class="th fail">错</text>
           <text class="th ok">对</text>
-          <text class="th">错误率</text>
-          <text class="th">连对</text>
           <text class="th">活动</text>
-          <text class="th">最近练习</text>
         </view>
         <view class="tbody">
-          <view class="tr" v-for="row in mistakeDisplayRows" :key="row.key" :style="{ display:'grid', gridTemplateColumns:'220rpx 120rpx 120rpx 120rpx 120rpx 120rpx 120rpx 200rpx' }">
-            <text class="td" style="text-align:left;">{{ row.displayKey }}</text>
+          <view class="tr" v-for="row in mistakeDisplayRows" :key="row.key" :style="{ display:'grid', gridTemplateColumns:'260rpx 140rpx 140rpx 140rpx 140rpx' }">
+            <text class="td mistake-key" style="text-align:left;" @tap="copyMistakeKey(row)">{{ row.displayKey }}</text>
             <text class="td">{{ row.attempts }}</text>
             <text class="td fail">{{ row.wrong }}</text>
             <text class="td ok">{{ row.correct }}</text>
-            <text class="td">{{ row.errorRate }}%</text>
-            <text class="td">{{ row.streak }}</text>
             <text class="td" :class="{ ok: row.active }">{{ row.active ? '是' : '否' }}</text>
-            <text class="td">{{ row.lastSeenText }}</text>
           </view>
         </view>
       </view>
-      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无错题记录</view>
-    </view>
-
-    <!-- 首运算符成功率 + 运算熵 -->
-    <view v-if="selectedUserId" class="section">
-      <view class="row" style="justify-content:space-between; align-items:center;">
-        <text class="title">运算偏好与效率</text>
-        <text style="color:#64748b; font-size:26rpx;">运算熵：{{ opStats.entropyPct }}%</text>
-      </view>
-      <view class="table">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr 1fr' }">
-          <text class="th">运算符</text>
-          <text class="th">总出现</text>
-          <text class="th">首运算-局数</text>
-          <text class="th">首运算-胜率</text>
-          <text class="th">可视化</text>
-        </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr 1fr' }" v-for="o in ['+','-','×','÷']" :key="o">
-            <text class="td">{{ o }}</text>
-            <text class="td">{{ opStats.allCounts[o] }}</text>
-            <text class="td">{{ opStats.first[o].total }}</text>
-            <text class="td">{{ opStats.first[o].total ? Math.round(100*opStats.first[o].success/opStats.first[o].total) : 0 }}%</text>
-            <view class="td" style="padding:0 8rpx">
-              <MiniBar :pct="opStats.first[o].total ? Math.round(100*opStats.first[o].success/opStats.first[o].total) : 0" />
-            </view>
-          </view>
-        </view>
-      </view>
-      <!-- 运算序列偏好 bigram/trigram + 首两步 -->
-      <view class="table" style="margin-top:12rpx;">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-          <text class="th">Top 序列</text>
-          <text class="th">局数</text>
-          <text class="th">胜率</text>
-        </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in seqStats.topBigrams" :key="'b-'+r.key">
-            <text class="td">{{ r.key }}</text>
-            <text class="td">{{ r.total }}</text>
-            <text class="td">{{ r.win }}%</text>
-          </view>
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in seqStats.topTrigrams" :key="'t-'+r.key">
-            <text class="td">{{ r.key }}</text>
-            <text class="td">{{ r.total }}</text>
-            <text class="td">{{ r.win }}%</text>
-          </view>
-        </view>
-      </view>
-      <view class="table" style="margin-top:12rpx;">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-          <text class="th">首两步</text>
-          <text class="th">局数</text>
-          <text class="th">胜率</text>
-        </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in seqStats.firstTwo" :key="'f2-'+r.key">
-            <text class="td">{{ r.key }}</text>
-            <text class="td">{{ r.total }}</text>
-            <text class="td">{{ r.win }}%</text>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 牌型签名命中率（Top 5） -->
-    <view v-if="selectedUserId" class="section">
-      <view class="row" style="justify-content:space-between; align-items:center;">
-        <text class="title">牌型签名命中率（Top 5）</text>
-      </view>
-      <view class="table" v-if="faceSignStats.length">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }">
-          <text class="th">签名</text>
-          <text class="th">局数</text>
-          <text class="th">成功</text>
-          <text class="th">胜率</text>
-        </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }" v-for="r in faceSignStats" :key="r.sig">
-            <text class="td">{{ r.sig }}</text>
-            <text class="td">{{ r.total }}</text>
-            <text class="td ok">{{ r.success }}</text>
-            <text class="td">{{ r.win }}%</text>
-          </view>
-        </view>
-      </view>
-      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无统计</view>
-    </view>
-
-    <!-- 难度热力（列表版）：Top/Bottom -->
-    <view v-if="selectedUserId" class="section">
-      <view class="row" style="justify-content:space-between; align-items:center;">
-        <text class="title">难度热力（Top/Bottom）</text>
-        <text style="color:#64748b; font-size:24rpx;">样本门槛：{{ faceHeat.minTotal }} 局</text>
-      </view>
-      <view class="difficulty-heatmaps">
-        <view class="table">
-          <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-            <text class="th">Top 容易</text>
-            <text class="th">局数</text>
-            <text class="th">胜率</text>
-          </view>
-          <view class="tbody">
-            <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in faceHeat.top" :key="'top-'+r.sig">
-              <text class="td">{{ r.sig }}</text>
-              <text class="td">{{ r.total }}</text>
-              <text class="td ok">{{ r.win }}%</text>
-            </view>
-          </view>
-        </view>
-        <view class="table">
-          <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-            <text class="th">Bottom 困难</text>
-            <text class="th">局数</text>
-            <text class="th">胜率</text>
-          </view>
-          <view class="tbody">
-            <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }" v-for="r in faceHeat.bottom" :key="'bot-'+r.sig">
-              <text class="td">{{ r.sig }}</text>
-              <text class="td">{{ r.total }}</text>
-              <text class="td fail">{{ r.win }}%</text>
-            </view>
-          </view>
-        </view>
-      </view>
+      <view v-else class="mistake-empty">{{ mistakeFilterActiveOnly ? '当前无活动错题' : '暂无错题记录' }}</view>
     </view>
 
     <!-- 称号系统（基础版） -->
@@ -402,15 +274,7 @@ import { exitApp } from '../../utils/navigation.js'
 import {
   computeOverviewRows,
   summarizeNearMisses,
-  computeOpStats,
-  computeSeqStats,
-  computeStreakStats,
-  computeSkillsRadar,
   computeDailySeries,
-  computeSparkSeries,
-  computeFaceHeat,
-  computeBadges,
-  computeFaceSignStats,
   computeSpeedBuckets,
 } from '../../utils/stats.js'
 
@@ -444,8 +308,7 @@ const rotateDates = computed(() => {
 
 const mistakeBook = ref({ active: {}, ledger: {} })
 const mistakeSummary = ref({ totalWrongCount: 0, totalActiveCount: 0 })
-const mistakeFilterActiveOnly = ref(false)
-const mistakeSortKey = ref('errorRate')
+const mistakeFilterActiveOnly = ref(true)
 
 const mistakeRows = computed(() => {
   const book = mistakeBook.value || { active: {}, ledger: {} }
@@ -481,22 +344,12 @@ const mistakeRows = computed(() => {
 })
 
 const mistakeDisplayRows = computed(() => {
-  let arr = mistakeRows.value.slice()
-  if (mistakeFilterActiveOnly.value) {
-    arr = arr.filter(r => r.active)
-  }
-  const sorter = mistakeSortKey.value
-  const compare = (a, b) => {
-    if (sorter === 'attempts') {
-      return (b.attempts - a.attempts) || (b.errorRate - a.errorRate) || (b.lastSeenTs - a.lastSeenTs)
-    }
-    if (sorter === 'streak') {
-      return (b.streak - a.streak) || (b.lastSeenTs - a.lastSeenTs)
-    }
-    return (b.errorRate - a.errorRate) || (b.attempts - a.attempts) || (b.lastSeenTs - a.lastSeenTs)
-  }
-  arr.sort(compare)
-  return arr
+  const arr = mistakeRows.value.slice()
+  const filtered = mistakeFilterActiveOnly.value ? arr.filter(r => r.active) : arr
+  filtered.sort((a, b) => {
+    return (b.attempts - a.attempts) || (b.wrong - a.wrong) || (b.lastSeenTs - a.lastSeenTs)
+  })
+  return filtered
 })
 
 onMounted(() => {
@@ -618,8 +471,7 @@ function applyDefaultSelectedUser(list){
 
 watch(selectedUserId, (uid, prev) => {
   if (uid !== prev) {
-    mistakeFilterActiveOnly.value = false
-    mistakeSortKey.value = 'errorRate'
+    mistakeFilterActiveOnly.value = true
   }
   loadMistakeData()
   persistSelectedUserId(uid || '')
@@ -639,8 +491,36 @@ function onToggleMistakeActive(e){
   mistakeFilterActiveOnly.value = !!(e?.detail?.value)
 }
 
-function setMistakeSort(key){
-  mistakeSortKey.value = key
+function copyMistakeKey(row){
+  try {
+    const text = typeof row?.displayKey === 'string' && row.displayKey.trim()
+      ? row.displayKey
+      : (typeof row?.key === 'string' ? row.key : '')
+    if (!text) return
+    const notifySuccess = () => {
+      try {
+        if (typeof uni !== 'undefined' && typeof uni.showToast === 'function') {
+          uni.showToast({ title: '题目 key 已复制', icon: 'none' })
+        } else {
+          showHint('题目 key 已复制', 1200)
+        }
+      } catch (_) {
+        showHint('题目 key 已复制', 1200)
+      }
+    }
+    const notifyFail = () => { showHint('复制失败，请手动选择', 1500) }
+    if (typeof uni !== 'undefined' && typeof uni.setClipboardData === 'function') {
+      uni.setClipboardData({ data: text, success: notifySuccess, fail: notifyFail })
+      return
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(notifySuccess).catch(notifyFail)
+      return
+    }
+    notifyFail()
+  } catch (_) {
+    showHint('复制失败，请重试', 1500)
+  }
 }
 
 function startOfTodayMs(){
@@ -854,31 +734,6 @@ const opStats = computed(() => {
 })
 
 // 运算序列偏好（bigram/trigram）与首两步
-const seqStats = computed(() => {
-  const big = new Map() // key -> { total, success }
-  const tri = new Map()
-  const firstTwo = new Map()
-  const add = (map, key, success) => {
-    if (!key) return
-    const cur = map.get(key) || { total:0, success:0 }
-    cur.total += 1; if (success) cur.success += 1
-    map.set(key, cur)
-  }
-  for (const r of currentRounds.value) {
-    const seq = Array.isArray(r?.ops) ? r.ops : []
-    const ok = !!r?.success
-    if (seq.length >= 2) add(firstTwo, `${seq[0]} → ${seq[1]}`, ok)
-    for (let i=0;i+1<seq.length;i++) add(big, `${seq[i]} ${seq[i+1]}`, ok)
-    for (let i=0;i+2<seq.length;i++) add(tri, `${seq[i]} ${seq[i+1]} ${seq[i+2]}`, ok)
-  }
-  const toRows = (map) => Array.from(map.entries()).map(([key,v])=>({ key, total:v.total, win: v.total ? Math.round(100*v.success/v.total) : 0 }))
-  const byTotal = (a,b)=> (b.total - a.total) || (b.win - a.win)
-  const topBigrams = toRows(big).sort(byTotal).slice(0,6)
-  const topTrigrams = toRows(tri).sort(byTotal).slice(0,6)
-  const firstTwoRows = toRows(firstTwo).sort(byTotal).slice(0,6)
-  return { topBigrams: topBigrams, topTrigrams: topTrigrams, firstTwo: firstTwoRows }
-})
-
 // ========== 趋势与连胜 ==========
 const streakStats = computed(() => {
   // 在当前时间窗口内计算连胜/连败
@@ -948,12 +803,6 @@ const rolling = computed(() => ({
   avg30: rollingOf(30).avg,
 }))
 
-const spark7 = computed(() => computeSparkSeries(dailySeries.value, 7))
-const spark30 = computed(() => computeSparkSeries(dailySeries.value, 30))
-
-// ========== 难度热力（Top/Bottom 列表版） ==========
-const faceHeat = computed(() => computeFaceHeat(currentRounds.value))
-
 // ========== 称号系统（基础规则） ==========
 const badges = computed(() => {
   const out = []
@@ -993,8 +842,6 @@ function handSignature(hand){
     return ranks.join(',')
   } catch (_) { return '' }
 }
-const faceSignStats = computed(() => computeFaceSignStats(currentRounds.value))
-
 // 4) 速度-准确散点（用时间分桶概览代替复杂图表）
 const speedBuckets = computed(() => {
   const rows = computeSpeedBuckets(currentRounds.value)
@@ -1107,11 +954,11 @@ function exitStatsPage() {
   grid-gap: 6rpx; 
   min-height: 44rpx;
 }
-.thead { 
-  color: #6b7280; 
-  font-weight: 700; 
-  padding: 8rpx 12rpx; 
-  background: #f8fafc;
+.thead {
+  color: var(--tf24-table-head-color, #475569);
+  font-weight: 700;
+  padding: 8rpx 12rpx;
+  background: var(--tf24-table-head-bg, #f8fafc);
   font-size: 24rpx;
 }
 .tr { 
@@ -1191,6 +1038,26 @@ function exitStatsPage() {
   white-space: nowrap;
 }
 .rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
+.rounds-head{
+  display:grid;
+  grid-template-columns: 200rpx 120rpx 160rpx 1fr;
+  gap:8rpx;
+  padding:8rpx 4rpx;
+  background: var(--tf24-table-head-bg, #f8fafc);
+  color: var(--tf24-table-head-color, #475569);
+  font-size:24rpx;
+  font-weight:700;
+  border-radius:12rpx;
+}
+.rounds-head text{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.rounds-head text:nth-child(2),
+.rounds-head text:nth-child(3){ text-align:center; }
+.rounds-head text:first-child,
+.rounds-head text:last-child{ text-align:left; }
 .round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
 .r-time, .r-result, .r-timeMs {
   font-size: 26rpx;
@@ -1224,12 +1091,18 @@ function exitStatsPage() {
 .mistake-summary-item{ background:#f8fafc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
 .mistake-summary-label{ color:#6b7280; font-size:26rpx; }
 .mistake-summary-value{ color:#111827; font-size:36rpx; font-weight:700; }
-.mistake-controls{ display:flex; align-items:center; justify-content:space-between; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
+.mistake-controls{ display:flex; align-items:center; justify-content:flex-start; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
 .mistake-filter{ display:flex; align-items:center; gap:12rpx; color:#374151; font-size:26rpx; }
-.mistake-sort{ display:grid; grid-template-columns:repeat(3,1fr); gap:12rpx; flex:1; min-width:360rpx; }
 .mistake-table .td{ text-align:center; }
 .mistake-table .td:first-child{ text-align:left; }
 .mistake-tip{ color:#6b7280; font-size:24rpx; flex:1; text-align:right; }
+.mistake-key{
+  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  color:#0f172a;
+}
+.mistake-key:active{ opacity:.7; }
+.mistake-empty{ color:#64748b; font-size:26rpx; margin-top:8rpx; }
+.empty-tip{ color:#64748b; font-size:26rpx; margin-top:8rpx; }
 
 /* 表头排序：高亮当前列 */
 /* .th.active{ color:#0953e9; font-weight:800 } */

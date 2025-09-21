@@ -2,17 +2,24 @@
   <view
     class="page col"
     :class="{ booted }"
-    style="padding: 24rpx; gap: 16rpx; position: relative;"
+    style="padding: 24rpx; position: relative;"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
 
-    <!-- 顶部：当前用户与切换 -->
-    <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
-      <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
-      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
+    <view class="game-content">
+
+    <!-- 顶部：当前用户 -->
+    <view class="topbar">
+      <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
+        <template v-if="currentUserAvatar && !avatarLoadFailed">
+          <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
+        </template>
+        <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
+        <text class="user-chip-name">{{ currentUserName }}</text>
+      </view>
     </view>
 
     <view class="mode-bar">
@@ -57,66 +64,66 @@
         </view>
       </view>
     </view>
-    <template v-if="mode === 'pro'">
-      <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-      <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
-        <view v-for="(card, idx) in cards" :key="idx"
-              class="playing-card"
-              :class="{ used: (usedByCard[idx]||0) > 0 }"
-              @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-              @touchmove.stop.prevent="onDrag($event)"
-              @touchend.stop.prevent="endDrag()">
-          <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
-        </view>
-      </view>
-
-      <!-- 运算符候选区：两行布局 -->
-      <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
-        <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
-                @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+    <view class="mode-panels">
+      <view class="pro-mode mode-panel" v-show="mode === 'pro'">
+        <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
+        <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
+          <view v-for="(card, idx) in cards" :key="idx"
+                class="playing-card"
+                :class="{ used: (usedByCard[idx]||0) > 0 }"
+                @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
                 @touchmove.stop.prevent="onDrag($event)"
-                @touchend.stop.prevent="endDrag()">{{ op }}</button>
-      </view>
-      <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
-        <view class="ops-left">
-          <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                @touchend.stop.prevent="endDrag()">
+            <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
+          </view>
+        </view>
+
+        <!-- 运算符候选区：两行布局 -->
+        <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
+          <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
                   @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                   @touchmove.stop.prevent="onDrag($event)"
                   @touchend.stop.prevent="endDrag()">{{ op }}</button>
         </view>
-        <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
-      </view>
-
-      <!-- 拖拽中的浮层 -->
-      <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
-
-      <!-- 表达式卡片容器（高度由脚本计算） -->
-      <view class="expr-card card section">
-        <view
-          id="exprZone"
-          class="expr-zone"
-          :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
-          :style="{ height: exprZoneHeight + 'px' }"
-        >
-          <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
-          <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
-            <block v-for="(t, i) in tokens" :key="i">
-              <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-              <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                    @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+        <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
+          <view class="ops-left">
+            <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                    @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                     @touchmove.stop.prevent="onDrag($event)"
-                    @touchend.stop.prevent="endDrag()">
-                <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S'})" mode="heightFix"/>
-                <text v-else class="tok-op-text">{{ t.value }}</text>
-              </view>
-            </block>
-            <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                    @touchend.stop.prevent="endDrag()">{{ op }}</button>
+          </view>
+          <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+        </view>
+
+        <!-- 拖拽中的浮层 -->
+        <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
+
+        <!-- 表达式卡片容器（高度由脚本计算） -->
+        <view class="expr-card card section">
+          <view
+            id="exprZone"
+            class="expr-zone"
+            :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
+            :style="{ height: exprZoneHeight + 'px' }"
+          >
+            <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
+            <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
+              <block v-for="(t, i) in tokens" :key="i">
+                <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
+                      @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                      @touchmove.stop.prevent="onDrag($event)"
+                      @touchend.stop.prevent="endDrag()">
+                  <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S'})" mode="heightFix"/>
+                  <text v-else class="tok-op-text">{{ t.value }}</text>
+                </view>
+              </block>
+              <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+            </view>
           </view>
         </view>
       </view>
-    </template>
-    <template v-else>
-      <view class="basic-mode">
+      <view class="basic-mode mode-panel" v-show="mode !== 'pro'">
         <view class="basic-board">
           <view class="basic-column">
             <view v-for="i in [0, 2]" :key="'basic-left-' + i" class="basic-card-wrapper">
@@ -144,21 +151,28 @@
           </view>
         </view>
       </view>
-    </template>
-
-    <view v-if="mode === 'pro'" id="submitRow">
-      <button class="btn btn-primary" style="width:100%" @click="check">提交答案</button>
     </view>
 
-    <view v-if="mode === 'pro'" id="failRow" class="pair-grid">
-      <button class="btn btn-secondary" @click="showSolution">提示</button>
-      <button class="btn btn-secondary" @click="skipHand">下一题</button>
     </view>
-    <view v-else class="basic-actions">
-      <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
-      <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
-      <button class="btn btn-secondary" @click="showSolution">提示</button>
-      <button class="btn btn-secondary" @click="skipHand">下一题</button>
+
+    <view class="game-footer">
+      <view id="submitRow" class="footer-row">
+        <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
+        <view v-show="mode !== 'pro'" class="basic-utility-grid">
+          <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
+          <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
+        </view>
+      </view>
+      <view id="failRow" class="footer-row">
+        <view class="pair-grid footer-pair" v-show="mode === 'pro'">
+          <button class="btn btn-secondary" @click="showSolution">提示</button>
+          <button class="btn btn-secondary" @click="skipHand">下一题</button>
+        </view>
+        <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
+          <button class="btn btn-secondary" @click="showSolution">提示</button>
+          <button class="btn btn-secondary" @click="skipHand">下一题</button>
+        </view>
+      </view>
     </view>
 
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
@@ -237,6 +251,14 @@ const faceUseHigh = ref(false)
 const handRecorded = ref(false)
 const exprZoneHeight = ref(200)
 const currentUser = ref(null)
+const avatarLoadFailed = ref(false)
+const currentUserName = computed(() => {
+  const name = currentUser.value && typeof currentUser.value.name === 'string' ? currentUser.value.name.trim() : ''
+  return name || '未登录'
+})
+const currentUserAvatar = computed(() => (currentUser.value && currentUser.value.avatar) ? currentUser.value.avatar : '')
+const currentUserInitial = computed(() => avatarInitial(currentUserName.value))
+const currentUserColor = computed(() => colorFromUser(currentUser.value))
 const deck = ref([])
 const deckSource = ref('normal')
 const deckSourceLabel = computed(() => deckSource.value === 'mistake' ? '题库：错题' : '题库：整副')
@@ -282,6 +304,27 @@ const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort
 const cardImage = cardImagePath
+
+function avatarInitial(name) {
+  if (!name) return 'U'
+  const s = String(name).trim()
+  return s.length ? s[0].toUpperCase() : 'U'
+}
+
+function colorFromUser(user) {
+  const base = String(user?.id || user?.name || '')
+  if (!base) return '#e2e8f0'
+  let hash = 0
+  for (let i = 0; i < base.length; i++) {
+    hash = (hash * 33 + base.charCodeAt(i)) >>> 0
+  }
+  const palette = ['#e2e8f0', '#fde68a', '#bbf7d0', '#bfdbfe', '#fecaca', '#f5d0fe', '#c7d2fe']
+  return palette[hash % palette.length]
+}
+
+function onAvatarError() {
+  avatarLoadFailed.value = true
+}
 
 function saveSession() {
   try {
@@ -1134,7 +1177,13 @@ function exitGamePage() {
   })
 }
 
-function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
+function goLogin(){
+  try {
+    uni.navigateTo({ url:'/pages/login/index' })
+  } catch (e1) {
+    try { uni.reLaunch({ url:'/pages/login/index' }) } catch (_) {}
+  }
+}
 function goStats(){ try { uni.reLaunch({ url:'/pages/stats/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} } }
 function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(_){} } }
 function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} } }
@@ -1286,6 +1335,10 @@ function updateExprScale() {
   })
 }
 
+watch(currentUser, () => {
+  avatarLoadFailed.value = false
+})
+
 watch(mode, (m) => {
   const normalized = m === 'pro' ? 'pro' : 'basic'
   try { setLastMode(normalized) } catch (_) {}
@@ -1413,8 +1466,50 @@ function onSessionOver() {
 .page { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); background: #f8fafc; display:flex; flex-direction: column; } 
 .page { opacity: 0; } 
 .page.booted { animation: page-fade-in .28s ease-out forwards; } 
-.topbar { padding: 12rpx 0; } 
-.topbar-title { font-size: 36rpx; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block; } 
+.game-content { flex:1; display:flex; flex-direction:column; gap:16rpx; }
+.mode-panels { flex:1; display:flex; flex-direction:column; gap:18rpx; }
+.mode-panel { display:flex; flex-direction:column; gap:18rpx; }
+.pro-mode { flex:1; }
+.topbar { padding: 12rpx 0; }
+.user-chip {
+  display:flex;
+  align-items:center;
+  gap:16rpx;
+  padding:12rpx 20rpx;
+  background:#fff;
+  border:2rpx solid #e2e8f0;
+  border-radius:9999rpx;
+  box-shadow:0 6rpx 16rpx rgba(15,23,42,0.08);
+  width:100%;
+  box-sizing:border-box;
+}
+.user-chip-avatar,
+.user-chip-fallback {
+  width:80rpx;
+  height:80rpx;
+  border-radius:50%;
+  flex:0 0 80rpx;
+}
+.user-chip-avatar { display:block; object-fit:cover; }
+.user-chip-fallback {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:34rpx;
+  font-weight:700;
+  color:#0f172a;
+  background:#e2e8f0;
+}
+.user-chip-name {
+  flex:1;
+  font-size:32rpx;
+  font-weight:700;
+  color:#0f172a;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.user-chip-hover { opacity:0.86; }
  
 /* 牌区 */ 
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; } 
@@ -1426,7 +1521,7 @@ function onSessionOver() {
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
 .ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:18rpx; align-items:stretch; }
 .ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
+.pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; width:100%; }
 .mode-bar { display:flex; align-items:stretch; gap:18rpx; margin: 8rpx 0 16rpx; }
 .mode-btn { width: 100%; white-space: nowrap; }
 .mode-toggle-btn { flex:1; width:100%; border:2rpx solid transparent; font-weight:700; }
@@ -1443,6 +1538,35 @@ function onSessionOver() {
   color:#fff;
   background:#3d5714;
 }
+
+.game-footer {
+  margin-top:auto;
+  display:flex;
+  flex-direction:column;
+  gap:var(--tf24-footer-gap, 16rpx);
+  padding-top:12rpx;
+}
+.footer-row {
+  display:flex;
+  align-items:stretch;
+  gap:18rpx;
+  min-height:var(--tf24-footer-row-height, 120rpx);
+}
+.footer-row .btn {
+  width:100%;
+  height:100%;
+  min-height:var(--tf24-footer-row-height, 120rpx);
+  padding:0;
+}
+.footer-primary-btn { width:100%; }
+.basic-utility-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:18rpx;
+  width:100%;
+}
+.basic-utility-grid .btn[disabled] { opacity:.6; }
+.footer-pair { height:100%; }
 
 .timer-cell { cursor: pointer; }
 .timer-popover-layer { position:fixed; inset:0; z-index:998; }
@@ -1536,7 +1660,7 @@ function onSessionOver() {
 
 .btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
 
-.basic-mode { display:flex; flex-direction:column; gap:24rpx; }
+.basic-mode { display:flex; flex-direction:column; gap:24rpx; flex:1; }
 .basic-board { display:flex; gap:24rpx; align-items:stretch; justify-content:center; }
 .basic-column { display:flex; flex-direction:column; gap:24rpx; flex:1; }
 .basic-card-wrapper { flex:1; }
@@ -1551,8 +1675,6 @@ function onSessionOver() {
 .basic-ops .btn-operator { height:110rpx; font-size:64rpx; }
 .basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
 .basic-face-toggle { margin-top:12rpx; white-space:normal;word-break: break-all;}
-.basic-actions { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.basic-actions .btn[disabled] { opacity:.6; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
