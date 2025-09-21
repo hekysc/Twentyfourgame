@@ -23,4 +23,13 @@ export default {
 page {
   background-color: #f8f8f8;
 }
+
+/* uni-h5 旧版头部兜底隐藏（仅当 navigationStyle 未生效时） */
+.uni-page-head,
+.uni-header,
+.uni-btn-icon,
+.uni-page-head__left,
+.uni-page-head__back {
+  display: none !important;
+}
 </style>

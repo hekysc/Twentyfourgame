@@ -4,37 +4,58 @@
       "path": "pages/login/index",
       "style": {
         "navigationBarTitleText": "登录",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": false
+          }
+        }
       }
     },
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "无敌24点程序·观测"
+        "navigationBarTitleText": "无敌24点程序·观测",
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": false
+          }
+        }
       }
     },
     {
       "path": "pages/user/index",
       "style": {
-        "navigationBarTitleText": "用户管理"
+        "navigationBarTitleText": "用户管理",
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": false
+          }
+        }
       }
     },
     {
       "path": "pages/stats/index",
       "style": {
         "navigationBarTitleText": "历史统计",
-        "enablePullDownRefresh": true
+        "enablePullDownRefresh": true,
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": false
+          }
+        }
       }
     }
   ],
   "globalStyle": {
+    "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "无敌24点程序·观测",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8",
-		"app-plus": {
+    "app-plus": {
       "animationType": "none",
       "animationDuration": 0
-  }
+    }
   }
 }
