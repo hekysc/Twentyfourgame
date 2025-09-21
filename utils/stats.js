@@ -35,6 +35,41 @@ export function computeTrendBars(rounds) {
   })
 }
 
+const RANK_TIERS = [
+  { key: 'mythic', label: '神话', icon: '🐉', color: '#f97316', minWinRate: 85, minStreak: 10 },
+  { key: 'grandmaster', label: '宗师', icon: '🏆', color: '#facc15', minWinRate: 75, minStreak: 7 },
+  { key: 'diamond', label: '钻石', icon: '💎', color: '#38bdf8', minWinRate: 65, minStreak: 5 },
+  { key: 'gold', label: '黄金', icon: '🥇', color: '#fbbf24', minWinRate: 55, minStreak: 3 },
+  { key: 'silver', label: '白银', icon: '🥈', color: '#cbd5f5', minWinRate: 40, minStreak: 2 },
+  { key: 'bronze', label: '青铜', icon: '🥉', color: '#f59e0b', minWinRate: 0, minStreak: 0 },
+]
+
+function clamp01(v) { return Math.max(0, Math.min(1, v)) }
+
+export function resolveRankTier(winRate = 0, longestWinStreak = 0) {
+  const tiers = RANK_TIERS.slice()
+  let matched = tiers[tiers.length - 1]
+  for (const tier of tiers) {
+    if (winRate >= tier.minWinRate || longestWinStreak >= tier.minStreak) {
+      matched = tier
+      break
+    }
+  }
+  const idx = tiers.findIndex(t => t.key === matched.key)
+  const nextTier = idx > 0 ? tiers[idx - 1] : null
+  const winRange = nextTier ? (nextTier.minWinRate - matched.minWinRate) : 0
+  const streakRange = nextTier ? (nextTier.minStreak - matched.minStreak) : 0
+  const winProgress = winRange > 0 ? (winRate - matched.minWinRate) / winRange : 1
+  const streakProgress = streakRange > 0 ? (longestWinStreak - matched.minStreak) / streakRange : 1
+  const progress = clamp01(Math.max(winProgress, streakProgress))
+  return {
+    ...matched,
+    progress,
+    progressPct: Math.round(progress * 100),
+    nextTier,
+  }
+}
+
 // 总览表-行聚合（受时间窗口影响）
 export function computeOverviewRows(userRows, userExtMap, cutoffMs = 0) {
   const items = (userRows || []).map(u => {
@@ -42,14 +77,35 @@ export function computeOverviewRows(userRows, userExtMap, cutoffMs = 0) {
     const rounds = (rec.rounds || []).filter(r => (!cutoffMs || (r.ts || 0) >= cutoffMs))
     const total = rounds.length
     const success = rounds.filter(r => r.success).length
+    const fail = total - success
     const winRate = total ? Math.round(100 * success / total) : 0
     const times = rounds.filter(r => r.success && Number.isFinite(r.timeMs)).map(r => r.timeMs)
     const bestTimeMs = times.length ? Math.min(...times) : null
     const avgTimeMs = times.length ? Math.round(times.reduce((a, b) => a + b, 0) / times.length) : null
-    const fail = total - success
-    return { id: u.id, name: u.name, total, success, fail, times: total, winRate, bestTimeMs, avgTimeMs }
+    const streaks = computeStreakStats(rounds)
+    const currentWin = streaks.curWin || 0
+    const maxWin = Math.max(streaks.maxWin || 0, u.longestStreak || 0)
+    const tier = resolveRankTier(winRate, maxWin)
+    const successPct = total ? Math.round((success / total) * 100) : 0
+    const failPct = total ? Math.max(0, 100 - successPct) : 0
+    return {
+      id: u.id,
+      name: u.name,
+      total,
+      success,
+      fail,
+      times: total,
+      winRate,
+      bestTimeMs,
+      avgTimeMs,
+      currentWin,
+      maxWin,
+      tier,
+      successPct,
+      failPct,
+    }
   })
-  items.sort((a, b) => (b.winRate - a.winRate) || (b.times - a.times))
+  items.sort((a, b) => (b.winRate - a.winRate) || (b.times - a.times) || (b.maxWin - a.maxWin))
   return items
 }
 

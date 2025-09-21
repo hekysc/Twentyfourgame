@@ -7,10 +7,10 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <view class="section">
-      <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
+    <view class="section overview-section">
+      <view class="panel-header">
         <text class="title">玩家总览</text>
-        <view class="row" style="display:flex; align-items:center; gap:12rpx;">
+        <view class="panel-actions">
           <view class="seg">
             <button class="seg-btn" :class="{ active: overviewRange===1 }" @click="setOverviewRange(1)">今天</button>
             <button class="seg-btn" :class="{ active: overviewRange===3 }" @click="setOverviewRange(3)">3天</button>
@@ -20,35 +20,56 @@
           </view>
         </view>
       </view>
-      <view class="table">
+      <view class="grid-table overview-table">
         <view class="thead">
-          <text class="th rank">#</text>
-          <text class="th user" @click="sortBy('name')" :class="{ active: sortKey==='name' }">用户</text>
-          <text class="th" @click="sortBy('times')" :class="{ active: sortKey==='times' }">总局数</text>
-          <text class="th ok" @click="sortBy('success')" :class="{ active: sortKey==='success' }">成
-            <text>/
-              <text class="th fail">败
-              </text>
-            </text>
-          </text>
-          <text class="th" @click="sortBy('winRate')" :class="{ active: sortKey==='winRate' }">🎯胜率</text>
-          <text class="th" @click="sortBy('avgTimeMs')" :class="{ active: sortKey==='avgTimeMs' }">平均</text>
-          <text class="th" @click="sortBy('bestTimeMs')" :class="{ active: sortKey==='bestTimeMs' }">🏆最佳</text>
+          <text class="th rank">排名</text>
+          <text class="th user" @click="sortBy('name')" :class="{ active: sortKey==='name' }">玩家</text>
+          <text class="th win" @click="sortBy('winRate')" :class="{ active: sortKey==='winRate' }">胜率</text>
+          <text class="th streak" @click="sortBy('maxWin')" :class="{ active: sortKey==='maxWin' }">连胜</text>
+          <text class="th total" @click="sortBy('times')" :class="{ active: sortKey==='times' }">场次</text>
+          <text class="th time" @click="sortBy('avgTimeMs')" :class="{ active: sortKey==='avgTimeMs' }">平均/最佳</text>
         </view>
         <view class="tbody">
-          <view class="tr" v-for="(row, i) in overviewRowsSorted" :key="row.id" @click="selectUser(row.id)">
-            <text class="td rank">{{ i+1 }}</text>
-            <text class="td user">{{ row.name }}</text>
-            <text class="td">{{ row.times }}</text>
-            <text class="td ok">{{ row.success }}
-              <text>/
-                <text class="td fail">{{ row.fail }}
-                </text>
-              </text>
-            </text>
-            <text class="td">{{ row.winRate }}%</text>
-            <text class="td">{{ row.avgTimeMs != null ? fmtMs(row.avgTimeMs) : '-' }}</text>
-            <text class="td">{{ row.bestTimeMs != null ? fmtMs(row.bestTimeMs) : '-' }}</text>
+          <view class="tr" v-for="row in overviewDisplayRows" :key="row.id" @click="selectUser(row.id)">
+            <view class="td rank">
+              <text v-if="row.rankBadge" class="rank-medal">{{ row.rankBadge }}</text>
+              <text class="rank-index">#{{ row.index + 1 }}</text>
+            </view>
+            <view class="td user">
+              <view class="user-main">
+                <text class="tier-icon" :style="{ backgroundColor: row.tier.color }">{{ row.tier.icon }}</text>
+                <view class="user-meta">
+                  <text class="user-name">{{ row.name }}</text>
+                  <text class="user-tier">{{ row.tier.label }}</text>
+                </view>
+              </view>
+            </view>
+            <view class="td win">
+              <text class="stat-value text-win">{{ row.winRate }}%</text>
+              <view class="stacked-bar small">
+                <view class="seg win" :style="{ width: row.successPct + '%' }"></view>
+                <view class="seg fail" :style="{ width: row.failPct + '%' }"></view>
+              </view>
+              <text class="stat-sub">胜 {{ row.success }} · 败 {{ row.fail }}</text>
+            </view>
+            <view class="td streak">
+              <view class="streak-pill current">
+                <text class="pill-label">当前</text>
+                <text class="pill-value">{{ row.currentWin }}</text>
+              </view>
+              <view class="streak-pill longest">
+                <text class="pill-label">最长</text>
+                <text class="pill-value">{{ row.maxWin }}</text>
+              </view>
+            </view>
+            <view class="td total">
+              <text class="stat-value">{{ row.total }}</text>
+              <text class="stat-sub">胜率 {{ row.winRate }}%</text>
+            </view>
+            <view class="td time">
+              <text class="stat-value">{{ row.avgTimeText }}</text>
+              <text class="stat-sub">最佳 {{ row.bestTimeText }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -63,12 +84,45 @@
       </view>
     </view>
 
-    <view v-if="selectedUserId" class="section">    
-      <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap: wrap;">
+    <view v-if="selectedUserId" class="section trend-section">
+      <view class="panel-header">
         <text class="title">📈个人趋势</text>
+        <view class="trend-chips">
+          <view class="stat-chip">
+            <text class="chip-label">段位</text>
+            <view class="chip-value tier">
+              <text class="tier-icon" :style="{ backgroundColor: selectedTier.color }">{{ selectedTier.icon }}</text>
+              <text>{{ selectedTier.label }}</text>
+            </view>
+          </view>
+          <view class="stat-chip">
+            <text class="chip-label">窗口胜率</text>
+            <text class="chip-value text-win">{{ currentWindowSummary.winPct }}%</text>
+          </view>
+          <view class="stat-chip">
+            <text class="chip-label">当前连胜</text>
+            <text class="chip-value text-win">{{ streakStats.curWin }}</text>
+          </view>
+          <view class="stat-chip">
+            <text class="chip-label">最长连胜</text>
+            <text class="chip-value text-accent">{{ streakStats.maxWin }}</text>
+          </view>
+        </view>
       </view>
 
-      <view class="trend-chart" style="margin-top:12rpx;">
+      <view class="panel-slot trend-summary" v-if="currentWindowSummary.total">
+        <view class="stacked-bar big">
+          <view class="seg win" :style="{ width: currentWindowSummary.winPct + '%' }"></view>
+          <view class="seg fail" :style="{ width: Math.max(0, 100 - currentWindowSummary.winPct) + '%' }"></view>
+        </view>
+        <view class="trend-meta">
+          <text class="meta text-win">胜 {{ currentWindowSummary.success }}</text>
+          <text class="meta text-fail">败 {{ currentWindowSummary.fail }}</text>
+          <text class="meta muted">共 {{ currentWindowSummary.total }} 局</text>
+        </view>
+      </view>
+
+      <view class="trend-chart panel-slot">
         <view class="trend-chart-inner"
               :style="{ width: trendSeries.width ? (trendSeries.width + 'rpx') : '100%', height: trendSeries.chartHeight + 'rpx' }">
           <view class="trend-bars"
@@ -88,35 +142,27 @@
                 :style="{ width: trendSeries.barWidth + 'rpx' }">{{ d.shortLabel }}</text>
         </view>
       </view>
-      <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=胜利局数，红色=失败局数</view>
-      <!-- <view class="table" style="margin-top:12rpx;">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-          <text class="th">窗口</text>
-          <text class="th">滚动胜率</text>
-          <text class="th">滚动平均用时</text>
+      <view class="trend-legend panel-hint">绿色=胜利局数，红色=失败局数</view>
+
+      <view class="panel-slot rank-progress">
+        <view class="rank-progress-bar stacked-bar">
+          <view class="seg rank" :style="{ width: selectedTier.progressPct + '%' }"></view>
         </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-            <text class="td">7天</text>
-            <text class="td">{{ rolling.win7 }}%</text>
-            <text class="td">{{ rolling.avg7 }}</text>
-          </view>
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
-            <text class="td">30天</text>
-            <text class="td">{{ rolling.win30 }}%</text>
-            <text class="td">{{ rolling.avg30 }}</text>
-          </view>
+        <view class="rank-progress-meta">
+          <text class="meta">段位进度 {{ selectedTier.progressPct }}%</text>
+          <text class="meta muted">{{ tierAdvancementHint.text }}</text>
         </view>
-      </view> -->
-      <view class="table" style="margin-top:12rpx;">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)' }">
+      </view>
+
+      <view class="grid-table streak-table panel-slot">
+        <view class="thead">
           <text class="th">当前连胜</text>
           <text class="th">最长连胜</text>
           <text class="th">当前连败</text>
           <text class="th">最长连败</text>
         </view>
         <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)' }">
+          <view class="tr">
             <text class="td ok">{{ streakStats.curWin }}</text>
             <text class="td ok">{{ streakStats.maxWin }}</text>
             <text class="td fail">{{ streakStats.curLose }}</text>
@@ -140,22 +186,32 @@
       </view>
     </view>
 
-    <view v-if="selectedUserId" class="section">
-      <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
+    <view v-if="selectedUserId" class="section mistakes-section">
+      <view class="panel-header">
         <text class="title">📝错题本</text>
         <text class="mistake-tip">连续正确 5 次将自动移出活动错题本（但仍计入总错题统计）</text>
       </view>
-      <view class="mistake-summary">
+      <view class="mistake-summary panel-slot">
         <view class="mistake-summary-item">
           <text class="mistake-summary-label">错题总数</text>
           <text class="mistake-summary-value">{{ mistakeSummary.totalWrongCount }}</text>
         </view>
-        <view class="mistake-summary-item">
+        <view class="mistake-summary-item active">
           <text class="mistake-summary-label">遗留错题</text>
           <text class="mistake-summary-value">{{ mistakeSummary.totalActiveCount }}</text>
         </view>
+        <view v-if="mistakeProgress.total" class="mistake-progress">
+          <view class="stacked-bar small">
+            <view class="seg warn" :style="{ width: mistakeProgress.activePct + '%' }"></view>
+            <view class="seg calm" :style="{ width: mistakeProgress.clearedPct + '%' }"></view>
+          </view>
+          <view class="mistake-progress-meta">
+            <text class="meta text-warn">活动 {{ mistakeProgress.active }}</text>
+            <text class="meta text-calm">清除 {{ mistakeProgress.cleared }}</text>
+          </view>
+        </view>
       </view>
-      <view class="mistake-controls">
+      <view class="mistake-controls panel-slot">
         <label class="mistake-filter">
           <switch :checked="mistakeFilterActiveOnly" @change="onToggleMistakeActive" color="#145751" />
           <text>仅看活动</text>
@@ -166,7 +222,7 @@
           <button class="seg-btn" :class="{ active: mistakeSortKey==='streak' }" @click="setMistakeSort('streak')">连对</button>
         </view>
       </view>
-      <view class="table mistake-table" v-if="mistakeDisplayRows.length">
+      <view class="grid-table mistake-table panel-slot" v-if="mistakeDisplayRows.length">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'220rpx 120rpx 120rpx 120rpx 120rpx 120rpx 120rpx 200rpx' }">
           <text class="th" style="text-align:left;">题目 key</text>
           <text class="th">尝试</text>
@@ -190,7 +246,7 @@
           </view>
         </view>
       </view>
-      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无错题记录</view>
+      <view v-else class="panel-hint empty-hint">暂无错题记录</view>
     </view>
 
     <!-- 首运算符成功率 + 运算熵 -->
@@ -199,7 +255,7 @@
         <text class="title">运算偏好与效率</text>
         <text style="color:#64748b; font-size:26rpx;">运算熵：{{ opStats.entropyPct }}%</text>
       </view>
-      <view class="table">
+      <view class="grid-table panel-slot operations-table">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'120rpx 1fr 1fr 1fr 1fr' }">
           <text class="th">运算符</text>
           <text class="th">总出现</text>
@@ -220,7 +276,7 @@
         </view>
       </view>
       <!-- 运算序列偏好 bigram/trigram + 首两步 -->
-      <view class="table" style="margin-top:12rpx;">
+      <view class="grid-table panel-slot operations-table">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
           <text class="th">Top 序列</text>
           <text class="th">局数</text>
@@ -239,7 +295,7 @@
           </view>
         </view>
       </view>
-      <view class="table" style="margin-top:12rpx;">
+      <view class="grid-table panel-slot operations-table">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
           <text class="th">首两步</text>
           <text class="th">局数</text>
@@ -260,7 +316,7 @@
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">牌型签名命中率（Top 5）</text>
       </view>
-      <view class="table" v-if="faceSignStats.length">
+      <view class="grid-table panel-slot table" v-if="faceSignStats.length">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr' }">
           <text class="th">签名</text>
           <text class="th">局数</text>
@@ -276,7 +332,7 @@
           </view>
         </view>
       </view>
-      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无统计</view>
+      <view v-else class="panel-hint empty-hint">暂无统计</view>
     </view>
 
     <!-- 难度热力（列表版）：Top/Bottom -->
@@ -286,7 +342,7 @@
         <text style="color:#64748b; font-size:24rpx;">样本门槛：{{ faceHeat.minTotal }} 局</text>
       </view>
       <view class="difficulty-heatmaps">
-        <view class="table">
+        <view class="grid-table table compact-table">
           <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
             <text class="th">Top 容易</text>
             <text class="th">局数</text>
@@ -300,7 +356,7 @@
             </view>
           </view>
         </view>
-        <view class="table">
+        <view class="grid-table table compact-table">
           <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
             <text class="th">Bottom 困难</text>
             <text class="th">局数</text>
@@ -332,7 +388,7 @@
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">速度-准确概览</text>
       </view>
-      <view class="table">
+      <view class="grid-table panel-slot table">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1.5fr repeat(5, 1fr)' }">
           <text class="th">时间段</text>
           <text class="th">总数</text>
@@ -361,7 +417,7 @@
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">技能雷达（表格版）</text>
       </view>
-      <view class="table">
+      <view class="grid-table panel-slot table">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
           <text class="th">技能</text>
           <text class="th">使用占比</text>
@@ -412,6 +468,7 @@ import {
   computeBadges,
   computeFaceSignStats,
   computeSpeedBuckets,
+  resolveRankTier,
 } from '../../utils/stats.js'
 
 const SELECTED_USER_STORE_KEY = 'tf24_stats_selected_user_v1'
@@ -497,6 +554,15 @@ const mistakeDisplayRows = computed(() => {
   }
   arr.sort(compare)
   return arr
+})
+
+const mistakeProgress = computed(() => {
+  const total = Math.max(0, Number(mistakeSummary.value.totalWrongCount) || 0)
+  const active = Math.max(0, Number(mistakeSummary.value.totalActiveCount) || 0)
+  const cleared = Math.max(0, total - active)
+  const activePct = total ? Math.round((active / total) * 100) : 0
+  const clearedPct = total ? Math.max(0, 100 - activePct) : 0
+  return { total, active, cleared, activePct, clearedPct }
 })
 
 onMounted(() => {
@@ -801,6 +867,17 @@ const trendSeries = computed(() => {
 // 玩家总览：按筛选范围/提示/面牌统计并按胜率排序
 const overviewRows = computed(() => computeOverviewRows(rows.value, userExtMap.value, calcCutoffMs()))
 
+const selectedOverviewRow = computed(() => {
+  try {
+    const id = selectedUserId.value
+    if (!id) return null
+    const rows = overviewRows.value || []
+    return rows.find(r => r.id === id) || null
+  } catch (_) {
+    return null
+  }
+})
+
 // ========== 首批 4 项：计算逻辑 ==========
 const currentRounds = computed(() => {
   const uid = selectedUserId.value
@@ -808,6 +885,15 @@ const currentRounds = computed(() => {
   const cutoff = calcCutoffMs()
   const arr = (rec.rounds || [])
   return cutoff > 0 ? arr.filter(r => (r.ts||0) >= cutoff) : arr.slice()
+})
+
+const currentWindowSummary = computed(() => {
+  const list = currentRounds.value || []
+  const total = list.length
+  const success = list.filter(r => r.success).length
+  const fail = Math.max(0, total - success)
+  const winPct = total ? Math.round((success / total) * 100) : 0
+  return { total, success, fail, winPct }
 })
 
 function evalExprToNumber(expr){
@@ -894,6 +980,32 @@ const streakStats = computed(() => {
     }
   }
   return { curWin, maxWin, curLose, maxLose }
+})
+
+const selectedTier = computed(() => {
+  const row = selectedOverviewRow.value
+  if (row && row.tier) return row.tier
+  return resolveRankTier(currentWindowSummary.value.winPct, streakStats.value?.maxWin || 0)
+})
+
+const tierAdvancementHint = computed(() => {
+  const tier = selectedTier.value
+  if (!tier) return { text: '', winDiff: 0, streakDiff: 0, next: null }
+  const next = tier.nextTier
+  if (!next) return { text: '已达最高段位', winDiff: 0, streakDiff: 0, next: null }
+  const winDiff = Math.max(0, (next.minWinRate || 0) - currentWindowSummary.value.winPct)
+  const streakDiff = Math.max(0, (next.minStreak || 0) - (streakStats.value?.maxWin || 0))
+  let text = ''
+  if (winDiff <= 0 && streakDiff <= 0) {
+    text = `已满足 ${next.label} 条件，等待统计刷新`
+  } else if (winDiff <= 0) {
+    text = `再保持 ${streakDiff} 连胜即可解锁 ${next.label}`
+  } else if (streakDiff <= 0) {
+    text = `胜率再提升 ${winDiff}pt 可晋级 ${next.label}`
+  } else {
+    text = `距 ${next.label}：胜率 +${winDiff}pt 或 连胜 ${streakDiff} 局`
+  }
+  return { text, winDiff, streakDiff, next }
 })
 
 // ========== 技能雷达（表格版） ==========
@@ -1069,6 +1181,28 @@ const overviewRowsSorted = computed(() => {
   } catch(_) { return [] }
 })
 
+const overviewDisplayRows = computed(() => {
+  const list = overviewRowsSorted.value || []
+  return list.map((row, index) => {
+    const tier = row?.tier || resolveRankTier(row?.winRate || 0, row?.maxWin || 0)
+    const avgTimeText = Number.isFinite(row?.avgTimeMs) ? fmtMs(row.avgTimeMs) : '-'
+    const bestTimeText = Number.isFinite(row?.bestTimeMs) ? fmtMs(row.bestTimeMs) : '-'
+    const successPct = Number.isFinite(row?.successPct) ? row.successPct : (row?.total ? Math.round((row.success / row.total) * 100) : 0)
+    const failPct = Number.isFinite(row?.failPct) ? row.failPct : Math.max(0, 100 - successPct)
+    const rankBadge = index === 0 ? '👑' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : ''))
+    return {
+      ...row,
+      index,
+      rankBadge,
+      tier,
+      avgTimeText,
+      bestTimeText,
+      successPct,
+      failPct,
+    }
+  })
+})
+
 function exitStatsPage() {
   exitApp({
     fallback: () => {
@@ -1090,153 +1224,117 @@ function exitStatsPage() {
 </script>
 
 <style scoped>
-.page{ min-height:100vh; box-sizing:border-box; position:relative; }
-.section{ background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
-.section.title{ background:none; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
-.title{ font-size:32rpx; font-weight:800 }
-.table { 
-  margin-top: 12rpx; 
-  border-radius: 12rpx; 
-  overflow: hidden; 
-  border: 1rpx solid #e5e7eb; 
+.page{
+  min-height:100vh;
+  box-sizing:border-box;
+  position:relative;
+  background:linear-gradient(180deg,#0f172a 0%,#111827 100%);
+  color:#e2e8f0;
+  padding-bottom:140rpx;
 }
-.thead, .tr { 
-  display: grid; 
-  grid-template-columns: 40rpx 1fr 120rpx 120rpx 80rpx 80rpx 80rpx; 
-  align-items: center; 
-  grid-gap: 6rpx; 
-  min-height: 44rpx;
+.section{
+  background:rgba(15,23,42,0.78);
+  border-radius:24rpx;
+  border:1rpx solid rgba(148,163,184,0.24);
+  padding:20rpx 24rpx;
+  box-shadow:0 24rpx 48rpx rgba(2,6,23,0.45);
+  backdrop-filter:blur(16rpx);
 }
-.thead { 
-  color: #6b7280; 
-  font-weight: 700; 
-  padding: 8rpx 12rpx; 
-  background: #f8fafc;
-  font-size: 24rpx;
+.section.title{
+  background:transparent;
+  border:none;
+  box-shadow:none;
+  padding:0;
 }
-.tr { 
-  padding: 10rpx 12rpx; 
-  border-top: 1rpx solid #f1f5f9;
-  font-size: 26rpx;
-  transition: background-color 0.2s;
+.title{
+  font-size:34rpx;
+  font-weight:800;
+  color:#f8fafc;
 }
-.th, .td { 
-  text-align: center; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  white-space: nowrap;
-  line-height: 1.4;
+.panel-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16rpx;
+  flex-wrap:wrap;
 }
-.rank { 
-  text-align: center; 
-  font-weight: 600;
+.panel-actions{ display:flex; gap:12rpx; align-items:center; }
+.seg{ display:flex; background:rgba(148,163,184,0.18); border-radius:16rpx; overflow:hidden }
+.seg-btn{ padding:10rpx 20rpx; color:#e2e8f0; background:transparent; border:none; font-size:26rpx }
+.seg-btn.active{ background:rgba(56,189,248,0.18); color:#38bdf8; font-weight:700 }
+.overview-table{ margin-top:16rpx }
+.table{ margin-top:0 }
+.compact-table{ margin-top:0 }
+.overview-table .thead,
+.overview-table .tr{
+  grid-template-columns:140rpx minmax(0,1.5fr) minmax(0,1.5fr) minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.25fr);
 }
-.td.rank {
-  color: #64748b;
-  font-size: 24rpx;
-}
-
-.td.user {
-  font-weight: 600;
-  color: #1e293b;
-}
-.ok { 
-  color: #059669; 
-  font-weight: 700; 
-}
-
-.fail { 
-  color: #dc2626; 
-  font-weight: 700; 
-}
-/* 数值列居中对齐，更紧凑 */
-.th:nth-child(3), .th:nth-child(4), .th:nth-child(5), .th:nth-child(6), .th:nth-child(7),
-.td:nth-child(3), .td:nth-child(4), .td:nth-child(5), .td:nth-child(6), .td:nth-child(7) {
-  text-align: center;
-}
-
-/* 胜率列特殊样式 */
-.td:nth-child(5) {
-  font-weight: 600;
-  color: #0891b2;
-}
-
-/* 最佳成绩列特殊样式 */
-.td:nth-child(7) {
-  font-weight: 600;
-  color: #7c3aed;
-}
-.btn.mini{ padding:10rpx 16rpx; border-radius:12rpx; background:#eef2f7 }
-.btn.link{ background:transparent; color:#2563eb }
-.seg{ display:flex; background:#f1f5f9; border-radius:12rpx; overflow:hidden }
-.seg-btn{ padding:10rpx 16rpx; background:transparent; border:none }
-.seg-btn.active{ background:#fff; font-weight:700 }
-.trend-chart{ width:100%; overflow-x:auto; }
-.trend-chart-inner{ position:relative; }
-.trend-bars{ display:flex; align-items:flex-end; height:100%; }
-.trend-item{ display:flex; justify-content:center; align-items:flex-end; height:100%; }
-.trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:12rpx 12rpx 0 0; overflow:hidden; background:#f1f5f9; }
-.trend-item .bar-fail{ width:100%; background:#dc2626; }
-.trend-item .bar-success{ width:100%; background:#16a34a; }
-.trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx; }
-.trend-labels .bar-label{ text-align:center; color:#64748b; font-size:22rpx; white-space:nowrap; }
-.trend-labels.rotate {
-  min-height: 60rpx;
-  align-items: flex-end;
-}
-.trend-labels.rotate .bar-label {
-  display: inline-block;        /* 让 transform 生效 */
-  transform: rotate(-90deg);    /* 顺时针或逆时针旋转 */
-  transform-origin: center center;  /* 旋转参考点，可以根据需求改为 left bottom 等 */
-  white-space: nowrap;
-}
-.rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
-.round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
-.r-time, .r-result, .r-timeMs {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #1e293b;
-}
-.r-cards{
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #0f172a;
-  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
-}
-.r-result.ok{ color:#16a34a; font-weight:700 }
-.r-result.fail{ color:#dc2626; font-weight:700 }
-.picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
-.difficulty-heatmaps{
-  display:grid;
-  grid-template-rows:auto auto;
-  row-gap:12rpx;
-  margin-top:8rpx;
-  width:100%;
-}
-@media screen and (min-width: 960px) {
-  .difficulty-heatmaps{
-    max-width:960px;
-    margin-left:auto;
-    margin-right:auto;
-  }
-}
-.mistake-summary{ margin-top:16rpx; display:flex; flex-wrap:wrap; gap:24rpx; }
-.mistake-summary-item{ background:#f8fafc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
-.mistake-summary-label{ color:#6b7280; font-size:26rpx; }
-.mistake-summary-value{ color:#111827; font-size:36rpx; font-weight:700; }
-.mistake-controls{ display:flex; align-items:center; justify-content:space-between; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
-.mistake-filter{ display:flex; align-items:center; gap:12rpx; color:#374151; font-size:26rpx; }
-.mistake-sort{ display:grid; grid-template-columns:repeat(3,1fr); gap:12rpx; flex:1; min-width:360rpx; }
-.mistake-table .td{ text-align:center; }
-.mistake-table .td:first-child{ text-align:left; }
-.mistake-tip{ color:#6b7280; font-size:24rpx; flex:1; text-align:right; }
-
-/* 表头排序：高亮当前列 */
-/* .th.active{ color:#0953e9; font-weight:800 } */
-.th.active{ color:#e5e7eb; background-color:#030300; font-weight:800 }
-
+.overview-table .td.rank{ display:flex; flex-direction:column; align-items:flex-start; gap:6rpx }
+.rank-medal{ font-size:34rpx; line-height:1 }
+.rank-index{ font-size:24rpx; color:#94a3b8 }
+.user-main{ display:flex; align-items:center; gap:16rpx }
+.tier-icon{ width:56rpx; height:56rpx; border-radius:18rpx; display:flex; align-items:center; justify-content:center; font-size:32rpx; color:#0f172a; box-shadow:0 12rpx 24rpx rgba(2,6,23,0.45) }
+.user-meta{ display:flex; flex-direction:column; gap:4rpx }
+.user-name{ font-size:30rpx; font-weight:700; color:#f8fafc }
+.user-tier{ font-size:24rpx; color:#94a3b8 }
+.stat-value{ font-size:30rpx; font-weight:700; color:#f8fafc }
+.stat-sub{ display:block; font-size:22rpx; color:#94a3b8; margin-top:8rpx }
+.streak-pill{ display:flex; align-items:center; justify-content:space-between; gap:10rpx; padding:8rpx 14rpx; border-radius:14rpx; background:rgba(56,189,248,0.12) }
+.streak-pill.longest{ background:rgba(248,113,113,0.12) }
+.pill-label{ font-size:22rpx; color:#94a3b8 }
+.pill-value{ font-size:28rpx; font-weight:700; color:#38bdf8 }
+.streak-pill.longest .pill-value{ color:#f87171 }
+.panel-slot{ margin-top:16rpx; padding:16rpx 20rpx; border-radius:18rpx; border:1rpx solid rgba(148,163,184,0.2); background:rgba(2,6,23,0.35) }
+.panel-hint{ margin-top:12rpx; color:#94a3b8; font-size:24rpx }
+.trend-chips{ display:flex; gap:12rpx; align-items:center; flex-wrap:wrap }
+.stat-chip{ min-width:160rpx; padding:10rpx 16rpx; border-radius:16rpx; background:rgba(2,6,23,0.45); border:1rpx solid rgba(148,163,184,0.24); display:flex; flex-direction:column; gap:4rpx }
+.chip-label{ font-size:22rpx; color:#94a3b8; letter-spacing:2rpx }
+.chip-value{ font-size:30rpx; font-weight:700; display:flex; align-items:center; gap:8rpx; color:#f8fafc }
+.trend-summary .stacked-bar{ box-shadow:inset 0 4rpx 8rpx rgba(2,6,23,0.25) }
+.trend-meta{ margin-top:12rpx; display:flex; gap:12rpx; flex-wrap:wrap }
+.meta{ font-size:24rpx; color:#e2e8f0 }
+.meta.muted{ color:#94a3b8 }
+.trend-chart{ width:100%; overflow-x:auto }
+.trend-chart-inner{ position:relative }
+.trend-bars{ display:flex; align-items:flex-end; height:100% }
+.trend-item{ display:flex; justify-content:center; align-items:flex-end; height:100% }
+.trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:14rpx 14rpx 0 0; overflow:hidden; background:rgba(148,163,184,0.24) }
+.trend-item .bar-fail{ width:100%; background:rgba(248,113,113,0.55) }
+.trend-item .bar-success{ width:100%; background:linear-gradient(180deg,#4ade80,#15803d) }
+.trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx }
+.trend-labels .bar-label{ text-align:center; color:#94a3b8; font-size:22rpx; white-space:nowrap }
+.trend-labels.rotate{ min-height:60rpx; align-items:flex-end }
+.trend-labels.rotate .bar-label{ transform:rotate(-90deg); transform-origin:center center }
+.rank-progress{ display:flex; flex-direction:column; gap:12rpx }
+.rank-progress-bar{ height:20rpx }
+.rank-progress-meta{ display:flex; gap:12rpx; flex-wrap:wrap }
+.streak-table .thead,
+.streak-table .tr{ grid-template-columns:repeat(4,minmax(0,1fr)) }
+.rounds{ margin-top:16rpx; display:flex; flex-direction:column; gap:12rpx }
+.round-item{ display:grid; grid-template-columns:200rpx 120rpx 160rpx 1fr; gap:12rpx; padding:12rpx 16rpx; border-radius:16rpx; background:rgba(2,6,23,0.45); border:1rpx solid rgba(148,163,184,0.2) }
+.r-time, .r-result, .r-timeMs{ font-size:26rpx; font-weight:600; color:#f8fafc }
+.r-cards{ font-size:26rpx; font-weight:600; color:#cbd5f5; font-family:'SFMono-Regular','Menlo','Monaco','Consolas','Liberation Mono','Courier New',monospace }
+.r-result.ok{ color:#34d399 }
+.r-result.fail{ color:#f87171 }
+.picker-trigger{ padding:8rpx 14rpx; background:rgba(148,163,184,0.16); border-radius:12rpx; color:#e2e8f0 }
+.mistake-summary{ display:flex; flex-wrap:wrap; gap:16rpx; align-items:stretch }
+.mistake-summary-item{ flex:1 1 200rpx; padding:16rpx 20rpx; border-radius:16rpx; background:rgba(56,189,248,0.08); border:1rpx solid rgba(148,163,184,0.2); display:flex; flex-direction:column; gap:6rpx }
+.mistake-summary-item.active{ background:rgba(248,113,113,0.12) }
+.mistake-summary-label{ font-size:24rpx; color:#94a3b8 }
+.mistake-summary-value{ font-size:36rpx; font-weight:800; color:#f8fafc }
+.mistake-progress{ flex-basis:100%; display:flex; flex-direction:column; gap:8rpx }
+.mistake-progress-meta{ display:flex; gap:12rpx; flex-wrap:wrap }
+.mistake-controls{ display:flex; align-items:center; justify-content:space-between; gap:16rpx; flex-wrap:wrap }
+.mistake-filter{ display:flex; align-items:center; gap:12rpx; color:#e2e8f0; font-size:26rpx }
+.mistake-sort{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12rpx; flex:1; min-width:360rpx }
+.mistake-table .thead,
+.mistake-table .tr{ grid-template-columns:220rpx 120rpx 120rpx 120rpx 120rpx 120rpx 120rpx 200rpx }
+.mistake-table .td:first-child{ text-align:left }
+.mistake-tip{ color:#94a3b8; font-size:24rpx; flex:1; text-align:right }
+.empty-hint{ margin-top:16rpx; font-size:26rpx }
+.difficulty-heatmaps{ display:grid; grid-template-rows:auto auto; row-gap:12rpx; margin-top:8rpx; width:100% }
+@media screen and (min-width:960px){ .difficulty-heatmaps{ max-width:960rpx; margin-left:auto; margin-right:auto } }
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
 .floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
-
 </style>
