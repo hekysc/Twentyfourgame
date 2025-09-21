@@ -169,20 +169,20 @@
         </label>
       </view>
       <view class="table mistake-table" v-if="mistakeDisplayRows.length">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'260rpx 140rpx 140rpx 140rpx 140rpx' }">
-          <text class="th" style="text-align:left;">题目 key</text>
-          <text class="th">尝试</text>
-          <text class="th fail">错</text>
-          <text class="th ok">对</text>
-          <text class="th">活动</text>
+        <view class="mistake-grid mistake-head">
+          <text class="mistake-th key">题目 key</text>
+          <text class="mistake-th">尝试</text>
+          <text class="mistake-th">错误</text>
+          <text class="mistake-th">正确</text>
+          <text class="mistake-th">是否活动</text>
         </view>
-        <view class="tbody">
-          <view class="tr" v-for="row in mistakeDisplayRows" :key="row.key" :style="{ display:'grid', gridTemplateColumns:'260rpx 140rpx 140rpx 140rpx 140rpx' }">
-            <text class="td mistake-key" style="text-align:left;" @tap="copyMistakeKey(row)">{{ row.displayKey }}</text>
-            <text class="td">{{ row.attempts }}</text>
-            <text class="td fail">{{ row.wrong }}</text>
-            <text class="td ok">{{ row.correct }}</text>
-            <text class="td" :class="{ ok: row.active }">{{ row.active ? '是' : '否' }}</text>
+        <view class="mistake-body">
+          <view class="mistake-grid mistake-row" v-for="row in mistakeDisplayRows" :key="row.key">
+            <text class="mistake-cell key" @tap="copyMistakeKey(row)">{{ row.displayKey }}</text>
+            <text class="mistake-cell">{{ row.attempts }}</text>
+            <text class="mistake-cell fail">{{ row.wrong }}</text>
+            <text class="mistake-cell ok">{{ row.correct }}</text>
+            <text class="mistake-cell" :class="{ ok: row.active }">{{ row.active ? '是' : '否' }}</text>
           </view>
         </view>
       </view>
@@ -1037,10 +1037,16 @@ function exitStatsPage() {
   transform-origin: center center;  /* 旋转参考点，可以根据需求改为 left bottom 等 */
   white-space: nowrap;
 }
-.rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
+.rounds{
+  margin-top:12rpx;
+  display:flex;
+  flex-direction:column;
+  row-gap:16rpx;
+  --recent-rounds-grid: 200rpx 120rpx 160rpx 1fr;
+}
 .rounds-head{
   display:grid;
-  grid-template-columns: 200rpx 120rpx 160rpx 1fr;
+  grid-template-columns: var(--recent-rounds-grid);
   gap:8rpx;
   padding:8rpx 4rpx;
   background: var(--tf24-table-head-bg, #f8fafc);
@@ -1049,16 +1055,23 @@ function exitStatsPage() {
   font-weight:700;
   border-radius:12rpx;
 }
-.rounds-head text{
+.rounds-head text,
+.round-item text{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
 }
-.rounds-head text:nth-child(2),
-.rounds-head text:nth-child(3){ text-align:center; }
-.rounds-head text:first-child,
-.rounds-head text:last-child{ text-align:left; }
-.round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
+.round-item{
+  display:grid;
+  grid-template-columns: var(--recent-rounds-grid);
+  grid-gap:8rpx;
+  padding:8rpx 4rpx;
+  border-top:2rpx solid #eef2f7;
+}
 .r-time, .r-result, .r-timeMs {
   font-size: 26rpx;
   font-weight: 600;
@@ -1093,14 +1106,38 @@ function exitStatsPage() {
 .mistake-summary-value{ color:#111827; font-size:36rpx; font-weight:700; }
 .mistake-controls{ display:flex; align-items:center; justify-content:flex-start; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
 .mistake-filter{ display:flex; align-items:center; gap:12rpx; color:#374151; font-size:26rpx; }
-.mistake-table .td{ text-align:center; }
-.mistake-table .td:first-child{ text-align:left; }
-.mistake-tip{ color:#6b7280; font-size:24rpx; flex:1; text-align:right; }
-.mistake-key{
+.mistake-table{ max-width:100%; overflow:hidden; }
+.mistake-grid{
+  display:grid;
+  grid-template-columns: minmax(200rpx, 1.6fr) repeat(4, minmax(120rpx, 1fr));
+  width:100%;
+}
+.mistake-head{
+  background: var(--tf24-table-head-bg, #f8fafc);
+  color: var(--tf24-table-head-color, #475569);
+  font-weight:700;
+  font-size:24rpx;
+}
+.mistake-body{ display:flex; flex-direction:column; width:100%; }
+.mistake-row{ border-top:1rpx solid #f1f5f9; font-size:26rpx; }
+.mistake-grid text{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10rpx 8rpx;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.mistake-grid .mistake-th{ padding:12rpx 8rpx; }
+.mistake-cell.key,
+.mistake-th.key{
   font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
   color:#0f172a;
 }
-.mistake-key:active{ opacity:.7; }
+.mistake-cell.key:active{ opacity:.7; }
+.mistake-tip{ color:#6b7280; font-size:24rpx; flex:1; text-align:right; }
 .mistake-empty{ color:#64748b; font-size:26rpx; margin-top:8rpx; }
 .empty-tip{ color:#64748b; font-size:26rpx; margin-top:8rpx; }
 

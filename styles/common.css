@@ -4,6 +4,9 @@
   --tf24-table-head-color: #334155;
   --tf24-footer-row-height: 120rpx;
   --tf24-footer-gap: 16rpx;
+  --tf24-footer-bg: #f8fafc;
+  --tf24-tabbar-height: 120rpx;
+  --tf24-footer-total: calc(var(--tf24-footer-row-height, 120rpx) * 2 + var(--tf24-footer-gap, 16rpx));
 }
 
 /* 通用卡片与标题 */

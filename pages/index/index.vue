@@ -2,69 +2,73 @@
   <view
     class="page col"
     :class="{ booted }"
-    style="padding: 24rpx; position: relative;"
+    style="position: relative;"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
 
-    <view class="game-content">
+    <view class="game-shell">
+      <view class="game-header">
 
-    <!-- 顶部：当前用户 -->
-    <view class="topbar">
-      <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
-        <template v-if="currentUserAvatar && !avatarLoadFailed">
-          <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
-        </template>
-        <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
-        <text class="user-chip-name">{{ currentUserName }}</text>
-      </view>
-    </view>
-
-    <view class="mode-bar">
-      <button
-        class="btn mode-toggle-btn"
-        :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
-        @click="toggleMode"
-      >{{ modeButtonLabel }}</button>
-      <view style="flex:1;">
-        <button
-          class="btn btn-secondary deck-toggle-btn"
-          @click="toggleDeckSource"
-        >{{ deckSourceLabel }}</button>
-      </view>
-    </view>
-
-    <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
-      <view id="statsRow" class="card section stats-compact-table stats-card">
-        <view class="thead">
-        <text class="th">剩余</text>
-        <text class="th">局数</text>
-        <text class="th ok">成功</text>
-        <text class="th fail">失败</text>
-        <text class="th">胜率</text>
-        <text class="th">上一局</text>
-        <text class="th">本局</text>
+        <!-- 顶部：当前用户 -->
+        <view class="topbar">
+          <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
+            <template v-if="currentUserAvatar && !avatarLoadFailed">
+              <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
+            </template>
+            <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
+            <text class="user-chip-name">{{ currentUserName }}</text>
+          </view>
         </view>
-      <view class="tbody">
-        <text class="td">{{ remainingCards }}</text>
-        <text class="td">{{ handsPlayed }}</text>
-        <text class="td ok">{{ successCount }}</text>
-        <text class="td fail">{{ failCount }}</text>
-        <text class="td">{{ winRate }}%</text>
-        <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
-        <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
-          <block v-if="handElapsedMs < 120000">
-            <text>{{ fmtMs1(handElapsedMs) }}</text>
-          </block>
-          <block v-else>
-            <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
-          </block>
+
+        <view class="mode-bar">
+          <button
+            class="btn mode-toggle-btn"
+            :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
+            @click="toggleMode"
+          >{{ modeButtonLabel }}</button>
+          <view style="flex:1;">
+            <button
+              class="btn btn-secondary deck-toggle-btn"
+              @click="toggleDeckSource"
+            >{{ deckSourceLabel }}</button>
+          </view>
+        </view>
+
+        <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
+        <view id="statsRow" class="card section stats-compact-table stats-card">
+          <view class="thead">
+            <text class="th">剩余</text>
+            <text class="th">局数</text>
+            <text class="th ok">成功</text>
+            <text class="th fail">失败</text>
+            <text class="th">胜率</text>
+            <text class="th">上一局</text>
+            <text class="th">本局</text>
+          </view>
+          <view class="tbody">
+            <text class="td">{{ remainingCards }}</text>
+            <text class="td">{{ handsPlayed }}</text>
+            <text class="td ok">{{ successCount }}</text>
+            <text class="td fail">{{ failCount }}</text>
+            <text class="td">{{ winRate }}%</text>
+            <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
+            <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
+              <block v-if="handElapsedMs < 120000">
+                <text>{{ fmtMs1(handElapsedMs) }}</text>
+              </block>
+              <block v-else>
+                <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
+              </block>
+            </view>
+          </view>
         </view>
       </view>
-    </view>
-    <view class="mode-panels">
+
+      <view class="game-main">
+        <view class="mode-panels">
       <view class="pro-mode mode-panel" v-show="mode === 'pro'">
         <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
         <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
@@ -151,11 +155,8 @@
           </view>
         </view>
       </view>
-    </view>
 
-    </view>
-
-    <view class="game-footer">
+      <view class="game-footer">
       <view id="submitRow" class="footer-row">
         <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
         <view v-show="mode !== 'pro'" class="basic-utility-grid">
@@ -173,6 +174,8 @@
           <button class="btn btn-secondary" @click="skipHand">下一题</button>
         </view>
       </view>
+    </view>
+
     </view>
 
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
@@ -1463,10 +1466,27 @@ function onSessionOver() {
 </script>
 
 <style scoped> 
-.page { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); background: #f8fafc; display:flex; flex-direction: column; } 
-.page { opacity: 0; } 
-.page.booted { animation: page-fade-in .28s ease-out forwards; } 
-.game-content { flex:1; display:flex; flex-direction:column; gap:16rpx; }
+.page {
+  min-height: 100dvh;
+  min-height: calc(var(--vh, 1vh) * 100);
+  background: #f8fafc;
+  display:flex;
+  flex-direction: column;
+  box-sizing:border-box;
+  padding:24rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom) + var(--tf24-tabbar-height, 120rpx) + (var(--tf24-footer-row-height, 120rpx) * 2) + var(--tf24-footer-gap, 16rpx));
+}
+.page { opacity: 0; }
+.page.booted { animation: page-fade-in .28s ease-out forwards; }
+.game-shell {
+  flex:1;
+  min-height:100%;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  gap:24rpx;
+}
+.game-header { display:flex; flex-direction:column; gap:16rpx; }
+.game-main { display:flex; flex-direction:column; min-height:400rpx; }
 .mode-panels { flex:1; display:flex; flex-direction:column; gap:18rpx; }
 .mode-panel { display:flex; flex-direction:column; gap:18rpx; }
 .pro-mode { flex:1; }
@@ -1540,11 +1560,17 @@ function onSessionOver() {
 }
 
 .game-footer {
-  margin-top:auto;
+  position:sticky;
+  bottom: calc(var(--tf24-tabbar-height, 120rpx) + env(safe-area-inset-bottom));
+  z-index:20;
   display:flex;
   flex-direction:column;
   gap:var(--tf24-footer-gap, 16rpx);
-  padding-top:12rpx;
+  padding:12rpx 0;
+  background: var(--tf24-footer-bg, #f8fafc);
+  box-shadow:0 -8rpx 20rpx rgba(15,23,42,0.12);
+  border-radius:24rpx;
+  min-height: var(--tf24-footer-total, calc(var(--tf24-footer-row-height, 120rpx) * 2 + var(--tf24-footer-gap, 16rpx)));
 }
 .footer-row {
   display:flex;
