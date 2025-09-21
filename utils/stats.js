@@ -271,24 +271,47 @@ export function computeFaceSignStats(rounds) {
 
 // 用时分桶
 export function computeSpeedBuckets(rounds) {
-  const buckets = [
-    { key: '<1s', min: 0, max: 1000 },
-    { key: '1-2s', min: 1000, max: 2000 },
-    { key: '2-5s', min: 2000, max: 5000 },
-    { key: '5-10s', min: 5000, max: 10000 },
-    { key: '10-30s', min: 10000, max: 30000 },
-    { key: '≥30s', min: 30000, max: Infinity },
+  const defs = [
+    { label: '<5s', min: 0, max: 5000, minInclusive: true, maxInclusive: false },
+    { label: '5-10s', min: 5000, max: 10000, minInclusive: true, maxInclusive: false },
+    { label: '10-20s', min: 10000, max: 20000, minInclusive: true, maxInclusive: false },
+    { label: '20-30s', min: 20000, max: 30000, minInclusive: true, maxInclusive: false },
+    { label: '30-40s', min: 30000, max: 40000, minInclusive: true, maxInclusive: false },
+    { label: '40-50s', min: 40000, max: 50000, minInclusive: true, maxInclusive: false },
+    { label: '50-60s', min: 50000, max: 60000, minInclusive: true, maxInclusive: false },
+    { label: '60-90s', min: 60000, max: 90000, minInclusive: true, maxInclusive: false },
+    { label: '90-120s', min: 90000, max: 120000, minInclusive: true, maxInclusive: true },
+    { label: '>120s', min: 120000, max: Infinity, minInclusive: false, maxInclusive: false },
   ]
-  const rows = buckets.map(b => ({ label: b.key, total: 0, success: 0, fail: 0 }))
+
+  const rows = defs.map(def => ({ label: def.label, total: 0, success: 0, fail: 0, totalTimeMs: 0 }))
+
+  const withinBucket = (value, def) => {
+    if (!Number.isFinite(value)) return false
+    const minOk = def.minInclusive === false ? (value > def.min) : (value >= def.min)
+    const maxOk = def.maxInclusive ? (value <= def.max) : (value < def.max)
+    return minOk && maxOk
+  }
+
   for (const r of (rounds || [])) {
     if (!Number.isFinite(r?.timeMs)) continue
-    const t = r.timeMs
-    const i = buckets.findIndex(b => t >= b.min && t < b.max)
-    if (i < 0) continue
-    rows[i].total += 1
-    if (r.success) rows[i].success += 1; else rows[i].fail += 1
+    const t = Math.max(0, Math.floor(r.timeMs))
+    const idx = defs.findIndex(def => withinBucket(t, def))
+    if (idx < 0) continue
+    const row = rows[idx]
+    row.total += 1
+    if (r.success) row.success += 1
+    else row.fail += 1
+    row.totalTimeMs += t
   }
-  return rows
+
+  return rows.map(row => ({
+    label: row.label,
+    total: row.total,
+    success: row.success,
+    fail: row.fail,
+    avgTimeMs: row.total ? Math.round(row.totalTimeMs / row.total) : null,
+  }))
 }
 
 // 徽章（基础规则，与原逻辑一致）

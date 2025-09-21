@@ -75,12 +75,6 @@
               </view>
             </view>
           </view>
-          <view class="trend-line">
-            <view v-for="(seg,i) in trendSeries.lineSegments" :key="'seg-'+i" class="line-segment"
-                  :style="{ left: seg.left + 'rpx', bottom: seg.bottom + 'rpx', width: seg.length + 'rpx', transform: `translateY(-1rpx) rotate(${seg.angle}deg)` }"></view>
-            <view v-for="(d,i) in trendSeries.items" :key="'pt-'+i" class="line-point"
-                  :style="{ left: d.lineX + 'rpx', bottom: d.lineY + 'rpx' }"></view>
-          </view>
         </view>
         <view class="trend-labels" :class="{ rotate: rotateDates }"
               :style="{ gap: trendSeries.gap + 'rpx', width: trendSeries.width ? (trendSeries.width + 'rpx') : '100%' }">
@@ -88,7 +82,7 @@
                 :style="{ width: trendSeries.barWidth + 'rpx' }">{{ d.shortLabel }}</text>
         </view>
       </view>
-      <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=胜利局数，红色=失败局数，蓝色折线=胜率</view>
+      <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=胜利局数，红色=失败局数</view>
       <!-- <view class="table" style="margin-top:12rpx;">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
           <text class="th">窗口</text>
@@ -131,10 +125,11 @@
         <text class="title">最近战绩</text>
       </view>
       <view class="rounds">
-        <view v-for="r in (recentRounds || []).slice().reverse()" :key="r.id" class="round-item compact3">
+        <view v-for="r in (recentRounds || []).slice().reverse()" :key="r.id" class="round-item">
           <text class="r-time">{{ fmtTs(r.ts) }}</text>
           <text class="r-result" :class="{ ok: r.success, fail: !r.success }">{{ r.success ? '成功' : '失败' }}</text>
           <text class="r-timeMs">{{ (r.timeMs != null && Number.isFinite(r.timeMs)) ? ((r.timeMs/1000).toFixed(1) + 's') : '-' }}</text>
+          <text class="r-cards">{{ r.cardsText }}</text>
         </view>
       </view>
     </view>
@@ -190,51 +185,6 @@
         </view>
       </view>
       <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无错题记录</view>
-    </view>
-
-    <!-- 错误近似度与差一点榜 -->
-    <view v-if="selectedUserId" class="section">
-      <view class="row" style="justify-content:space-between; align-items:center;">
-        <text class="title">差一点榜（错误近似度）</text>
-      </view>
-      <view class="table" v-if="nearMisses.length">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'200rpx 1fr 160rpx 160rpx' }">
-          <text class="th" style="width:200rpx">时间</text>
-          <text class="th">表达式</text>
-          <text class="th">结果</text>
-          <text class="th">偏差</text>
-        </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'200rpx 1fr 160rpx 160rpx' }" v-for="(m,i) in nearMisses" :key="i">
-            <text class="td" style="width:200rpx">{{ fmtTs(m.ts) }}</text>
-            <text class="td" style="text-align:left">{{ m.expr }}</text>
-            <text class="td">{{ m.value }}</text>
-            <text class="td" :style="{color: m.diff>0?'#2563eb':'#dc2626', fontWeight:'700'}">{{ m.diff>0? ('+'+m.diff.toFixed(3)) : m.diff.toFixed(3) }}</text>
-          </view>
-        </view>
-      </view>
-      <view v-else style="color:#64748b; font-size:26rpx; margin-top:8rpx;">暂无可展示的错误记录</view>
-      <!-- 近似度分布摘要 -->
-      <view class="table" style="margin-top:12rpx;">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)' }">
-          <text class="th">错误样本</text>
-          <text class="th">|24-值| 中位</text>
-          <text class="th">P90</text>
-          <text class="th"><1 占比</text>
-          <text class="th"><0.1 占比</text>
-          <text class="th">偏上/偏下</text>
-        </view>
-        <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)' }">
-            <text class="td">{{ nearSummary.count }}</text>
-            <text class="td">{{ nearSummary.median }}</text>
-            <text class="td">{{ nearSummary.p90 }}</text>
-            <text class="td">{{ nearSummary.lt1 }}%</text>
-            <text class="td">{{ nearSummary.lt01 }}%</text>
-            <text class="td">{{ nearSummary.biasUp }}% / {{ nearSummary.biasDown }}%</text>
-          </view>
-        </view>
-      </view>
     </view>
 
     <!-- 首运算符成功率 + 运算熵 -->
@@ -329,7 +279,7 @@
         <text class="title">难度热力（Top/Bottom）</text>
         <text style="color:#64748b; font-size:24rpx;">样本门槛：{{ faceHeat.minTotal }} 局</text>
       </view>
-      <view class="row" style="display:grid; grid-template-columns:1fr 1fr; gap:12rpx; margin-top:8rpx;">
+      <view class="difficulty-heatmaps">
         <view class="table">
           <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
             <text class="th">Top 容易</text>
@@ -377,22 +327,24 @@
         <text class="title">速度-准确概览</text>
       </view>
       <view class="table">
-        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr' }">
+        <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1.5fr repeat(5, 1fr)' }">
           <text class="th">时间段</text>
           <text class="th">总数</text>
           <text class="th">成功</text>
           <text class="th">失败</text>
           <text class="th">成功率</text>
+          <text class="th">平均用时</text>
         </view>
         <view class="tbody">
-          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr' }" v-for="b in speedBuckets" :key="b.label">
+          <view class="tr" :style="{ display:'grid', gridTemplateColumns:'1.5fr repeat(5, 1fr)' }" v-for="b in speedBuckets" :key="b.label">
             <text class="td">{{ b.label }}</text>
             <text class="td">{{ b.total }}</text>
             <text class="td ok">{{ b.success }}</text>
             <text class="td fail">{{ b.fail }}</text>
             <view class="td" style="padding:0 8rpx">
-              <MiniBar :pct="b.total ? Math.round(100*b.success/b.total) : 0" />
+              <MiniBar :pct="b.successRate" />
             </view>
+            <text class="td">{{ b.avgTimeText }}</text>
           </view>
         </view>
       </view>
@@ -426,13 +378,11 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import MiniBar from '../../components/MiniBar.vue'
-import MicroSpark from '../../components/MicroSpark.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
-import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
+import { ensureInit, allUsersWithStats, readStatsExtended, getCurrentUser } from '../../utils/store.js'
 import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mistakes.js'
 import {
   computeOverviewRows,
-  computeNearMisses,
   summarizeNearMisses,
   computeOpStats,
   computeSeqStats,
@@ -445,6 +395,8 @@ import {
   computeFaceSignStats,
   computeSpeedBuckets,
 } from '../../utils/stats.js'
+
+const SELECTED_USER_STORE_KEY = 'tf24_stats_selected_user_v1'
 
 const rows = ref([]) // 基础用户列表（不含筛选数据）
 const overviewRange = ref(1) // 默认“今天”：1 / 3 / 7 / 30 / 0（0=全部；其余为“今天+前N-1天”）
@@ -553,6 +505,7 @@ function load(){
   const list = allUsersWithStats()
   list.sort((a,b)=> (b.winRate - a.winRate) || (b.totals.total - a.totals.total))
   rows.value = list
+  applyDefaultSelectedUser(list)
 }
 function loadExt(){
   // 总览与趋势都需要：始终加载所有用户扩展数据
@@ -583,18 +536,74 @@ function loadMistakeData(){
   }
 }
 
+function loadStoredSelectedUserId(){
+  try {
+    if (typeof uni !== 'undefined' && typeof uni.getStorageSync === 'function') {
+      const raw = uni.getStorageSync(SELECTED_USER_STORE_KEY)
+      return typeof raw === 'string' ? raw : ''
+    }
+  } catch (_) {}
+  return ''
+}
+
+function persistSelectedUserId(id){
+  try {
+    if (id) {
+      if (typeof uni !== 'undefined' && typeof uni.setStorageSync === 'function') {
+        uni.setStorageSync(SELECTED_USER_STORE_KEY, id)
+      }
+    } else if (typeof uni !== 'undefined' && typeof uni.removeStorageSync === 'function') {
+      uni.removeStorageSync(SELECTED_USER_STORE_KEY)
+    }
+  } catch (_) {}
+}
+
+function resolveDefaultSelectedUserId(list){
+  const arr = Array.isArray(list) ? list : []
+  if (!arr.length) return ''
+  const stored = loadStoredSelectedUserId()
+  if (stored && arr.some(u => u.id === stored)) return stored
+  const current = getCurrentUser()
+  if (current && arr.some(u => u.id === current.id)) return current.id
+  return arr[0]?.id || ''
+}
+
+function applyDefaultSelectedUser(list){
+  const arr = Array.isArray(list) ? list : []
+  if (!arr.length) {
+    if (selectedUserId.value) selectedUserId.value = ''
+    persistSelectedUserId('')
+    return
+  }
+  const current = selectedUserId.value
+  if (current && arr.some(u => u.id === current)) {
+    // 当前位置有效，确保存储同步
+    persistSelectedUserId(current)
+    return
+  }
+  const target = resolveDefaultSelectedUserId(arr)
+  if (target && current !== target) {
+    selectedUserId.value = target
+  } else if (!target && current) {
+    selectedUserId.value = ''
+  }
+  persistSelectedUserId(target)
+}
+
 watch(selectedUserId, (uid, prev) => {
   if (uid !== prev) {
     mistakeFilterActiveOnly.value = false
     mistakeSortKey.value = 'errorRate'
   }
   loadMistakeData()
+  persistSelectedUserId(uid || '')
 })
-function selectUser(uid){ 
-  selectedUserId.value = uid || ''; 
-  loadExt(); 
+function selectUser(uid){
+  selectedUserId.value = uid || '';
+  persistSelectedUserId(selectedUserId.value)
+  loadExt();
 }
-function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = userOptions.value[idx]; if (opt){ selectedUserId.value = opt.id; loadExt() } } catch(_){} }
+function onUserChange(e){ try { const idx = e?.detail?.value|0; const opt = userOptions.value[idx]; if (opt){ selectedUserId.value = opt.id; persistSelectedUserId(opt.id); loadExt() } } catch(_){} }
 function setOverviewRange(d = 0){
   // 若未传参则激活“今天”；显式传 0 仍表示“全部”
   overviewRange.value = (arguments.length === 0 ? 1 : d)
@@ -624,6 +633,44 @@ function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ 
 function fmtTs(ts){ try { const d=new Date(ts); return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` } catch(_) { return '-' } }
 function fmtMs(ms){ if (!Number.isFinite(ms)) return '-'; if (ms < 1000) return ms + 'ms'; const s = ms/1000; if (s<60) return s.toFixed(1)+'s'; const m = Math.floor(s/60); const r = Math.round(s%60); return `${m}m${r}s` }
 
+function normalizeCardRank(value){
+  if (Number.isFinite(value)) return value
+  const num = Number(value)
+  if (Number.isFinite(num)) return num
+  if (typeof value === 'string') {
+    const key = value.trim().toUpperCase()
+    if (key === 'A') return 1
+    if (key === 'J') return 11
+    if (key === 'Q') return 12
+    if (key === 'K') return 13
+  }
+  return null
+}
+
+function extractRoundRanks(round){
+  if (!round || typeof round !== 'object') return []
+  if (Array.isArray(round.cards)) {
+    return round.cards.map(normalizeCardRank).filter(n => Number.isFinite(n))
+  }
+  if (round.hand && Array.isArray(round.hand.cards)) {
+    return round.hand.cards.map(c => normalizeCardRank(c?.rank)).filter(n => Number.isFinite(n))
+  }
+  if (Array.isArray(round.nums)) {
+    return round.nums.map(normalizeCardRank).filter(n => Number.isFinite(n))
+  }
+  return []
+}
+
+function formatRoundCardsText(round){
+  try {
+    const ranks = extractRoundRanks(round)
+    if (!ranks.length) return '-'
+    return ranks.map(n => String(Math.trunc(n))).join(',')
+  } catch (_) {
+    return '-'
+  }
+}
+
 const activeRounds = computed(() => {
   const uid = selectedUserId.value
   if (uid === 'all') {
@@ -646,7 +693,7 @@ const filteredRounds = computed(() => {
 })
 const recentRounds = computed(() => {
   const sorted = filteredRounds.value.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))
-  return sorted.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid] })).reverse()
+  return sorted.slice(0, 12).map(r => ({ ...r, user: userMap.value[r.uid], cardsText: formatRoundCardsText(r) })).reverse()
 })
 
 const TREND_BAR_HEIGHT = 160
@@ -702,39 +749,23 @@ const trendSeries = computed(() => {
 
   const maxTotal = Math.max(1, ...seriesData.map(item => item.total))
 
-  const items = seriesData.map((item, index) => {
+  const items = seriesData.map((item) => {
     const totalHeight = item.total ? Math.max(4, Math.round((item.total / maxTotal) * TREND_BAR_HEIGHT)) : 0
     const successHeight = item.total ? Math.round(totalHeight * item.winRate) : 0
     const failHeight = Math.max(0, totalHeight - successHeight)
-    const lineY = Math.round(Math.min(1, Math.max(0, item.winRate)) * TREND_BAR_HEIGHT)
-    const lineX = index * (TREND_BAR_WIDTH + TREND_BAR_GAP) + TREND_BAR_WIDTH / 2
     return {
       label: item.key,
       shortLabel: shortLabel(item.key),
       totalHeight,
       successHeight,
       failHeight,
-      lineX,
-      lineY,
     }
   })
-
-  const lineSegments = []
-  for (let i = 1; i < items.length; i += 1) {
-    const prev = items[i - 1]
-    const cur = items[i]
-    const dx = cur.lineX - prev.lineX
-    const dy = cur.lineY - prev.lineY
-    const length = Math.hypot(dx, dy)
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI
-    lineSegments.push({ left: prev.lineX, bottom: prev.lineY, length: Number(length.toFixed(2)), angle })
-  }
 
   const width = items.length ? (items.length * (TREND_BAR_WIDTH + TREND_BAR_GAP) - TREND_BAR_GAP) : 0
 
   return {
     items,
-    lineSegments,
     barWidth: TREND_BAR_WIDTH,
     gap: TREND_BAR_GAP,
     chartHeight: TREND_BAR_HEIGHT,
@@ -767,9 +798,7 @@ function evalExprToNumber(expr){
   } catch (_) { return null }
 }
 
-// 1) 错误近似度画像与“差一点”榜
-const nearMisses = computed(() => computeNearMisses(currentRounds.value))
-
+// 错误近似度摘要（用于徽章等计算）
 const nearSummary = computed(() => summarizeNearMisses(currentRounds.value))
 
 // 2) 首运算符成功率 + 运算熵
@@ -942,24 +971,23 @@ const faceSignStats = computed(() => computeFaceSignStats(currentRounds.value))
 
 // 4) 速度-准确散点（用时间分桶概览代替复杂图表）
 const speedBuckets = computed(() => {
-  const buckets = [
-    { key:'<1s', min:0, max:1000 },
-    { key:'1-2s', min:1000, max:2000 },
-    { key:'2-5s', min:2000, max:5000 },
-    { key:'5-10s', min:5000, max:10000 },
-    { key:'10-30s', min:10000, max:30000 },
-    { key:'≥30s', min:30000, max:Infinity },
-  ]
-  const rows = buckets.map(b=>({ label:b.key, total:0, success:0, fail:0 }))
-  for (const r of currentRounds.value) {
-    if (!Number.isFinite(r?.timeMs)) continue
-    const t = r.timeMs
-    const i = buckets.findIndex(b => t >= b.min && t < b.max)
-    if (i < 0) continue
-    rows[i].total += 1
-    if (r.success) rows[i].success += 1; else rows[i].fail += 1
-  }
-  return rows
+  const rows = computeSpeedBuckets(currentRounds.value)
+  return rows.map(row => {
+    const total = row.total || 0
+    const success = row.success || 0
+    const fail = row.fail || 0
+    const avgTimeMs = Number.isFinite(row.avgTimeMs) ? row.avgTimeMs : null
+    const successRate = total ? Math.round((success / total) * 100) : 0
+    return {
+      label: row.label,
+      total,
+      success,
+      fail,
+      successRate,
+      avgTimeMs,
+      avgTimeText: avgTimeMs != null ? fmtMs(avgTimeMs) : '-',
+    }
+  })
 })
 
 // —— 玩家总览：表头排序 ——
@@ -1171,16 +1199,13 @@ function navigateTab(url){
 .trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:12rpx 12rpx 0 0; overflow:hidden; background:#f1f5f9; }
 .trend-item .bar-fail{ width:100%; background:#dc2626; }
 .trend-item .bar-success{ width:100%; background:#16a34a; }
-.trend-line{ position:absolute; left:0; bottom:0; width:100%; height:100%; pointer-events:none; }
-.trend-line .line-segment{ position:absolute; height:2rpx; background:#0ea5e9; transform-origin:left center; border-radius:2rpx; }
-.trend-line .line-point{ position:absolute; width:10rpx; height:10rpx; border-radius:50%; background:#0ea5e9; border:2rpx solid #fff; box-shadow:0 0 4rpx rgba(14,165,233,0.4); transform:translate(-50%, -50%); }
 .trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx; }
 .trend-labels .bar-label{ text-align:center; color:#64748b; font-size:22rpx; white-space:nowrap; }
-.trend-labels.rotate { 
-  min-height: 60rpx; 
-  align-items: flex-end; 
+.trend-labels.rotate {
+  min-height: 60rpx;
+  align-items: flex-end;
 }
-.trend-labels.rotate .bar-label { 
+.trend-labels.rotate .bar-label {
   display: inline-block;        /* 让 transform 生效 */
   transform: rotate(-90deg);    /* 顺时针或逆时针旋转 */
   transform-origin: center center;  /* 旋转参考点，可以根据需求改为 left bottom 等 */
@@ -1188,15 +1213,34 @@ function navigateTab(url){
 }
 .rounds{ margin-top:12rpx; display:flex; flex-direction:column; row-gap:16rpx }
 .round-item{ display:grid; grid-template-columns: 200rpx 120rpx 160rpx 1fr; grid-gap:8rpx; padding:8rpx 4rpx; border-top:2rpx solid #eef2f7 }
-.round-item.compact3{ grid-template-columns: 200rpx 120rpx 160rpx }
 .r-time, .r-result, .r-timeMs {
   font-size: 26rpx;
   font-weight: 600;
   color: #1e293b;
 }
+.r-cards{
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0f172a;
+  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+}
 .r-result.ok{ color:#16a34a; font-weight:700 }
 .r-result.fail{ color:#dc2626; font-weight:700 }
 .picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
+.difficulty-heatmaps{
+  display:grid;
+  grid-template-rows:auto auto;
+  row-gap:12rpx;
+  margin-top:8rpx;
+  width:100%;
+}
+@media screen and (min-width: 960px) {
+  .difficulty-heatmaps{
+    max-width:960px;
+    margin-left:auto;
+    margin-right:auto;
+  }
+}
 .mistake-summary{ margin-top:16rpx; display:flex; flex-wrap:wrap; gap:24rpx; }
 .mistake-summary-item{ background:#f8fafc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
 .mistake-summary-label{ color:#6b7280; font-size:26rpx; }
