@@ -1,36 +1,33 @@
 <template>
   <view
-    class="login-page"
+    class="page col"
+    style="padding:24rpx; gap:16rpx;"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <!-- 顶部栏 -->
-    <view class="login-topbar">
-      <!-- <button class="icon-btn" @tap="goBack">←</button> -->
-      <text class="login-title">无敌24点程序·观测</text>
-      <!-- <view style="width:40rpx"></view> -->
-    </view>
+    <UIHeader
+      :username="headerTitle"
+      @tap-avatar="refresh"
+      @tap-settings="createUser"
+    />
 
     <!-- 主体 -->
     <view class="login-body">
-      <view class="login-heading">
-        <text class="h1">选择玩家</text>
-      </view>
 
       <!-- 错误状态 -->
-      <view v-if="errMsg" class="error-card card section">
+      <view v-if="errMsg" class="claymorphism card error-card">
         <text class="err-title">数据异常</text>
         <text class="err-text">{{ errMsg }}</text>
-        <button class="btn danger" @tap="resetData">重置数据</button>
+        <button class="clay-button" @tap="resetData">重置数据</button>
       </view>
 
       <!-- 空状态 -->
-      <view v-else-if="(sortedUsers.length === 0)" class="empty-card card section">
+      <view v-else-if="(sortedUsers.length === 0)" class="claymorphism card empty-card">
         <text class="empty-ill">🃏</text>
         <text class="empty-text">还没有玩家，快创建一个吧！</text>
-        <button class="create-btn highlight" @tap="createUser">
+        <button class="clay-button-primary create-btn" @tap="createUser">
           <text class="create-plus">＋</text>
           <text>新建玩家</text>
         </button>
@@ -38,7 +35,7 @@
 
       <!-- 用户列表 -->
       <view v-else class="user-list">
-        <button class="user-item card section" v-for="u in sortedUsers" :key="u.id" @tap="choose(u)">
+        <button class="user-item claymorphism card" v-for="u in sortedUsers" :key="u.id" @tap="choose(u)">
           <image v-if="u.avatar" class="avatar-img" :src="u.avatar" mode="aspectFill" />
           <view v-else class="avatar" :style="{ backgroundColor: u.color || colorFrom(u) }">{{ avatarText(u.name) }}</view>
           <view class="user-col">
@@ -49,7 +46,7 @@
           </view>
           <text class="chev">›</text>
         </button>
-        <button class="create-btn" @tap="createUser">
+        <button class="clay-button create-btn" @tap="createUser">
           <text class="create-plus">＋</text>
           <text>新建玩家</text>
         </button>
@@ -70,6 +67,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import UIHeader from '../../components/UIHeader.vue'
 import { ensureInit, getUsers, addUser, switchUser, resetAllData, touchLastPlayed } from '../../utils/store.js'
 import { saveAvatarForUser } from '../../utils/avatar.js'
 import { useFloatingHint } from '../../utils/hints.js'
@@ -78,6 +76,7 @@ import { exitApp } from '../../utils/navigation.js'
 
 const users = ref({ list: [], currentId: '' })
 const errMsg = ref('')
+const headerTitle = computed(() => '选择玩家')
 
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitLoginPage() })
@@ -213,135 +212,29 @@ function resetData(){
 </script>
 
 <style scoped>
- .login-page {
-  /* 视口高度填满，兼容移动端动态地址栏 */
-  min-height: 100dvh;
-  min-height: calc(var(--vh, 1vh) * 100);
-  background: #f1f5f9;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;  /* 防止整体滚动 */
-}
-body {
-  overflow: hidden;
-  height: 100vh;
-}
-.login-topbar{ display:flex; align-items:center; padding:24rpx; gap:12rpx }
-/* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
-.login-title{ flex:1; text-align:center; font-weight:900; font-size:36rpx; color:#0e141b; letter-spacing:-0.5rpx }
-.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
-.floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
-.login-body {
-  flex: 1;  /* 占据剩余空间 */
-  padding: 10rpx 2.5rpx 0 2.5rpx;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;  /* 防止溢出 */
-  min-height: 0;  /* 允许收缩 */
-  height: 0;  /* 强制高度约束 */
-}
-.login-heading { 
-  flex-shrink: 0;  /* 不收缩 */
-  text-align: center; 
-  margin: 0rpx 0 24rpx 0;
-  height: 80rpx;  /* 固定高度 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.h1{ font-size:56rpx; font-weight:900; color:#0e141b }
-.user-list {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 20rpx;
-  padding: 0 100rpx 20rpx 100rpx;  /* 改为padding，不用margin */
-  overflow-y: auto;
-  min-height: 0;
-  height: 0;  /* 强制高度约束 */
-}
-/* 滚动条样式优化 */
-.user-list::-webkit-scrollbar {
-  width: 6rpx;
-}
+.login-body { display:flex; flex-direction:column; gap:16rpx; }
 
-.user-list::-webkit-scrollbar-track {
-  background: transparent;
-}
+.error-card { display:flex; flex-direction:column; gap:12rpx; text-align:center; }
+.err-title { font-size:32rpx; font-weight:800; color:var(--text-dark); }
+.err-text { font-size:26rpx; color:var(--text-light); }
 
-.user-list::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3rpx;
-}
+.empty-card { display:flex; flex-direction:column; align-items:center; gap:16rpx; text-align:center; padding:32rpx 16rpx; }
+.empty-ill { font-size:80rpx; }
+.empty-text { font-size:28rpx; color:var(--text-light); }
+.create-btn { display:flex; align-items:center; justify-content:center; gap:12rpx; font-size:28rpx; font-weight:700; padding:16rpx 24rpx; }
+.create-plus { font-size:36rpx; }
 
-.user-list::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-.user-item{ display:flex; align-items:center; padding:10rpx; height:100rpx;width:100%; border-radius:12rpx; border:2rpx solid #cfd8e3; background:#ffffff; box-shadow:0 2rpx 4rpx rgba(15,23,42,0.02) }
-.user-item:active{ transform:scale(0.98) }
-.avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:20rpx }
-.avatar-img{ width:72rpx; height:72rpx; border-radius:50%; margin-right:20rpx; background:#e2e8f0 }
-.user-col{
-  flex:1;
-  display:grid;
-  /* 方案A：定宽（最稳妥，确保“最近程序”纵向齐） */
-  grid-template-columns: minmax(0, 200rpx) 1fr;  /* ← 原来是 auto 1fr */
-  /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
-     （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
-  align-items:left;
-  justify-items:start;                /* ✅ 内容在各列内靠左 */
-  column-gap:10rpx; 
-  min-width:0;
-}
-.user-name {
-  font-size:34rpx;
-  color:#0f172a;
-  font-weight:700;
-  white-space:nowrap;               /* ✅ 不换行 */
-  overflow:hidden;
-  text-overflow:ellipsis;           /* ✅ 超长省略号 */
-  text-align:left;                    /* ✅ 明确指定左对齐 */
-  width: 100%;      /* 关键修复 */
-  max-width: 100%;  /* 双重保险 */
-}
-.user-sub {
-  font-size:20rpx;
-  color:#64748b;
-  white-space:nowrap;
-  align-self:center;                     /* ✅ 单独确保这一列底对齐 */
-}
-.chev{
-  flex:0 0 auto;          /* 不要挤压中间列 */
-  width: 40rpx;           /* 可选：固定宽度，视觉更稳 */
-  text-align:right;
-  color:#94a3b8; font-size:40rpx; font-weight:800; margin-left:12rpx;
-}
-.create-btn{ margin-top:20rpx; height:100rpx; border-radius:24rpx; background:#e2e8f0; color:#0f172a; font-size:32rpx; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:12rpx }
-.create-btn.highlight{ background:#145751; color:#fff }
-.create-plus{ font-size:36rpx }
-/* 底部区块相关样式已移除（guest 入口下线） */
-button{ -webkit-tap-highlight-color:rgba(0,0,0,0) }
+.user-list { display:flex; flex-direction:column; gap:16rpx; }
+.user-item { display:flex; align-items:center; gap:16rpx; padding:16rpx; border-radius:24rpx; }
+.user-item:active { box-shadow: inset 4rpx 4rpx 8rpx var(--bg-dark), inset -4rpx -4rpx 8rpx #ffffff; }
+.avatar-img, .avatar { width:96rpx; height:96rpx; border-radius:9999rpx; }
+.avatar { display:flex; align-items:center; justify-content:center; font-size:36rpx; font-weight:700; color:#fff; background:var(--primary-dark); }
+.user-col { flex:1; display:flex; flex-direction:column; gap:6rpx; }
+.user-name { font-size:32rpx; font-weight:700; color:var(--text-dark); }
+.user-sub { font-size:24rpx; color:var(--text-light); }
+.chev { font-size:40rpx; color:var(--text-light); }
 
-/* 空/错 视图 */
-.empty-card, .error-card {
-  flex: 1;  /* 占据可用空间 */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;  /* 垂直居中 */
-  gap: 16rpx;
-  padding: 40rpx 24rpx;
-  margin: 50rpx 100rpx;
-  border-radius: 24rpx;
-  background: #fff;
-  border: 2rpx solid #e5e7eb;
-  max-height: 100%;  /* 不超出容器 */
-  overflow-y: auto;  /* 如果内容过多也能滚动 */
-}
-.empty-ill{ font-size:88rpx }
-.empty-text{ color:#6b7280 }
-.err-title{ font-weight:800; color:#b91c1c }
-.err-text{ color:#6b7280; text-align:center }
-.btn.danger{ background:#ef4444; color:#fff; border:none; padding:20rpx 28rpx; border-radius:14rpx }
+.floating-hint-layer { position:fixed; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999; }
+.floating-hint-layer.interactive { pointer-events:auto; }
+.floating-hint { background:rgba(67,78,90,0.9); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; font-size:28rpx; box-shadow:0 12rpx 24rpx rgba(0,0,0,0.25); }
 </style>

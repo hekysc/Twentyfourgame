@@ -1,22 +1,28 @@
 <template>
   <view
-    class="page"
-    style="padding:24rpx; display:flex; flex-direction:column; gap:18rpx;"
+    class="page col"
+    style="padding:24rpx; gap:16rpx;"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <view class="section">
+    <UIHeader
+      :username="headerName"
+      @tap-avatar="goUserPage"
+      @tap-settings="goUserPage"
+    />
+
+    <view class="claymorphism card section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">玩家总览</text>
         <view class="row" style="display:flex; align-items:center; gap:12rpx;">
           <view class="seg">
-            <button class="seg-btn" :class="{ active: overviewRange===1 }" @click="setOverviewRange(1)">今天</button>
-            <button class="seg-btn" :class="{ active: overviewRange===3 }" @click="setOverviewRange(3)">3天</button>
-            <button class="seg-btn" :class="{ active: overviewRange===7 }" @click="setOverviewRange(7)">7天</button>
-            <button class="seg-btn" :class="{ active: overviewRange===30 }" @click="setOverviewRange(30)">30天</button>
-            <button class="seg-btn" :class="{ active: overviewRange===0 }" @click="setOverviewRange(0)">全部</button>
+            <button class="seg-btn clay-button" :class="{ active: overviewRange===1 }" @click="setOverviewRange(1)">今天</button>
+            <button class="seg-btn clay-button" :class="{ active: overviewRange===3 }" @click="setOverviewRange(3)">3天</button>
+            <button class="seg-btn clay-button" :class="{ active: overviewRange===7 }" @click="setOverviewRange(7)">7天</button>
+            <button class="seg-btn clay-button" :class="{ active: overviewRange===30 }" @click="setOverviewRange(30)">30天</button>
+            <button class="seg-btn clay-button" :class="{ active: overviewRange===0 }" @click="setOverviewRange(0)">全部</button>
           </view>
         </view>
       </view>
@@ -56,14 +62,14 @@
 
     <view v-if="selectedUserId" class="section title">
       <view class="user-picker" style="display:flex; align-items:center; gap:8rpx;">
-        <!-- <text style="color:#6b7280; font-size:26rpx;">查看</text> -->
+        <!-- <text style="color:var(--text-light); font-size:26rpx;">查看</text> -->
         <picker :range="userOptions" range-key="name" @change="onUserChange">
           <view class="picker-trigger">{{ selectedUserLabel }}</view>
         </picker>
       </view>
     </view>
 
-    <view v-if="selectedUserId" class="section">    
+    <view v-if="selectedUserId" class="claymorphism card section">    
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap: wrap;">
         <text class="title">📈个人趋势</text>
       </view>
@@ -88,7 +94,7 @@
                 :style="{ width: trendSeries.barWidth + 'rpx' }">{{ d.shortLabel }}</text>
         </view>
       </view>
-      <view class="trend-legend" style="margin-top:8rpx; color:#6b7280; font-size:24rpx;">绿色=胜利局数，红色=失败局数</view>
+      <view class="trend-legend" style="margin-top:8rpx; color:var(--text-light); font-size:24rpx;">绿色=胜利局数，红色=失败局数</view>
       <!-- <view class="table" style="margin-top:12rpx;">
         <view class="thead" :style="{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr' }">
           <text class="th">窗口</text>
@@ -126,7 +132,7 @@
       </view>
     </view>
 
-    <view v-if="selectedUserId" class="section">
+    <view v-if="selectedUserId" class="claymorphism card section">
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">最近战绩</text>
       </view>
@@ -147,7 +153,7 @@
       <view v-else class="empty-tip">暂无最近战绩</view>
     </view>
 
-    <view v-if="selectedUserId" class="section">
+    <view v-if="selectedUserId" class="claymorphism card section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">📝错题本</text>
         <text class="mistake-tip">连续正确 5 次将自动移出活动错题本（但仍计入总错题统计）</text>
@@ -190,7 +196,7 @@
     </view>
 
     <!-- 称号系统（基础版） -->
-    <view v-if="selectedUserId" class="section">
+    <view v-if="selectedUserId" class="claymorphism card section">
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">称号</text>
       </view>
@@ -200,7 +206,7 @@
     </view>
 
     <!-- 速度-准确概览（时间分桶） -->
-    <view v-if="selectedUserId" class="section">
+    <view v-if="selectedUserId" class="claymorphism card section">
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">速度-准确概览</text>
       </view>
@@ -229,7 +235,7 @@
     </view>
 
     <!-- 技能雷达（表格版） -->
-    <view v-if="selectedUserId" class="section">
+    <view v-if="selectedUserId" class="claymorphism card section">
       <view class="row" style="justify-content:space-between; align-items:center;">
         <text class="title">技能雷达（表格版）</text>
       </view>
@@ -257,12 +263,13 @@
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>
   </view>
-  <CustomTabBar />
+  <BottomTab />
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
+import UIHeader from '../../components/UIHeader.vue'
+import BottomTab from '../../components/BottomTab.vue'
 import MiniBar from '../../components/MiniBar.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended, getCurrentUser } from '../../utils/store.js'
@@ -288,6 +295,7 @@ const hintFilter = ref('all') // all | hint | nohint（全局）
 const selectedUserId = ref('')
 const userOptions = computed(() => rows.value.map(r => ({ id: r.id, name: r.name })))
 const selectedUserLabel = computed(() => (userOptions.value.find(o => o.id === selectedUserId.value)?.name) || '请选择用户')
+const headerName = computed(() => selectedUserId.value ? selectedUserLabel.value : '统计面板')
 const userExtMap = ref({}) // { uid: { rounds, totals, agg, days } }
 const userMap = computed(() => {
   const map = {}
@@ -934,219 +942,112 @@ function exitStatsPage() {
     },
   })
 }
+
+function goUserPage(){
+  try { uni.switchTab({ url:'/pages/user/index' }) }
+  catch (_) {
+    try { uni.navigateTo({ url:'/pages/user/index' }) }
+    catch (__) {}
+  }
+}
 </script>
 
 <style scoped>
-.page{ min-height:100vh; box-sizing:border-box; position:relative; }
-.section{ background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
-.section.title{ background:none; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
-.title{ font-size:32rpx; font-weight:800 }
-.table { 
-  margin-top: 12rpx; 
-  border-radius: 12rpx; 
-  overflow: hidden; 
-  border: 1rpx solid #e5e7eb; 
+.page {
+  min-height: calc(var(--vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
-.thead, .tr { 
-  display: grid; 
-  grid-template-columns: 40rpx 1fr 120rpx 120rpx 80rpx 80rpx 80rpx; 
-  align-items: center; 
-  grid-gap: 6rpx; 
-  min-height: 44rpx;
+
+.section { display:flex; flex-direction:column; gap:16rpx; }
+.section.title { gap:8rpx; background: transparent; box-shadow:none; border:none; }
+.title { font-size:32rpx; font-weight:800; color:var(--text-dark); }
+
+.table {
+  margin-top: 12rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+  border: 1rpx solid rgba(255,255,255,0.4);
+  background: var(--surface-light);
+  box-shadow: inset 4rpx 4rpx 8rpx rgba(0,0,0,0.05), inset -4rpx -4rpx 8rpx rgba(255,255,255,0.6);
 }
+
+.thead, .tr {
+  display: grid;
+  align-items: center;
+  gap: 8rpx;
+  padding: 12rpx 16rpx;
+  font-size: 26rpx;
+}
+
 .thead {
-  color: var(--tf24-table-head-color, #475569);
-  font-weight: 700;
-  padding: 8rpx 12rpx;
-  background: var(--tf24-table-head-bg, #f8fafc);
-  font-size: 24rpx;
-}
-.tr { 
-  padding: 10rpx 12rpx; 
-  border-top: 1rpx solid #f1f5f9;
-  font-size: 26rpx;
-  transition: background-color 0.2s;
-}
-.th, .td { 
-  text-align: center; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  white-space: nowrap;
-  line-height: 1.4;
-}
-.rank { 
-  text-align: center; 
-  font-weight: 600;
-}
-.td.rank {
-  color: #64748b;
-  font-size: 24rpx;
+  font-weight:700;
+  color: var(--text-light);
+  background: rgba(255,255,255,0.6);
 }
 
-.td.user {
-  font-weight: 600;
-  color: #1e293b;
-}
-.ok { 
-  color: #059669; 
-  font-weight: 700; 
+.tbody .tr {
+  border-top: 1rpx solid rgba(255,255,255,0.4);
+  color: var(--text-dark);
 }
 
-.fail { 
-  color: #dc2626; 
-  font-weight: 700; 
-}
-/* 数值列居中对齐，更紧凑 */
-.th:nth-child(3), .th:nth-child(4), .th:nth-child(5), .th:nth-child(6), .th:nth-child(7),
-.td:nth-child(3), .td:nth-child(4), .td:nth-child(5), .td:nth-child(6), .td:nth-child(7) {
+.th, .td {
   text-align: center;
-}
-
-/* 胜率列特殊样式 */
-.td:nth-child(5) {
-  font-weight: 600;
-  color: #0891b2;
-}
-
-/* 最佳成绩列特殊样式 */
-.td:nth-child(7) {
-  font-weight: 600;
-  color: #7c3aed;
-}
-.btn.mini{ padding:10rpx 16rpx; border-radius:12rpx; background:#eef2f7 }
-.btn.link{ background:transparent; color:#2563eb }
-.seg{ display:flex; background:#f1f5f9; border-radius:12rpx; overflow:hidden }
-.seg-btn{ padding:10rpx 16rpx; background:transparent; border:none }
-.seg-btn.active{ background:#fff; font-weight:700 }
-.trend-chart{ width:100%; overflow-x:auto; }
-.trend-chart-inner{ position:relative; }
-.trend-bars{ display:flex; align-items:flex-end; height:100%; }
-.trend-item{ display:flex; justify-content:center; align-items:flex-end; height:100%; }
-.trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:12rpx 12rpx 0 0; overflow:hidden; background:#f1f5f9; }
-.trend-item .bar-fail{ width:100%; background:#dc2626; }
-.trend-item .bar-success{ width:100%; background:#16a34a; }
-.trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx; }
-.trend-labels .bar-label{ text-align:center; color:#64748b; font-size:22rpx; white-space:nowrap; }
-.trend-labels.rotate {
-  min-height: 60rpx;
-  align-items: flex-end;
-}
-.trend-labels.rotate .bar-label {
-  display: inline-block;        /* 让 transform 生效 */
-  transform: rotate(-90deg);    /* 顺时针或逆时针旋转 */
-  transform-origin: center center;  /* 旋转参考点，可以根据需求改为 left bottom 等 */
-  white-space: nowrap;
-}
-.rounds{
-  margin-top:12rpx;
-  display:flex;
-  flex-direction:column;
-  row-gap:16rpx;
-  --recent-rounds-grid: 200rpx 120rpx 160rpx 1fr;
-}
-.rounds-head{
-  display:grid;
-  grid-template-columns: var(--recent-rounds-grid);
-  gap:8rpx;
-  padding:8rpx 4rpx;
-  background: var(--tf24-table-head-bg, #f8fafc);
-  color: var(--tf24-table-head-color, #475569);
-  font-size:24rpx;
-  font-weight:700;
-  border-radius:12rpx;
-}
-.rounds-head text,
-.round-item text{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
 }
-.round-item{
-  display:grid;
-  grid-template-columns: var(--recent-rounds-grid);
-  grid-gap:8rpx;
-  padding:8rpx 4rpx;
-  border-top:2rpx solid #eef2f7;
-}
-.r-time, .r-result, .r-timeMs {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #1e293b;
-}
-.r-cards{
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #0f172a;
-  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
-}
-.r-result.ok{ color:#16a34a; font-weight:700 }
-.r-result.fail{ color:#dc2626; font-weight:700 }
-.picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
-.difficulty-heatmaps{
-  display:grid;
-  grid-template-rows:auto auto;
-  row-gap:12rpx;
-  margin-top:8rpx;
-  width:100%;
-}
-@media screen and (min-width: 960px) {
-  .difficulty-heatmaps{
-    max-width:960px;
-    margin-left:auto;
-    margin-right:auto;
-  }
-}
-.mistake-summary{ margin-top:16rpx; display:flex; flex-wrap:wrap; gap:24rpx; }
-.mistake-summary-item{ background:#f8fafc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
-.mistake-summary-label{ color:#6b7280; font-size:26rpx; }
-.mistake-summary-value{ color:#111827; font-size:36rpx; font-weight:700; }
-.mistake-controls{ display:flex; align-items:center; justify-content:flex-start; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
-.mistake-filter{ display:flex; align-items:center; gap:12rpx; color:#374151; font-size:26rpx; }
-.mistake-table{ max-width:100%; overflow:hidden; }
-.mistake-grid{
-  display:grid;
-  grid-template-columns: minmax(200rpx, 1.6fr) repeat(4, minmax(120rpx, 1fr));
-  width:100%;
-}
-.mistake-head{
-  background: var(--tf24-table-head-bg, #f8fafc);
-  color: var(--tf24-table-head-color, #475569);
-  font-weight:700;
-  font-size:24rpx;
-}
-.mistake-body{ display:flex; flex-direction:column; width:100%; }
-.mistake-row{ border-top:1rpx solid #f1f5f9; font-size:26rpx; }
-.mistake-grid text{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:10rpx 8rpx;
-  text-align:center;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.mistake-grid .mistake-th{ padding:12rpx 8rpx; }
-.mistake-cell.key,
-.mistake-th.key{
-  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
-  color:#0f172a;
-}
-.mistake-cell.key:active{ opacity:.7; }
-.mistake-tip{ color:#6b7280; font-size:24rpx; flex:1; text-align:right; }
-.mistake-empty{ color:#64748b; font-size:26rpx; margin-top:8rpx; }
-.empty-tip{ color:#64748b; font-size:26rpx; margin-top:8rpx; }
 
-/* 表头排序：高亮当前列 */
-/* .th.active{ color:#0953e9; font-weight:800 } */
-.th.active{ color:#e5e7eb; background-color:#030300; font-weight:800 }
+.ok { color:#1f8750; font-weight:700; }
+.fail { color:#c84f4f; font-weight:700; }
 
-.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
-.floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
+.user-list .claymorphism { margin-top:12rpx; }
 
+.mistake-summary { display:grid; grid-template-columns:repeat(2,1fr); gap:16rpx; }
+.mistake-summary-item { display:flex; flex-direction:column; align-items:center; gap:8rpx; }
+.mistake-summary-label { font-size:24rpx; color:var(--text-light); }
+.mistake-summary-value { font-size:36rpx; font-weight:800; color:var(--text-dark); }
+
+.mistake-controls { display:flex; justify-content:flex-end; }
+.mistake-grid { display:grid; grid-template-columns:1.5fr repeat(4,1fr); gap:12rpx; align-items:center; }
+.mistake-th { font-weight:700; color:var(--text-light); }
+.mistake-cell { text-align:center; font-size:26rpx; color:var(--text-dark); }
+
+.trend-chart { display:flex; flex-direction:column; gap:12rpx; }
+.trend-chart-inner { overflow:auto; }
+.trend-bars { display:flex; align-items:flex-end; }
+.trend-item { display:flex; align-items:flex-end; justify-content:center; }
+.bar { width:100%; border-radius:16rpx; background: var(--surface-dark); box-shadow: inset 4rpx 4rpx 8rpx var(--bg-dark), inset -4rpx -4rpx 8rpx #ffffff; display:flex; flex-direction:column-reverse; }
+.bar-success { background: var(--accent2); border-radius:16rpx 16rpx 0 0; }
+.bar-fail { background: var(--accent1); border-radius:0 0 16rpx 16rpx; }
+.trend-labels { display:flex; justify-content:space-between; color:var(--text-light); font-size:24rpx; }
+.trend-labels.rotate { writing-mode:vertical-rl; }
+
+.rounds { display:flex; flex-direction:column; gap:12rpx; }
+.rounds-head, .round-item { display:grid; grid-template-columns:1fr 1fr 1fr 2fr; gap:12rpx; align-items:center; }
+.rounds-head { font-weight:700; color:var(--text-light); }
+.round-item { background: var(--surface-light); border-radius:20rpx; padding:12rpx 16rpx; box-shadow: inset 4rpx 4rpx 8rpx rgba(0,0,0,0.05), inset -4rpx -4rpx 8rpx rgba(255,255,255,0.6); }
+.r-result.ok { color:#1f8750; }
+.r-result.fail { color:#c84f4f; }
+
+.mistake-table { margin-top:16rpx; }
+.mistake-head { font-weight:700; color:var(--text-light); }
+.mistake-row { background: var(--surface-light); border-radius:20rpx; padding:12rpx 16rpx; box-shadow: inset 4rpx 4rpx 8rpx rgba(0,0,0,0.05), inset -4rpx -4rpx 8rpx rgba(255,255,255,0.6); }
+.mistake-empty, .empty-tip { text-align:center; color:var(--text-light); padding:24rpx 0; }
+
+.seg { display:flex; background: var(--surface-light); border-radius:24rpx; padding:6rpx; box-shadow: inset 4rpx 4rpx 8rpx rgba(0,0,0,0.05), inset -4rpx -4rpx 8rpx rgba(255,255,255,0.6); }
+.seg-btn { flex:1; border:none; background:transparent; font-size:26rpx; padding:12rpx 18rpx; border-radius:18rpx; color:var(--text-light); }
+.seg-btn.active { background: var(--primary); color:#fff; box-shadow: 4rpx 4rpx 8rpx var(--primary-dark), -4rpx -4rpx 8rpx #c4eaff; }
+
+.picker-trigger { display:flex; align-items:center; justify-content:center; background: var(--surface-light); padding:16rpx; border-radius:24rpx; box-shadow: inset 4rpx 4rpx 8rpx rgba(0,0,0,0.05), inset -4rpx -4rpx 8rpx rgba(255,255,255,0.6); font-weight:700; color:var(--text-dark); }
+
+.mistake-filter { display:flex; align-items:center; gap:12rpx; font-size:26rpx; color:var(--text-dark); }
+.mistake-tip { font-size:24rpx; color:var(--text-light); }
+
+.speed-grid { display:grid; grid-template-columns:1.5fr repeat(5,1fr); gap:12rpx; }
+
+.floating-hint-layer { position:fixed; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999; }
+.floating-hint-layer.interactive { pointer-events:auto; }
+.floating-hint { background:rgba(67,78,90,0.9); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; font-size:28rpx; box-shadow:0 12rpx 24rpx rgba(0,0,0,0.25); }
 </style>

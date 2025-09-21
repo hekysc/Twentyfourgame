@@ -19,10 +19,7 @@ export default {
 </script>
 
 <style>
-/* 全局样式可放在 uni.scss 中 */
-page {
-  background-color: #f8f8f8;
-}
+@import "@/common/theme.css";
 
 /* uni-h5 旧版头部兜底隐藏（仅当 navigationStyle 未生效时） */
 .uni-page-head,

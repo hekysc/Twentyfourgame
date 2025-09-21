@@ -1,0 +1,79 @@
+/* Claymorphism theme tokens and utility classes */
+:root, page {
+  --bg-light: #F0F4F8;
+  --bg-dark: #A9B4C2;
+  --surface-light: #E6ECF2;
+  --surface-dark: #C2CAD6;
+  --primary: #98D2EB;
+  --primary-dark: #64A2C5;
+  --text-light: #5C6A79;
+  --text-dark: #434E5A;
+  --accent1: #F9C897;
+  --accent2: #A8E6CF;
+}
+
+page {
+  background-color: var(--bg-light);
+  color: var(--text-light);
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft Yahei";
+}
+
+.page { display:flex; flex-direction:column; min-height:100vh; }
+.row { display:flex; flex-direction:row; }
+.col { display:flex; flex-direction:column; }
+.center { align-items:center; justify-content:center; }
+
+.claymorphism{
+  border-radius: 30rpx;
+  background: var(--surface-light);
+  box-shadow: 8rpx 8rpx 16rpx var(--bg-dark), -8rpx -8rpx 16rpx #ffffff;
+}
+.claymorphism-inset{
+  border-radius: 20rpx;
+  background: var(--bg-light);
+  box-shadow: inset 6rpx 6rpx 12rpx var(--bg-dark), inset -6rpx -6rpx 12rpx #ffffff;
+}
+
+.clay-button{
+  border-radius: 20rpx;
+  background: var(--surface-light);
+  color: var(--text-light);
+  box-shadow: 6rpx 6rpx 12rpx var(--bg-dark), -6rpx -6rpx 12rpx #ffffff;
+  transition: all .2s ease-in-out;
+}
+.clay-button:active{
+  box-shadow: inset 4rpx 4rpx 8rpx var(--bg-dark), inset -4rpx -4rpx 8rpx #ffffff;
+}
+.clay-button-primary{
+  border-radius: 20rpx;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 6rpx 6rpx 12rpx var(--primary-dark), -6rpx -6rpx 12rpx #c4eaff;
+}
+.clay-button-primary:active{
+  box-shadow: inset 4rpx 4rpx 8rpx var(--primary-dark), inset -4rpx -4rpx 8rpx #c4eaff;
+}
+
+.text-shadow-strong{
+  text-shadow: 2rpx 2rpx 0 var(--primary-dark), 4rpx 4rpx 0 var(--bg-dark);
+}
+.card { padding: 24rpx; }
+.gap16 > * + * { margin-top: 16rpx; }
+.gap24 > * + * { margin-top: 24rpx; }
+.grid2 { display:grid; grid-template-columns: 1fr 1fr; grid-gap: 16rpx; }
+.grid4 { display:grid; grid-template-columns: repeat(4, 1fr); grid-gap: 16rpx; }
+.h56 { height: 56rpx; }
+.h96 { height: 96rpx; }
+.h120{ height: 120rpx; }
+.text-xs{ font-size: 22rpx; }
+.text-sm{ font-size: 26rpx; }
+.text-lg{ font-size: 32rpx; }
+.text-2xl{ font-size: 40rpx; }
+.text-3xl{ font-size: 48rpx; }
+.text-4xl{ font-size: 56rpx; }
+.text-5xl{ font-size: 64rpx; }
+.text-6xl{ font-size: 72rpx; }
+.rounded-full{ border-radius: 9999rpx; }
+.opacity-50{ opacity: .5; }
+.bold{ font-weight: 700; }

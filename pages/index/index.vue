@@ -2,41 +2,36 @@
   <view
     class="page col"
     :class="{ booted }"
-    style="position: relative;"
+    style="position: relative; padding:24rpx; gap:16rpx;"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <view class="game-shell">
+    <UIHeader
+      :username="currentUserName"
+      :avatar="(!avatarLoadFailed && currentUserAvatar) ? currentUserAvatar : ''"
+      @tap-avatar="goLogin"
+      @tap-settings="goLogin"
+      @avatar-error="onAvatarError"
+    />
+    <view class="game-shell col" style="gap:16rpx;">
       <view class="game-header">
-        <!-- 顶部：当前用户 -->
-        <view class="topbar">
-          <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
-            <template v-if="currentUserAvatar && !avatarLoadFailed">
-              <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
-            </template>
-            <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
-            <text class="user-chip-name">{{ currentUserName }}</text>
-          </view>
-        </view>
 
-        <view class="mode-bar">
+        <view class="claymorphism card mode-bar">
           <button
-            class="btn mode-toggle-btn"
+            class="clay-button mode-toggle-btn"
             :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
             @click="toggleMode"
           >{{ modeButtonLabel }}</button>
-          <view style="flex:1;">
-            <button
-              class="btn btn-secondary deck-toggle-btn"
-              @click="toggleDeckSource"
-            >{{ deckSourceLabel }}</button>
-          </view>
+          <button
+            class="clay-button deck-toggle-btn"
+            @click="toggleDeckSource"
+          >{{ deckSourceLabel }}</button>
         </view>
 
         <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
-        <view id="statsRow" class="card section stats-compact-table stats-card">
+        <view id="statsRow" class="claymorphism card stats-compact-table stats-card">
           <view class="thead">
             <text class="th">剩余</text>
             <text class="th">局数</text>
@@ -58,7 +53,7 @@
                 <text>{{ fmtMs1(handElapsedMs) }}</text>
               </block>
               <block v-else>
-                <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
+                <button class="clay-button btn-reshuffle" @click.stop="reshuffle">洗牌</button>
               </block>
             </view>
           </view>
@@ -82,26 +77,26 @@
 
             <!-- 运算符候选区：两行布局 -->
             <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
-              <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
+              <button v-for="op in ['+','-','×','÷']" :key="op" class="clay-button btn-operator"
                       @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                       @touchmove.stop.prevent="onDrag($event)"
                       @touchend.stop.prevent="endDrag()">{{ op }}</button>
             </view>
             <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
               <view class="ops-left">
-                <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                <button v-for="op in ['(',')']" :key="op" class="clay-button btn-operator"
                         @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                         @touchmove.stop.prevent="onDrag($event)"
                         @touchend.stop.prevent="endDrag()">{{ op }}</button>
               </view>
-              <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+              <button class="clay-button mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
             </view>
 
             <!-- 拖拽中的浮层 -->
             <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
 
             <!-- 表达式卡片容器（高度由脚本计算） -->
-            <view class="expr-card card section">
+            <view class="expr-card claymorphism-inset">
               <view
                 id="exprZone"
                 class="expr-zone"
@@ -139,8 +134,8 @@
                 </view>
               </view>
               <view class="basic-ops">
-                <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
-                <button class="btn btn-secondary mode-btn basic-face-toggle" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+                <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="clay-button btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
+                <button class="clay-button mode-btn basic-face-toggle" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
               </view>
               <view class="basic-column">
                 <view v-for="i in [1, 3]" :key="'basic-right-' + i" class="basic-card-wrapper">
@@ -158,20 +153,20 @@
 
         <view class="game-footer">
           <view id="submitRow" class="footer-row">
-            <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
+            <button v-show="mode === 'pro'" class="clay-button-primary footer-primary-btn" @click="check">提交答案</button>
             <view v-show="mode !== 'pro'" class="basic-utility-grid">
-              <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
-              <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
+              <button class="clay-button" :class="{ 'opacity-50': !basicHistory.length }" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
+              <button class="clay-button" @click="resetBasicBoard">重置</button>
             </view>
           </view>
           <view id="failRow" class="footer-row">
             <view class="pair-grid footer-pair" v-show="mode === 'pro'">
-              <button class="btn btn-secondary" @click="showSolution">提示</button>
-              <button class="btn btn-secondary" @click="skipHand">下一题</button>
+              <button class="clay-button" @click="showSolution">提示</button>
+              <button class="clay-button" @click="skipHand">下一题</button>
             </view>
             <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
-              <button class="btn btn-secondary" @click="showSolution">提示</button>
-              <button class="btn btn-secondary" @click="skipHand">下一题</button>
+              <button class="clay-button" @click="showSolution">提示</button>
+              <button class="clay-button" @click="skipHand">下一题</button>
             </view>
           </view>
         </view>
@@ -207,15 +202,15 @@
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>
 
-    <!-- ✅ 把自闭合组件改为成对闭合，避免误报 -->
-    <CustomTabBar></CustomTabBar>
+    <BottomTab />
   </view>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
-import CustomTabBar from '../../components/CustomTabBar.vue'
+import UIHeader from '../../components/UIHeader.vue'
+import BottomTab from '../../components/BottomTab.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 import {
@@ -1467,244 +1462,146 @@ function onSessionOver() {
 }
 </script>
 
-<style scoped> 
+<style scoped>
 .page {
-  min-height: 100dvh;
   min-height: calc(var(--vh, 1vh) * 100);
-  background: #f8fafc;
-  display:flex;
+  display: flex;
   flex-direction: column;
-  box-sizing:border-box;
-  padding:24rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom) + var(--tf24-tabbar-height, 120rpx) + (var(--tf24-footer-row-height, 120rpx) * 2) + var(--tf24-footer-gap, 16rpx));
+  box-sizing: border-box;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom) + 240rpx);
 }
+
 .page { opacity: 0; }
 .page.booted { animation: page-fade-in .28s ease-out forwards; }
+
 .game-shell {
-  flex:1;
-  min-height:100%;
-  display:grid;
-  grid-template-rows:auto 1fr auto;
-  gap:24rpx;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
+
 .game-header { display:flex; flex-direction:column; gap:16rpx; }
-.game-main { display:flex; flex-direction:column; min-height:400rpx; }
+.game-main { display:flex; flex-direction:column; gap:16rpx; }
 .mode-panels { flex:1; display:flex; flex-direction:column; gap:18rpx; }
 .mode-panel { display:flex; flex-direction:column; gap:18rpx; }
 .pro-mode { flex:1; }
-.topbar { padding: 12rpx 0; }
-.user-chip {
-  display:flex;
-  align-items:center;
-  gap:16rpx;
-  padding:12rpx 20rpx;
-  background:#fff;
-  border:2rpx solid #e2e8f0;
-  border-radius:9999rpx;
-  box-shadow:0 6rpx 16rpx rgba(15,23,42,0.08);
-  width:100%;
-  box-sizing:border-box;
-}
-.user-chip-avatar,
-.user-chip-fallback {
-  width:80rpx;
-  height:80rpx;
-  border-radius:50%;
-  flex:0 0 80rpx;
-}
-.user-chip-avatar { display:block; object-fit:cover; }
-.user-chip-fallback {
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:34rpx;
-  font-weight:700;
-  color:#0f172a;
-  background:#e2e8f0;
-}
-.user-chip-name {
-  flex:1;
-  font-size:32rpx;
-  font-weight:700;
-  color:#0f172a;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.user-chip-hover { opacity:0.86; }
- 
-/* 牌区 */ 
-.card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; } 
-.playing-card { background:None; border-radius:16rpx; overflow:hidden; box-shadow:0 8rpx 20rpx rgba(15,23,42,.08); border:1rpx solid #e5e7eb; } 
-.playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; } 
-.card-img { width:100%; height:auto; display:block; } 
 
-/* 运算符与按钮 */
-.ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
-.ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:18rpx; align-items:stretch; }
-.ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; width:100%; }
-.mode-bar { display:flex; align-items:stretch; gap:18rpx; margin: 8rpx 0 16rpx; }
-.mode-btn { width: 100%; white-space: nowrap; }
-.mode-toggle-btn { flex:1; width:100%; border:2rpx solid transparent; font-weight:700; }
-.mode-toggle-basic { background:#145751; color:#fff; border-color:#145751; }
-.mode-toggle-pro { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
-.deck-toggle-btn {
-  width:100%;
-  margin: 8rpx;
-  padding:28rpx 36rpx;
-  white-space:normal;
-  word-wrap: break-word;
-  font-weight:700;
-  border:2rpx solid #145751;
-  color:#fff;
-  background:#3d5714;
+.mode-bar { display:flex; gap:16rpx; align-items:stretch; }
+.mode-toggle-btn { flex:1; font-weight:700; }
+.mode-toggle-pro { background: var(--primary); color:#fff; }
+.mode-toggle-basic { background: var(--accent1); color: var(--text-dark); }
+.deck-toggle-btn { flex:1; font-weight:700; white-space:normal; }
+
+.stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:12rpx; }
+.stats-compact-table .thead,
+.stats-compact-table .tbody { display:grid; grid-template-columns: repeat(7, 1fr); align-items:center; column-gap:12rpx; text-align:center; }
+.stats-compact-table .thead { color: var(--text-light); font-weight:700; font-size:26rpx; }
+.stats-compact-table .tbody { font-size:28rpx; color: var(--text-dark); }
+.stats-compact-table .ok { color:#1f8750; }
+.stats-compact-table .fail { color:#c84f4f; }
+.timer-cell { display:flex; align-items:center; justify-content:center; }
+
+.card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16rpx; }
+.playing-card {
+  background: var(--surface-light);
+  border-radius:24rpx;
+  overflow:hidden;
+  box-shadow: 6rpx 6rpx 12rpx rgba(0,0,0,0.08), -6rpx -6rpx 12rpx rgba(255,255,255,0.6);
+  border:2rpx solid rgba(255,255,255,0.4);
 }
+.playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
+.card-img { width:100%; height:auto; display:block; }
+
+.ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:16rpx; }
+.ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16rpx; align-items:stretch; }
+.ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:16rpx; }
+.btn-operator { font-size:64rpx; font-weight:700; color:var(--text-dark); }
+.btn-operator.active { background: var(--primary); color:#fff; }
+
+.mode-btn { height:100%; font-weight:700; }
+.btn-reshuffle { font-size:28rpx; }
 
 .game-footer {
-  position:sticky;
-  bottom: calc(var(--tf24-tabbar-height, 120rpx) + env(safe-area-inset-bottom));
-  z-index:20;
+  position: sticky;
+  bottom: calc(env(safe-area-inset-bottom) + 160rpx);
   display:flex;
   flex-direction:column;
-  gap:var(--tf24-footer-gap, 16rpx);
-  padding:12rpx 0;
-  background: var(--tf24-footer-bg, #f8fafc);
-  box-shadow:0 -8rpx 20rpx rgba(15,23,42,0.12);
-  border-radius:24rpx;
-  min-height: var(--tf24-footer-total, calc(var(--tf24-footer-row-height, 120rpx) * 2 + var(--tf24-footer-gap, 16rpx)));
+  gap:16rpx;
+  padding:16rpx;
+  border-radius:30rpx;
+  background: var(--surface-light);
+  box-shadow: 8rpx 8rpx 16rpx var(--bg-dark), -8rpx -8rpx 16rpx #ffffff;
 }
-.footer-row {
-  display:flex;
-  align-items:stretch;
-  gap:18rpx;
-  min-height:var(--tf24-footer-row-height, 120rpx);
-}
-.footer-row .btn {
-  width:100%;
-  height:100%;
-  min-height:var(--tf24-footer-row-height, 120rpx);
-  padding:0;
-}
+
+.footer-row { display:flex; gap:16rpx; }
 .footer-primary-btn { width:100%; }
-.basic-utility-grid {
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:18rpx;
-  width:100%;
-}
-.basic-utility-grid .btn[disabled] { opacity:.6; }
-.footer-pair { height:100%; }
+.basic-utility-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16rpx; }
+.pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16rpx; width:100%; }
 
-.timer-cell { cursor: pointer; }
-.timer-popover-layer { position:fixed; inset:0; z-index:998; }
-.timer-popover { position:absolute; background:#fff; padding:18rpx 28rpx; border-radius:20rpx; box-shadow:0 16rpx 40rpx rgba(15,23,42,0.2); transform:translate(-50%, 0); display:flex; flex-direction:column; gap:12rpx; }
-.timer-popover-item { border:none; border-radius:12rpx; padding:16rpx 32rpx; background:#fee2e2; color:#b91c1c; font-size:28rpx; font-weight:700; }
-
-.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
-.floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
-
-.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}
-.btn-primary { background:#145751; color:#fff; }
-/* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */
-
-/* 成功动画覆盖层 */
 .success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-.success-burst { background: rgba(34,197,94,0.92); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(34,197,94,.35); animation: success-pop .5s ease-out both; }
+.success-burst { background: var(--accent2); color:var(--text-dark); font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(0,0,0,.12); animation: success-pop .5s ease-out both; }
 .error-burst { background: rgba(239,68,68,0.92); color:#fff; font-weight:800; font-size:48rpx; padding:28rpx 40rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(239,68,68,.35); animation: success-pop .5s ease-out both; display:flex; flex-direction:column; align-items:center; gap:6rpx }
 .error-burst .err-title{ font-size:48rpx; font-weight:800 }
 .error-burst .err-val{ font-size:28rpx; font-weight:700; opacity:.95 }
-@keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
-/* 表达式区 */
-.expr-card { background:#fff; padding:20rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); } 
-.expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
-.status-text { color:#1f2937; font-weight:700; }
-.expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; position:relative;}
-.expr-override {
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  padding:0 32rpx;
-  color:#1f2937;
-  font-size:30rpx;
-  font-weight:700;
-  background:rgba(245,247,251,0.92);
-  pointer-events:none;
-  z-index:2;
-}
-.expr-zone-active { border-color:#3a7afe; }
-.expr-placeholder { color:#9ca3af; text-align:center; margin-top: 8rpx; }
-.expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
-/* 只有在 empty 状态下显示提示 */
+.expr-card { border-radius:24rpx; padding:24rpx; background: var(--surface-light); box-shadow: inset 6rpx 6rpx 12rpx rgba(0,0,0,0.05), inset -6rpx -6rpx 12rpx rgba(255,255,255,0.6); border:2rpx solid rgba(255,255,255,0.4); }
+.expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; border-radius:24rpx; padding:28rpx; overflow:hidden; position:relative; background: var(--surface-dark); box-shadow: inset 6rpx 6rpx 12rpx var(--bg-dark), inset -6rpx -6rpx 12rpx #ffffff; }
 .expr-zone.empty::after {
   content: "表达式区域";
   position: absolute;
-  inset: 0;                  /* 覆盖容器，但不改变布局 */
-  display: flex;             /* 仅用于居中文案 */
+  inset: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;      /* 不拦截拖拽/点击 */
-  color: #9aa3af;            /* 轻提示色 */
+  pointer-events: none;
+  color: rgba(67,78,90,0.6);
   font-size: 26rpx;
-  letter-spacing: 1rpx;
-  user-select: none;
-  /* 可以按需加淡入效果（可选）
-  opacity: 1;
-  transition: opacity .18s ease;
-  */
 }
-.tok { color:#1f3a93; border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
+.expr-zone-active { box-shadow: inset 4rpx 4rpx 8rpx var(--bg-dark), inset -4rpx -4rpx 8rpx #ffffff; }
+.expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
+.tok { color:var(--text-dark); border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
 .tok.num { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block; }
-.tok-card-img { width:100%; height:100%; object-fit: contain; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(15,23,42,.08); }
-.tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:#fff; border:2rpx solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(15,23,42,.06); box-sizing: border-box; }
+.tok-card-img { width:100%; height:100%; object-fit: contain; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(0,0,0,.08); }
+.tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background: var(--surface-light); box-shadow: 6rpx 6rpx 12rpx rgba(0,0,0,0.08), -6rpx -6rpx 12rpx rgba(255,255,255,0.6); display:flex; align-items:center; justify-content:center; box-sizing: border-box; }
 .tok.dragging { opacity:.6; box-shadow:0 6rpx 24rpx rgba(0,0,0,.18); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
-.insert-placeholder { border-radius:14rpx; border:2rpx dashed #3a7afe; background:#eaf1ff; opacity:.9; position:relative; overflow:hidden; }
+.insert-placeholder { border-radius:14rpx; border:2rpx dashed rgba(100,162,197,0.8); background:rgba(152,210,235,0.3); opacity:.9; position:relative; overflow:hidden; }
 .insert-placeholder.num { min-width: calc(var(--tok-card-h) * var(--card-w-ratio)); min-height: var(--tok-card-h); margin:2rpx; }
 .insert-placeholder.op { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin:2rpx; }
-.insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
-.drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
-
-/* 统计：单行紧凑 */
-.stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; } 
-.stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
-.stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(7, 1fr); align-items:center; column-gap:12rpx; }
-.stats-compact-table .thead { color:#6b7280; font-weight:700; font-size:26rpx; text-align: center;}
-.stats-compact-table .tbody { font-size:28rpx; text-align: center;}
-.stats-compact-table .ok { color:#16a34a; font-weight:700 }
-.stats-compact-table .fail { color:#dc2626; font-weight:700 }
-.stats-one-line .stats-item { display:flex; align-items:center; gap:6rpx; padding:4rpx 8rpx; border-right:2rpx solid #e5e7eb; }
-.stats-one-line .stats-item:last-child { border-right:none; }
-.stat-label { color:#6b7280; font-size:26rpx; }
-.stat-label.ok, .stat-value.ok { color:#16a34a; font-weight:700 }
-.stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
-.stat-value { font-weight:700; color:#111827; font-size:28rpx; }
-
-.btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
+.insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(152,210,235,0.1) 0, rgba(152,210,235,0.1) 8rpx, rgba(100,162,197,0.2) 8rpx, rgba(100,162,197,0.2) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
+.drag-ghost { position:fixed; z-index:9999; background:var(--primary); color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; box-shadow:0 12rpx 24rpx rgba(0,0,0,.18); }
 
 .basic-mode { display:flex; flex-direction:column; gap:24rpx; flex:1; }
 .basic-board { display:flex; gap:24rpx; align-items:stretch; justify-content:center; }
 .basic-column { display:flex; flex-direction:column; gap:24rpx; flex:1; }
 .basic-card-wrapper { flex:1; }
-.basic-card { background:None; border-radius:8rpx; box-shadow:0 12rpx 28rpx rgba(15,23,42,.12); border:2rpx solid transparent; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; min-height:320rpx; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.basic-card {
+  border-radius:24rpx;
+  background: var(--surface-light);
+  box-shadow: 10rpx 10rpx 20rpx rgba(0,0,0,0.12), -10rpx -10rpx 20rpx rgba(255,255,255,0.6);
+  border:2rpx solid rgba(255,255,255,0.5);
+  overflow:hidden;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:320rpx;
+  transition:border-color 0.2s ease, box-shadow 0.2s ease;
+}
 .basic-card.hidden { visibility:hidden; pointer-events:none; }
-.basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
-.basic-card.result { background:#fef3c7; }
+.basic-card.selected { border-color: var(--primary); box-shadow: 10rpx 10rpx 24rpx rgba(100,162,197,0.32), -10rpx -10rpx 24rpx rgba(255,255,255,0.8); }
+.basic-card.result { background: var(--accent1); }
 .basic-card-img { width:100%; height:100%; object-fit:contain; }
-.basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
-.basic-card-value-text { font-size:72rpx; font-weight:700; color:#1f2937; }
+.basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fff4de 0%, #f9c897 100%); }
+.basic-card-value-text { font-size:72rpx; font-weight:700; color:var(--text-dark); }
 .basic-ops { display:flex; flex-direction:column; gap:20rpx; align-items:stretch; justify-content:center; flex:0 0 160rpx; }
-.basic-ops .btn-operator { height:110rpx; font-size:64rpx; }
-.basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
-.basic-face-toggle { margin-top:12rpx; white-space:normal;word-break: break-all;}
+.basic-ops .btn-operator { height:110rpx; }
+.basic-ops .btn-operator.active { background: var(--primary); color:#fff; }
+.basic-face-toggle { margin-top:12rpx; white-space:normal; word-break: break-all; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
+@keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
 </style>
