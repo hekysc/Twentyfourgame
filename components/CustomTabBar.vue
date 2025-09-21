@@ -1,16 +1,20 @@
 <template>
   <view class="ctb" :style="wrapStyle">
-    <button class="ctb-item" :class="{ active: isActive('stats') }" @click="go('/pages/stats/index')">
-      <text class="icon" :class="{ active: isActive('stats') }">📊</text>
-      <text class="label" :class="{ active: isActive('stats') }">统计</text>
-    </button>
-    <button class="ctb-item" :class="{ active: isActive('index') }" @click="go('/pages/index/index')">
-      <text class="icon" :class="{ active: isActive('index') }">🎮</text>
-      <text class="label" :class="{ active: isActive('index') }">程序</text>
-    </button>
-    <button class="ctb-item" :class="{ active: isActive('user') }" @click="go('/pages/user/index')">
-      <text class="icon" :class="{ active: isActive('user') }">👤</text>
-      <text class="label" :class="{ active: isActive('user') }">用户</text>
+    <button
+      v-for="tab in tabs"
+      :key="tab.key"
+      class="ctb-item"
+      :class="{ active: isActive(tab.key) }"
+      @click="go(tab.url)"
+    >
+      <view class="ctb-item-body">
+        <view class="icon-shell" :class="{ active: isActive(tab.key) }">
+          <image class="icon-img" mode="aspectFit" :src="tab.icon" />
+          <view v-if="tab.badge" class="badge">{{ tab.badge }}</view>
+          <view v-else-if="tab.dot" class="status-dot" />
+        </view>
+        <text class="label" :class="{ active: isActive(tab.key) }">{{ tab.label }}</text>
+      </view>
     </button>
   </view>
   <view class="ctb-safe"/>
@@ -19,8 +23,15 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
+const tabs = [
+  { key: 'stats', label: '统计', url: '/pages/stats/index', icon: '/static/icons/tab-stats.svg' },
+  { key: 'index', label: '程序', url: '/pages/index/index', icon: '/static/icons/tab-game.svg' },
+  { key: 'user', label: '用户', url: '/pages/user/index', icon: '/static/icons/tab-user.svg' }
+]
+
 const currentPath = ref('')
 const wrapStyle = ref('')
+const SAFE_EXTRA_PX = 20
 
 onMounted(() => {
   try {
@@ -30,7 +41,9 @@ onMounted(() => {
   try {
     const sys = uni.getSystemInfoSync && uni.getSystemInfoSync()
     const hb = (sys && sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0
-    wrapStyle.value = `padding-bottom:${hb ? hb + 'px' : 'env(safe-area-inset-bottom)'}`
+    wrapStyle.value = hb
+      ? `padding-bottom:${hb + SAFE_EXTRA_PX}px`
+      : `padding-bottom:calc(env(safe-area-inset-bottom) + ${SAFE_EXTRA_PX}px)`
   } catch (_) {}
   // 监听全局路由同步事件，确保返回/手势返回后高亮状态更新
   try { uni.$off && uni.$off('tabbar:update', updatePath) } catch(_) {}
@@ -115,67 +128,128 @@ function go(url){
 </script>
 
 <style scoped>
-.ctb { 
-  position: fixed; 
-  left: 0; 
-  right: 0; 
-  bottom: 0; 
-  z-index: 999; 
-  display: grid; 
-  grid-template-columns: repeat(3, 1fr); 
-  background: #ffffff; 
-  box-shadow: 0 -6rpx 16rpx rgba(15,23,42,.06); 
-  padding: 10rpx 8rpx; 
-  transition: background-color 0.3s ease;
-}
-.ctb-safe { height: env(safe-area-inset-bottom); }
-.ctb-item { 
-  background: transparent; 
-  border: none; 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  justify-content: center; 
-  width: 25dvw;
-  padding: 10rpx 0; 
-  gap: 6rpx; 
-  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  border-radius: 12rpx;
+.ctb {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 24rpx;
+  z-index: 999;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12rpx;
+  padding: 22rpx 26rpx;
+  border-radius: 40rpx;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.72) 0%, rgba(30, 41, 59, 0.55) 100%);
+  box-shadow: 0 26rpx 60rpx rgba(15, 23, 42, 0.32);
+  border: 1rpx solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(30rpx);
+  -webkit-backdrop-filter: blur(30rpx);
   overflow: visible;
+  isolation: isolate;
+  transition: box-shadow 0.35s ease, background 0.35s ease;
+}
+.ctb::after {
+  content: '';
+  position: absolute;
+  inset: 1rpx;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(148, 163, 184, 0.08));
+  opacity: 0.22;
+  z-index: 0;
+}
+.ctb-safe {
+  height: calc(env(safe-area-inset-bottom) + 180rpx);
+}
+.ctb-item {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12rpx 6rpx;
+  border-radius: 26rpx;
+  transition: transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.24s ease, background 0.24s ease;
   appearance: none;
   -webkit-appearance: none;
   outline: none;
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.05);
+  overflow: visible;
+  z-index: 1;
 }
-.ctb-item::after {
-  border: none !important;
-  border-width: 0 !important;
-  background: transparent !important;
+.ctb-item-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
 }
 .ctb-item:active {
-  transform: scale(0.8);
-  background: rgba(58, 122, 254, 0.08);
+  transform: translateY(4rpx) scale(0.96);
+  box-shadow: inset 0 0 0 1rpx rgba(148, 163, 184, 0.14);
 }
-.icon { 
-  font-size: 28rpx; 
-  line-height: 1; 
-  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  filter: grayscale(1) opacity(0.6);
+.ctb-item.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.24), rgba(96, 165, 250, 0.14));
+  box-shadow: 0 18rpx 38rpx rgba(59, 130, 246, 0.3), 0 0 0 1rpx rgba(148, 163, 184, 0.25) inset;
 }
-.icon.active {
-  transform: scale(1.2);
-  filter: grayscale(0) opacity(1);
+.ctb-item.active:active {
+  transform: translateY(2rpx) scale(0.98);
 }
-.label { 
-  font-size: 28rpx; 
-  font-weight: 800; 
-  color: #94a3b8; /* 未选中为灰 */
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  overflow: visible;
+.icon-shell {
+  position: relative;
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.42);
+  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.15);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
 }
-.label.active { 
-  transform: scale(1.2);
-  color: #0953e9; /* 选中为主色 */
+.icon-shell.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.78), rgba(96, 165, 250, 0.64));
+  box-shadow: 0 12rpx 26rpx rgba(37, 99, 235, 0.45), inset 0 0 0 1rpx rgba(255, 255, 255, 0.35);
+  transform: translateY(-4rpx) scale(1.06);
+}
+.icon-img {
+  width: 44rpx;
+  height: 44rpx;
+}
+.badge {
+  position: absolute;
+  top: -6rpx;
+  right: -4rpx;
+  min-width: 32rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #f97316, #fbbf24);
+  color: #0f172a;
+  font-size: 20rpx;
+  font-weight: 800;
+  box-shadow: 0 10rpx 20rpx rgba(249, 115, 22, 0.35);
+}
+.status-dot {
+  position: absolute;
+  top: -2rpx;
+  right: 2rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #34d399, #10b981);
+  box-shadow: 0 8rpx 14rpx rgba(16, 185, 129, 0.45);
+}
+.label {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.78);
+  letter-spacing: 2rpx;
+  transition: transform 0.24s ease, color 0.24s ease;
+}
+.label.active {
+  color: #f8fafc;
+  text-shadow: 0 4rpx 18rpx rgba(59, 130, 246, 0.75);
+  transform: translateY(-2rpx) scale(1.08);
 }
 </style>
