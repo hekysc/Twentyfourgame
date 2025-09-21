@@ -21,6 +21,26 @@ export default {
 <style>
 /* 全局样式可放在 uni.scss 中 */
 page {
-  background-color: #f8f8f8;
+  min-height: 100%;
+  background-color: var(--bg-canvas);
+  background-image: var(--bg-canvas-gradient), url('@/static/bg-pattern.svg');
+  background-repeat: no-repeat, repeat;
+  background-size: cover, 520rpx 520rpx;
+  background-position: center, 0 0;
+  animation: ambientShift 36s ease-in-out infinite;
+  color: var(--text-body);
+  transition: background-color 0.3s ease;
+}
+
+@keyframes ambientShift {
+  0% {
+    background-position: center, 0 0;
+  }
+  50% {
+    background-position: center, 220rpx 180rpx;
+  }
+  100% {
+    background-position: center, 0 0;
+  }
 }
 </style>

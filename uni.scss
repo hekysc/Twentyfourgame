@@ -1,10 +1,96 @@
 /* 自定义主题变量或全局样式（使用原生 CSS 变量，避免预处理器依赖） */
-:root { --primary: #3a7afe; --text: #333; }
+:root {
+  --color-primary: #3a7afe;
+  --color-primary-strong: #2a5ede;
+  --color-secondary: #20c997;
+  --color-secondary-strong: #17a37a;
+  --color-accent: #f59e0b;
+  --text-strong: #0f172a;
+  --text-body: #1f2937;
+  --text-muted: #6b7280;
+  --text-subtle: #94a3b8;
+  --text-inverse: #ffffff;
+  --surface-base: rgba(255, 255, 255, 0.9);
+  --surface-muted: rgba(248, 250, 252, 0.82);
+  --border-soft: rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 12rpx 36rpx rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 18rpx 48rpx rgba(15, 23, 42, 0.12);
+  --gradient-ambient: linear-gradient(135deg, rgba(58, 122, 254, 0.18), rgba(32, 201, 151, 0.18));
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.65));
+  --bg-canvas: #edf1ff;
+  --bg-canvas-gradient: linear-gradient(140deg, #eff4ff 0%, #f9fffb 45%, #eef2ff 100%);
+  --btn-radius: 999rpx;
+}
 
 /* 简易按钮样式（兼容 H5/APP/小程序） */
-.btn { padding: 20rpx 28rpx; border-radius: 12rpx; font-size: 28rpx; border:2rpx solid transparent; }
-.btn-primary { background-color: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-secondary { background-color: #fff; color: var(--primary); border: 2rpx solid var(--primary); }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 22rpx 40rpx;
+  border-radius: var(--btn-radius);
+  font-size: 28rpx;
+  font-weight: 600;
+  border: 2rpx solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.25s ease, color 0.25s ease;
+  box-shadow: 0 8rpx 18rpx rgba(15, 23, 42, 0.12);
+}
+
+.btn-primary {
+  background-image: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-strong) 100%);
+  color: var(--text-inverse);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.btn-secondary {
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+  color: var(--color-primary-strong);
+  border: 2rpx solid rgba(58, 122, 254, 0.32);
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.6);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-body);
+  border: 2rpx solid rgba(15, 23, 42, 0.18);
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  .btn:hover {
+    transform: translateY(-4rpx);
+    box-shadow: 0 12rpx 28rpx rgba(15, 23, 42, 0.18);
+  }
+  .btn-primary:hover {
+    background-image: linear-gradient(135deg, var(--color-primary-strong) 0%, var(--color-primary) 100%);
+  }
+  .btn-secondary:hover {
+    border-color: rgba(58, 122, 254, 0.48);
+    color: var(--color-primary);
+  }
+  .btn-ghost:hover {
+    background-color: rgba(148, 163, 184, 0.12);
+  }
+}
+
+.btn:active {
+  transform: translateY(2rpx);
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.14);
+}
+
+.btn-primary:active {
+  background-image: linear-gradient(135deg, var(--color-primary-strong) 0%, #1f4fd1 100%);
+}
+
+.btn-secondary:active {
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(233, 243, 255, 0.88));
+}
+
+.btn-ghost:active {
+  background-color: rgba(148, 163, 184, 0.2);
+}
+
 .row { display: flex; flex-direction: row; align-items: center; }
 .col { display: flex; flex-direction: column; }
 .space-between { justify-content: space-between; }
