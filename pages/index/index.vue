@@ -8,10 +8,8 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-
     <view class="game-shell">
       <view class="game-header">
-
         <!-- 顶部：当前用户 -->
         <view class="topbar">
           <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
@@ -69,113 +67,115 @@
 
       <view class="game-main">
         <view class="mode-panels">
-      <view class="pro-mode mode-panel" v-show="mode === 'pro'">
-        <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-        <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
-          <view v-for="(card, idx) in cards" :key="idx"
-                class="playing-card"
-                :class="{ used: (usedByCard[idx]||0) > 0 }"
-                @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-                @touchmove.stop.prevent="onDrag($event)"
-                @touchend.stop.prevent="endDrag()">
-            <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
-          </view>
-        </view>
-
-        <!-- 运算符候选区：两行布局 -->
-        <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
-          <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
-                  @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
-                  @touchmove.stop.prevent="onDrag($event)"
-                  @touchend.stop.prevent="endDrag()">{{ op }}</button>
-        </view>
-        <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
-          <view class="ops-left">
-            <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
-                    @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+          <view class="pro-mode mode-panel" v-show="mode === 'pro'">
+            <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
+            <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
+              <view v-for="(card, idx) in cards" :key="idx"
+                    class="playing-card"
+                    :class="{ used: (usedByCard[idx]||0) > 0 }"
+                    @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
                     @touchmove.stop.prevent="onDrag($event)"
-                    @touchend.stop.prevent="endDrag()">{{ op }}</button>
-          </view>
-          <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
-        </view>
+                    @touchend.stop.prevent="endDrag()">
+                <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
+              </view>
+            </view>
 
-        <!-- 拖拽中的浮层 -->
-        <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
-
-        <!-- 表达式卡片容器（高度由脚本计算） -->
-        <view class="expr-card card section">
-          <view
-            id="exprZone"
-            class="expr-zone"
-            :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
-            :style="{ height: exprZoneHeight + 'px' }"
-          >
-            <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
-            <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
-              <block v-for="(t, i) in tokens" :key="i">
-                <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-                <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                      @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+            <!-- 运算符候选区：两行布局 -->
+            <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
+              <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
+                      @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                       @touchmove.stop.prevent="onDrag($event)"
-                      @touchend.stop.prevent="endDrag()">
-                  <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S'})" mode="heightFix"/>
-                  <text v-else class="tok-op-text">{{ t.value }}</text>
-                </view>
-              </block>
-              <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                      @touchend.stop.prevent="endDrag()">{{ op }}</button>
             </view>
-          </view>
-        </view>
-      </view>
-      <view class="basic-mode mode-panel" v-show="mode !== 'pro'">
-        <view class="basic-board">
-          <view class="basic-column">
-            <view v-for="i in [0, 2]" :key="'basic-left-' + i" class="basic-card-wrapper">
-              <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
-                <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
-                <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
-                  <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
+            <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
+              <view class="ops-left">
+                <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                        @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+                        @touchmove.stop.prevent="onDrag($event)"
+                        @touchend.stop.prevent="endDrag()">{{ op }}</button>
+              </view>
+              <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+            </view>
+
+            <!-- 拖拽中的浮层 -->
+            <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
+
+            <!-- 表达式卡片容器（高度由脚本计算） -->
+            <view class="expr-card card section">
+              <view
+                id="exprZone"
+                class="expr-zone"
+                :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
+                :style="{ height: exprZoneHeight + 'px' }"
+              >
+                <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
+                <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
+                  <block v-for="(t, i) in tokens" :key="i">
+                    <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                    <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
+                          @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                          @touchmove.stop.prevent="onDrag($event)"
+                          @touchend.stop.prevent="endDrag()">
+                      <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S'})" mode="heightFix"/>
+                      <text v-else class="tok-op-text">{{ t.value }}</text>
+                    </view>
+                  </block>
+                  <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
                 </view>
               </view>
             </view>
           </view>
-          <view class="basic-ops">
-            <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
-            <button class="btn btn-secondary mode-btn basic-face-toggle" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
-          </view>
-          <view class="basic-column">
-            <view v-for="i in [1, 3]" :key="'basic-right-' + i" class="basic-card-wrapper">
-              <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
-                <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
-                <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
-                  <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
+
+          <view class="basic-mode mode-panel" v-show="mode !== 'pro'">
+            <view class="basic-board">
+              <view class="basic-column">
+                <view v-for="i in [0, 2]" :key="'basic-left-' + i" class="basic-card-wrapper">
+                  <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
+                    <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
+                    <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
+                      <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
+                    </view>
+                  </view>
+                </view>
+              </view>
+              <view class="basic-ops">
+                <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
+                <button class="btn btn-secondary mode-btn basic-face-toggle" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+              </view>
+              <view class="basic-column">
+                <view v-for="i in [1, 3]" :key="'basic-right-' + i" class="basic-card-wrapper">
+                  <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
+                    <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
+                    <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
+                      <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
+                    </view>
+                  </view>
                 </view>
               </view>
             </view>
           </view>
         </view>
-      </view>
 
-      <view class="game-footer">
-      <view id="submitRow" class="footer-row">
-        <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
-        <view v-show="mode !== 'pro'" class="basic-utility-grid">
-          <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
-          <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
+        <view class="game-footer">
+          <view id="submitRow" class="footer-row">
+            <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
+            <view v-show="mode !== 'pro'" class="basic-utility-grid">
+              <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
+              <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
+            </view>
+          </view>
+          <view id="failRow" class="footer-row">
+            <view class="pair-grid footer-pair" v-show="mode === 'pro'">
+              <button class="btn btn-secondary" @click="showSolution">提示</button>
+              <button class="btn btn-secondary" @click="skipHand">下一题</button>
+            </view>
+            <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
+              <button class="btn btn-secondary" @click="showSolution">提示</button>
+              <button class="btn btn-secondary" @click="skipHand">下一题</button>
+            </view>
+          </view>
         </view>
       </view>
-      <view id="failRow" class="footer-row">
-        <view class="pair-grid footer-pair" v-show="mode === 'pro'">
-          <button class="btn btn-secondary" @click="showSolution">提示</button>
-          <button class="btn btn-secondary" @click="skipHand">下一题</button>
-        </view>
-        <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
-          <button class="btn btn-secondary" @click="showSolution">提示</button>
-          <button class="btn btn-secondary" @click="skipHand">下一题</button>
-        </view>
-      </view>
-    </view>
-
     </view>
 
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
@@ -206,8 +206,10 @@
     >
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>
+
+    <!-- ✅ 把自闭合组件改为成对闭合，避免误报 -->
+    <CustomTabBar></CustomTabBar>
   </view>
-  <CustomTabBar />
 </template>
 
 <script setup>
