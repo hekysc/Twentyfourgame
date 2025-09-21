@@ -57,6 +57,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ensureInit, getUsers, addUser, switchUser, resetAllData, touchLastPlayed } from '../../utils/store.js'
+import { saveAvatarForUser } from '../../utils/avatar.js'
 
 const users = ref({ list: [], currentId: '' })
 const errMsg = ref('')
@@ -125,7 +126,8 @@ function stepChooseAvatar(name){
     if (idx === 1) {
       uni.chooseImage({ count:1, sizeType:['compressed'], success(sel){
         const path = (sel.tempFilePaths && sel.tempFilePaths[0]) || ''
-        finalizeCreate(name, path)
+        const size = (sel.tempFiles && sel.tempFiles[0] && sel.tempFiles[0].size) || 0
+        finalizeCreate(name, path, size)
       }, fail(){ finalizeCreate(name, '') } })
     } else if (idx === 2) {
       finalizeCreate(name, '') // 我们用随机背景色
@@ -135,8 +137,15 @@ function stepChooseAvatar(name){
     // idx === 0 就是点了“标题”，这里通常不处理
   }, fail(){ finalizeCreate(name, '') } })
 }
-function finalizeCreate(name, avatar){
-  const id = addUser(name, avatar)
+function finalizeCreate(name, avatar, size){
+  const id = addUser(name, '')
+  if (avatar) {
+    saveAvatarForUser(id, avatar, { size }).then(res => {
+      if (!res || !res.ok) {
+        try { uni.showToast({ title:'头像保存失败，请重试', icon:'none' }) } catch (_) {}
+      }
+    })
+  }
   switchUser(id)
   touchLastPlayed(id)
   go('/pages/login/index')

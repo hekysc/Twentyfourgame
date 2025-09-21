@@ -1,6 +1,8 @@
+import { writeAvatarMeta, clearAvatarMeta } from './prefs.js'
+
 // Simple local storage wrapper for users and stats
 // Data shape:
-//  - users: { list: [{ id, name, avatar, color, createdAt, lastPlayedAt }], currentId }
+//  - users: { list: [{ id, name, avatar, avatarUpdatedAt, color, createdAt, lastPlayedAt }], currentId }
 //  - stats: { [userId]: { totals: { total, success, fail }, days: { 'YYYY-MM-DD': { total, success, fail } } } }
 
 const UKEY = 'tf24_users_v1'
@@ -28,6 +30,7 @@ export function ensureInit() {
       id: u.id || genId(),
       name: u.name || '玩家',
       avatar: u.avatar || '',
+      avatarUpdatedAt: Number.isFinite(u.avatarUpdatedAt) ? u.avatarUpdatedAt : 0,
       color: u.color || randomColor(),
       createdAt: u.createdAt || Date.now(),
       lastPlayedAt: u.lastPlayedAt || 0
@@ -77,6 +80,7 @@ export function addUser(name, avatar = '', color) {
     id,
     name: name || `玩家${(u.list?.length || 0) + 1}`,
     avatar: avatar || '',
+    avatarUpdatedAt: 0,
     color: color || randomColor(),
     createdAt: Date.now(),
     lastPlayedAt: 0
@@ -88,7 +92,22 @@ export function addUser(name, avatar = '', color) {
 }
 export function renameUser(id, name) { const u = getUsers(); const t=u.list.find(x=>x.id===id); if (t){ t.name=name; setUsers(u) } }
 export function removeUser(id) { const u=getUsers(); u.list=u.list.filter(x=>x.id!==id); if (u.currentId===id) u.currentId=(u.list[0]&&u.list[0].id)||''; setUsers(u) }
-export function setUserAvatar(id, avatar) { const u = getUsers(); const t = (u.list||[]).find(x=>x.id===id); if (t){ t.avatar = avatar || ''; setUsers(u) } }
+export function setUserAvatar(id, avatar, lastModified) {
+  const u = getUsers();
+  const t = (u.list || []).find(x => x.id === id);
+  if (!t) return;
+  const uri = avatar || '';
+  t.avatar = uri;
+  if (uri) {
+    const ts = Number.isFinite(lastModified) ? Math.max(0, Math.floor(lastModified)) : Date.now();
+    t.avatarUpdatedAt = ts;
+    writeAvatarMeta(id, { uri, lastModified: ts });
+  } else {
+    t.avatarUpdatedAt = 0;
+    clearAvatarMeta(id);
+  }
+  setUsers(u);
+}
 export function setUserColor(id, color) { const u = getUsers(); const t = (u.list||[]).find(x=>x.id===id); if (t){ t.color = color || randomColor(); setUsers(u) } }
 
 // 记录一局：兼容旧签名 pushRound(boolean)

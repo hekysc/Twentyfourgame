@@ -1,6 +1,9 @@
 <script>
+import { ensureUserAvatars } from './utils/avatar.js'
+
 export default {
   onLaunch() {
+    try { ensureUserAvatars && ensureUserAvatars().catch(() => {}) } catch (_) {}
     try {
       // 仅 App 端支持预加载，H5 忽略
       // #ifdef APP-PLUS

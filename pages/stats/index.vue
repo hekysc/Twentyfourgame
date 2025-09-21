@@ -1,6 +1,11 @@
 <template>
-  <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:18rpx;"
-        @touchstart="swipeStart" @touchmove="swipeMove" @touchend="swipeEnd">
+  <view
+    class="page"
+    style="padding:24rpx; display:flex; flex-direction:column; gap:18rpx;"
+    @touchstart="edgeHandlers.handleTouchStart"
+    @touchmove="edgeHandlers.handleTouchMove"
+    @touchend="edgeHandlers.handleTouchEnd"
+  >
     <view class="section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">玩家总览</text>
@@ -418,6 +423,14 @@
         </view>
       </view>
     </view>
+    <view
+      v-if="hintState.visible"
+      class="floating-hint-layer"
+      :class="{ interactive: hintState.interactive }"
+      @tap="hintState.interactive ? hideHint() : null"
+    >
+      <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
+    </view>
   </view>
   <CustomTabBar />
 </template>
@@ -430,6 +443,9 @@ import MicroSpark from '../../components/MicroSpark.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended } from '../../utils/store.js'
 import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mistakes.js'
+import { useFloatingHint } from '../../utils/hints.js'
+import { useEdgeExit } from '../../utils/edge-exit.js'
+import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 import {
   computeOverviewRows,
   computeNearMisses,
@@ -460,6 +476,8 @@ const userMap = computed(() => {
   for (const r of rows.value) map[r.id] = { id:r.id, name:r.name }
   return map
 })
+const { hintState, showHint, hideHint } = useFloatingHint()
+const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitStatsPage() })
 // 单用户兼容：保留 ext 但内部来源于 userExtMap
 const ext = ref({ totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} })
 // 日期标签旋转：当数据点较多时自动竖排，避免重叠
@@ -532,12 +550,18 @@ onMounted(() => {
   ensureInit();
   load();
   loadExt()
+  if (consumeAvatarRestoreNotice()) {
+    showHint('头像文件丢失，已为你恢复为默认头像', 2000)
+  }
 })
 
 onShow(() => {
   load();
   loadExt();
   try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
+  if (consumeAvatarRestoreNotice()) {
+    showHint('头像文件丢失，已为你恢复为默认头像', 2000)
+  }
 })
 
 onPullDownRefresh(() => {
@@ -1015,70 +1039,34 @@ const overviewRowsSorted = computed(() => {
   } catch(_) { return [] }
 })
 
-// —— 左右滑动切换 Tab ——
-const swipeTracking = ref(false)
-const swipeStartX = ref(0)
-const swipeStartY = ref(0)
-const swipeDX = ref(0)
-const swipeDY = ref(0)
-
-function swipeStart(e){
-  try {
-    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-    if (!t) return
-    swipeTracking.value = true
-    swipeStartX.value = t.clientX || t.pageX || 0
-    swipeStartY.value = t.clientY || t.pageY || 0
-    swipeDX.value = 0
-    swipeDY.value = 0
-  } catch(_) {}
-}
-function swipeMove(e){
-  if (!swipeTracking.value) return
-  try {
-    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-    if (!t) return
-    const x = t.clientX || t.pageX || 0
-    const y = t.clientY || t.pageY || 0
-    swipeDX.value = x - swipeStartX.value
-    swipeDY.value = y - swipeStartY.value
-  } catch(_) {}
-}
-function swipeEnd(){
-  if (!swipeTracking.value) return
-  swipeTracking.value = false
-  const dx = swipeDX.value
-  const dy = swipeDY.value
-  const absX = Math.abs(dx)
-  const absY = Math.abs(dy)
-  if (absX > 60 && absX > absY * 1.5) {
-    if (dx < 0) {
-      navigateTab('/pages/index/index')
-    }
-  }
-}
-function navigateTab(url){
-  const done = () => {}
-  if (uni && typeof uni.switchTab === 'function') {
-    uni.switchTab({ url, success: done, fail(){
-      if (typeof uni.navigateTo === 'function') {
-        uni.navigateTo({ url, success: done, fail(){
-          if (typeof uni.reLaunch === 'function') {
-            uni.reLaunch({ url, success: done, fail: done })
-          } else { done() }
-        } })
-      } else if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url, success: done, fail: done })
-      } else { done() }
-    } })
-  } else if (typeof uni.navigateTo === 'function') {
-    uni.navigateTo({ url, success: done, fail(){
+function exitStatsPage() {
+  const fallback = () => {
+    try {
+      if (typeof uni.switchTab === 'function') {
+        uni.switchTab({ url: '/pages/index/index' })
+        return
+      }
+    } catch (_) {}
+    try {
       if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url, success: done, fail: done })
-      } else { done() }
-    } })
-  } else if (typeof uni.reLaunch === 'function') {
-    uni.reLaunch({ url, success: done, fail: done })
+        uni.reLaunch({ url: '/pages/index/index' })
+        return
+      }
+    } catch (_) {}
+    try {
+      if (typeof plus !== 'undefined' && plus.runtime && typeof plus.runtime.quit === 'function') {
+        plus.runtime.quit()
+      }
+    } catch (_) {}
+  }
+  try {
+    if (typeof uni.navigateBack === 'function') {
+      uni.navigateBack({ delta: 1, fail: () => fallback() })
+    } else {
+      fallback()
+    }
+  } catch (_) {
+    fallback()
   }
 }
 </script>
@@ -1211,5 +1199,9 @@ function navigateTab(url){
 /* 表头排序：高亮当前列 */
 /* .th.active{ color:#0953e9; font-weight:800 } */
 .th.active{ color:#e5e7eb; background-color:#030300; font-weight:800 }
+
+.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
+.floating-hint-layer.interactive{ pointer-events:auto }
+.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
 
 </style>

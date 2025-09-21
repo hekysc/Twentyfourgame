@@ -1,6 +1,8 @@
 ﻿<template>
   <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:16rpx;"
-        @touchstart="swipeStart" @touchmove="swipeMove" @touchend="swipeEnd">
+        @touchstart="edgeHandlers.handleTouchStart"
+        @touchmove="edgeHandlers.handleTouchMove"
+        @touchend="edgeHandlers.handleTouchEnd">
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
       <button class="btn btn-primary" @tap="create">添加</button>
@@ -19,6 +21,14 @@
         </view>
       </view>
     </view>
+    <view
+      v-if="hintState.visible"
+      class="floating-hint-layer"
+      :class="{ interactive: hintState.interactive }"
+      @tap="hintState.interactive ? hideHint() : null"
+    >
+      <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
+    </view>
   </view>
   <CustomTabBar />
   
@@ -28,17 +38,28 @@
 import { ref, onMounted, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
-import { ensureInit, getUsers, setUsers, addUser, renameUser, removeUser as rmUser, switchUser, setUserAvatar } from '../../utils/store.js'
+import { ensureInit, getUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
+import { useFloatingHint } from '../../utils/hints.js'
+import { useEdgeExit } from '../../utils/edge-exit.js'
+import { saveAvatarForUser, removeAvatarForUser, consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 
 const users = ref({ list: [], currentId: '' })
 const newName = ref('')
+
+const { hintState, showHint, hideHint } = useFloatingHint()
+const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitPage() })
 
 // 过滤掉游客账号（名称为 Guest 的历史记录）
 const visibleUsers = computed(() => (users.value.list || []).filter(u => String(u.name||'') !== 'Guest'))
 
 onMounted(() => { try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}; ensureInit(); users.value = getUsers() })
 
-onShow(() => { try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {} })
+onShow(() => {
+  try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
+  if (consumeAvatarRestoreNotice()) {
+    showHint('头像文件丢失，已为你恢复为默认头像', 2000)
+  }
+})
 
 function refresh(){ users.value = getUsers() }
 function create(){ addUser(newName.value.trim()||undefined); newName.value=''; refresh() }
@@ -52,23 +73,59 @@ function rename(u){
   uni.showModal({ title:'改名', editable:true, placeholderText:u.name, success(res){ if(res.confirm){ renameUser(u.id, res.content||u.name); refresh() } } })
 }
 function remove(id){
-  uni.showModal({ title:'删除用户', content:'确定删除该用户？', success(res){ if(res.confirm){ rmUser(id); refresh() } } })
+  uni.showModal({
+    title:'删除用户',
+    content:'确定删除该用户？',
+    success(res){
+      if(res.confirm){
+        removeAvatarForUser(id).finally(() => {
+          rmUser(id)
+          refresh()
+        })
+      }
+    }
+  })
 }
 function changeAvatar(u){
+  if (!u || !u.id) return
   try {
-    uni.showActionSheet({ itemList:['从相册选择','移除头像','取消'], success(a){
-      const i = a.tapIndex
-      if (i === 0) {
-        uni.chooseImage({ count:1, sizeType:['compressed'], success(sel){
-          const path = (sel.tempFilePaths && sel.tempFilePaths[0]) || ''
-          setUserAvatar(u.id, path)
-          refresh()
-        }})
-      } else if (i === 1) {
-        setUserAvatar(u.id, '')
-        refresh()
+    uni.showActionSheet({
+      itemList: ['从相册选择', '移除头像', '取消'],
+      success(a) {
+        const i = a.tapIndex
+        if (i === 0) {
+          try {
+            uni.chooseImage({
+              count: 1,
+              sizeType: ['compressed'],
+              success(sel) {
+                const path = (sel.tempFilePaths && sel.tempFilePaths[0]) || ''
+                const size = (sel.tempFiles && sel.tempFiles[0] && sel.tempFiles[0].size) || 0
+                if (!path) { showHint('未选择有效头像', 1500); return }
+                saveAvatarForUser(u.id, path, { size }).then(res => {
+                  if (!res || !res.ok) {
+                    showHint('头像保存失败，请重试', 1800)
+                  } else {
+                    showHint('头像已更新', 1200)
+                  }
+                  refresh()
+                })
+              },
+              fail() {
+                showHint('头像选择已取消', 1200)
+              }
+            })
+          } catch (_) {}
+        } else if (i === 1) {
+          removeAvatarForUser(u.id)
+            .then(() => {
+              showHint('已恢复默认头像', 1500)
+              refresh()
+            })
+            .catch(() => { showHint('头像清除失败，请重试', 1800) })
+        }
       }
-    } })
+    })
   } catch (_) { /* noop */ }
 }
 function avatarText(name){
@@ -77,50 +134,35 @@ function avatarText(name){
   return s.length ? s[0].toUpperCase() : 'U'
 }
 
-// —— 左右滑动切换 Tab ——
-const swipeTracking = ref(false)
-const swipeStartX = ref(0)
-const swipeStartY = ref(0)
-const swipeDX = ref(0)
-const swipeDY = ref(0)
-
-function swipeStart(e){
-  try {
-    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-    if (!t) return
-    swipeTracking.value = true
-    swipeStartX.value = t.clientX || t.pageX || 0
-    swipeStartY.value = t.clientY || t.pageY || 0
-    swipeDX.value = 0
-    swipeDY.value = 0
-  } catch(_) {}
-}
-function swipeMove(e){
-  if (!swipeTracking.value) return
-  try {
-    const t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0])
-    if (!t) return
-    const x = t.clientX || t.pageX || 0
-    const y = t.clientY || t.pageY || 0
-    swipeDX.value = x - swipeStartX.value
-    swipeDY.value = y - swipeStartY.value
-  } catch(_) {}
-}
-function swipeEnd(){
-  if (!swipeTracking.value) return
-  swipeTracking.value = false
-  const dx = swipeDX.value
-  const dy = swipeDY.value
-  const absX = Math.abs(dx)
-  const absY = Math.abs(dy)
-  if (absX > 60 && absX > absY * 1.5) {
-    if (dx > 0) {
-      navigateTab('/pages/index/index')
-    }
+function exitPage(){
+  const fallback = () => {
+    try {
+      if (typeof uni.switchTab === 'function') {
+        uni.switchTab({ url: '/pages/index/index' })
+        return
+      }
+    } catch (_) {}
+    try {
+      if (typeof uni.reLaunch === 'function') {
+        uni.reLaunch({ url: '/pages/index/index' })
+        return
+      }
+    } catch (_) {}
+    try {
+      if (typeof plus !== 'undefined' && plus.runtime && typeof plus.runtime.quit === 'function') {
+        plus.runtime.quit()
+      }
+    } catch (_) {}
   }
-}
-function navigateTab(url){
-  try { uni.switchTab && uni.switchTab({ url }) } catch (_) {}
+  try {
+    if (typeof uni.navigateBack === 'function') {
+      uni.navigateBack({ delta: 1, fail: () => fallback() })
+    } else {
+      fallback()
+    }
+  } catch (_) {
+    fallback()
+  }
 }
 </script>
 
@@ -137,5 +179,8 @@ function navigateTab(url){
 .mini{ padding:8rpx 12rpx; border-radius:10rpx; background:#eef2f7; font-size:24rpx }
 .mini.danger{ background:#fee2e2; color:#b91c1c }
 .btn-primary{ background:#1677ff; color:#fff; border:none; padding:18rpx 24rpx; border-radius:12rpx }
+.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
+.floating-hint-layer.interactive{ pointer-events:auto }
+.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
 </style>
 

@@ -1,5 +1,12 @@
 ﻿<template>
-  <view class="page col" :class="{ booted }" style="padding: 24rpx; gap: 16rpx; position: relative;">
+  <view
+    class="page col"
+    :class="{ booted }"
+    style="padding: 24rpx; gap: 16rpx; position: relative;"
+    @touchstart="edgeHandlers.handleTouchStart"
+    @touchmove="edgeHandlers.handleTouchMove"
+    @touchend="edgeHandlers.handleTouchEnd"
+  >
 
     <!-- 顶部：当前用户与切换 -->
     <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
@@ -8,11 +15,12 @@
     </view>
 
     <view class="mode-bar">
-      <view class="mode-switch">
-        <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'basic' }" @click="mode = 'basic'">Basic 模式</button>
-        <button class="btn btn-secondary mode-switch-btn" :class="{ active: mode === 'pro' }" @click="mode = 'pro'">Pro 模式</button>
-      </view>
-      <view>
+      <button
+        class="btn mode-toggle-btn"
+        :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
+        @click="toggleMode"
+      >{{ modeButtonLabel }}</button>
+      <view style="flex:1;">
         <button
           class="btn btn-secondary deck-toggle-btn"
           @click="toggleDeckSource"
@@ -38,12 +46,12 @@
         <text class="td fail">{{ failCount }}</text>
         <text class="td">{{ winRate }}%</text>
         <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
-        <view class="td">
+        <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
           <block v-if="handElapsedMs < 120000">
             <text>{{ fmtMs1(handElapsedMs) }}</text>
           </block>
           <block v-else>
-            <button class="btn btn-secondary btn-reshuffle" @click="reshuffle">洗牌</button>
+            <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
           </block>
         </view>
       </view>
@@ -166,6 +174,23 @@
         <text v-if="errorValueText" class="err-val">{{ errorValueText }}</text>
       </view>
     </view>
+    <view
+      v-if="timerPopover.visible"
+      class="timer-popover-layer"
+      @tap="closeTimerPopover"
+    >
+      <view class="timer-popover" :style="timerPopoverStyle" @tap.stop>
+        <button class="timer-popover-item" @tap="redealHand">重新发牌</button>
+      </view>
+    </view>
+    <view
+      v-if="hintState.visible"
+      class="floating-hint-layer"
+      :class="{ interactive: hintState.interactive }"
+      @tap="hintState.interactive ? hideHint() : null"
+    >
+      <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
+    </view>
   </view>
   <CustomTabBar />
 </template>
@@ -190,12 +215,20 @@ import {
 import { createBasicState, combineBasicSlots, undoBasicHistory } from '../../core/basic-mode.js'
 import { drawSolvableHand, newDeck } from '../../core/game-engine.js'
 import { getActivePool, recordRoundResult } from '../../utils/mistakes.js'
+import { useFloatingHint } from '../../utils/hints.js'
+import { useEdgeExit } from '../../utils/edge-exit.js'
+import { getLastMode, setLastMode } from '../../utils/prefs.js'
+import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
 const usedByCard = ref([0,0,0,0])
 const tokens = ref([])
-const mode = ref('basic')
+let initialMode = 'basic'
+try { const savedMode = getLastMode(); if (savedMode === 'pro' || savedMode === 'basic') initialMode = savedMode } catch (_) {}
+const mode = ref(initialMode)
+try { setLastMode(initialMode) } catch (_) {}
+const modeButtonLabel = computed(() => mode.value === 'pro' ? 'Pro模式' : 'Basic模式')
 const basicSlots = ref([])
 const basicSelection = ref({ first: null, operator: null })
 const basicHistory = ref([])
@@ -216,6 +249,8 @@ const handsPlayed = ref(0)
 const successCount = ref(0)
 const failCount = ref(0)
 const sessionOver = ref(false)
+const timerPopover = ref({ visible: false, left: 0, top: 0 })
+const timerPopoverStyle = computed(() => ({ left: `${timerPopover.value.left}px`, top: `${timerPopover.value.top}px` }))
 const successAnimating = ref(false)
 const errorAnimating = ref(false)
 const exprOverrideText = ref('')
@@ -229,6 +264,9 @@ const SESSION_KEY = 'tf24_game_session_v1'
 const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
 const settledResult = ref(null);         // 'success' | 'fail' | null
 const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
+
+const { hintState, showHint, hideHint } = useFloatingHint()
+const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort
@@ -256,6 +294,7 @@ function saveSession() {
       mistakeRunStamp: mistakeRunStamp.value || 0,
       currentHandSource: currentHandSource.value || 'normal',
       currentMistakeKey: currentMistakeKey.value || '',
+      mode: mode.value || 'basic',
     }
     uni.setStorageSync(SESSION_KEY, JSON.stringify(data))
   } catch (_) { /* noop */ }
@@ -289,6 +328,10 @@ function loadSession() {
       mistakeRunStamp.value = data.mistakeRunStamp || 0
       currentHandSource.value = data.currentHandSource === 'mistake' ? 'mistake' : 'normal'
       currentMistakeKey.value = typeof data.currentMistakeKey === 'string' ? data.currentMistakeKey : ''
+      const restoredMode = data.mode === 'pro' ? 'pro' : 'basic'
+      mode.value = restoredMode
+      try { setLastMode(restoredMode) } catch (_) {}
+      closeTimerPopover()
       // 如果没有 solution，则基于当前 cards 即时计算一份（兜底）
       if (!solution.value) {
         try {
@@ -389,13 +432,7 @@ function clearExprOverride() {
   if (exprOverrideText.value) exprOverrideText.value = ''
 }
 
-function showExpressionErrorToast() {
-  try {
-    if (uni && typeof uni.showToast === 'function') {
-      uni.showToast({ title: '表达式错误', icon: 'none', duration: 1000 })
-    }
-  } catch (_) {}
-}
+function showExpressionErrorToast() { showHint('表达式不合法，请重试', 1600) }
 
 function basicCardClass(idx) {
   const slot = basicSlots.value[idx]
@@ -510,13 +547,54 @@ function resetBasicBoard() {
   try { saveSession() } catch (_) {}
 }
 
+function toggleMode() { mode.value = mode.value === 'pro' ? 'basic' : 'pro' }
+
 function refresh() { nextHand() }
 
 function initDeck() {
   deck.value = newDeck()
 }
 
+function closeTimerPopover() { timerPopover.value = { visible: false, left: 0, top: 0 } }
+
+function openTimerPopover() {
+  try {
+    const q = uni.createSelectorQuery().in(proxy)
+    q.select('#timerCell').boundingClientRect().exec(res => {
+      const [rect] = res || []
+      if (!rect) {
+        timerPopover.value = { visible: true, left: 0, top: 0 }
+        return
+      }
+      const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+      let top = (rect.bottom || (rect.top || 0) + (rect.height || 0)) + 8
+      const limit = (sys && Number.isFinite(sys.windowHeight)) ? sys.windowHeight - 96 : 0
+      if (limit && top > limit) top = limit
+      const center = rect.left + rect.width / 2
+      timerPopover.value = { visible: true, left: center, top }
+    })
+  } catch (_) {
+    timerPopover.value = { visible: true, left: 0, top: 0 }
+  }
+}
+
+function handleTimerTap() {
+  if (timerPopover.value.visible) {
+    closeTimerPopover()
+  } else {
+    openTimerPopover()
+  }
+}
+
+function redealHand() {
+  closeTimerPopover()
+  errorValueText.value = ''
+  exprOverrideText.value = ''
+  nextHand()
+}
+
 async function nextHand() {
+  closeTimerPopover()
   const res = await getNextDraw()
   if (!res) return
 
@@ -562,7 +640,7 @@ async function drawFromNormalDeck() {
 async function drawFromMistakePool() {
   const uid = selectedUserId.value
   if (!uid) {
-    try { uni.showToast && uni.showToast({ title: '请先选择用户', icon: 'none' }) } catch (_) {}
+    showHint('请先选择用户', 1600)
     deckSource.value = 'normal'
     try { saveSession() } catch (_) {}
     return await drawFromNormalDeck()
@@ -670,7 +748,7 @@ function switchDeckSource(target) {
   if (deckSource.value === next) return
   if (next === 'mistake') {
     if (!selectedUserId.value) {
-      try { uni.showToast && uni.showToast({ title: '请先选择用户', icon: 'none' }) } catch (_) {}
+      showHint('请先选择用户', 1600)
       return
     }
     deckSource.value = 'mistake'
@@ -749,6 +827,9 @@ onMounted(() => {
   if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
   updateLastSuccess()
   startHandTimer()
+  if (consumeAvatarRestoreNotice()) {
+    showHint('头像文件丢失，已为你恢复为默认头像', 2000)
+  }
 })
 
 onShow(() => {
@@ -756,8 +837,11 @@ onShow(() => {
   loadSession()
   startHandTimer()
   try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
+  if (consumeAvatarRestoreNotice()) {
+    showHint('头像文件丢失，已为你恢复为默认头像', 2000)
+  }
 })
-onHide(() => { saveSession(); stopHandTimer() })
+onHide(() => { saveSession(); stopHandTimer(); closeTimerPopover() })
 onUnmounted(() => { stopHandTimer() })
 
 // 已移除“清空表达式”功能，避免误触清空
@@ -1009,6 +1093,40 @@ function reshuffle() {
   nextTick(() => { nextHand(); saveSession() })
 }
 
+function exitGamePage() {
+  if (!handRecorded.value) {
+    showHint('本局进度将丢失', 1200)
+  }
+  const fallback = () => {
+    try {
+      if (typeof uni.switchTab === 'function') {
+        uni.switchTab({ url: '/pages/stats/index' })
+        return
+      }
+    } catch (_) {}
+    try {
+      if (typeof uni.reLaunch === 'function') {
+        uni.reLaunch({ url: '/pages/stats/index' })
+        return
+      }
+    } catch (_) {}
+    try {
+      if (typeof plus !== 'undefined' && plus.runtime && typeof plus.runtime.quit === 'function') {
+        plus.runtime.quit()
+      }
+    } catch (_) {}
+  }
+  try {
+    if (typeof uni.navigateBack === 'function') {
+      uni.navigateBack({ delta: 1, fail: () => fallback() })
+    } else {
+      fallback()
+    }
+  } catch (_) {
+    fallback()
+  }
+}
+
 function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
 function goStats(){ try { uni.reLaunch({ url:'/pages/stats/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} } }
 function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(_){} } }
@@ -1162,12 +1280,20 @@ function updateExprScale() {
 }
 
 watch(mode, (m) => {
-  if (m === 'basic') {
+  const normalized = m === 'pro' ? 'pro' : 'basic'
+  try { setLastMode(normalized) } catch (_) {}
+  if (normalized === 'basic') {
     exprZoneHeight.value = 70
-    if (!basicSlots.value.length) resetBasicStateFromCards()
+    resetBasicStateFromCards()
+    basicSelection.value = { first: null, operator: null }
   } else {
+    tokens.value = []
+    usedByCard.value = [0, 0, 0, 0]
+    exprOverrideText.value = ''
+    errorValueText.value = ''
     nextTick(() => { updateExprScale(); recomputeExprHeight() })
   }
+  closeTimerPopover()
 })
 
 watch(cards, () => {
@@ -1296,9 +1422,9 @@ function onSessionOver() {
 .pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .mode-bar { display:flex; align-items:stretch; gap:18rpx; margin: 8rpx 0 16rpx; }
 .mode-btn { width: 100%; white-space: nowrap; }
-.mode-switch { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; flex:1; }
-.mode-switch-btn { width:100%; }
-.mode-switch-btn.active { background:#145751; color:#fff; }
+.mode-toggle-btn { flex:1; width:100%; border:2rpx solid transparent; font-weight:700; }
+.mode-toggle-basic { background:#145751; color:#fff; border-color:#145751; }
+.mode-toggle-pro { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
 .deck-toggle-btn {
   width:100%;
   margin: 8rpx;
@@ -1310,6 +1436,15 @@ function onSessionOver() {
   color:#fff;
   background:#3d5714;
 }
+
+.timer-cell { cursor: pointer; }
+.timer-popover-layer { position:fixed; inset:0; z-index:998; }
+.timer-popover { position:absolute; background:#fff; padding:18rpx 28rpx; border-radius:20rpx; box-shadow:0 16rpx 40rpx rgba(15,23,42,0.2); transform:translate(-50%, 0); display:flex; flex-direction:column; gap:12rpx; }
+.timer-popover-item { border:none; border-radius:12rpx; padding:16rpx 32rpx; background:#fee2e2; color:#b91c1c; font-size:28rpx; font-weight:700; }
+
+.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
+.floating-hint-layer.interactive{ pointer-events:auto }
+.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
 
 .btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}
