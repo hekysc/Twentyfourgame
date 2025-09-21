@@ -87,6 +87,10 @@ export function useEdgeExit(options = {}) {
     attemptExit()
   }
 
+  function handleTouchCancel() {
+    resetTracking()
+  }
+
   onUnmounted(() => {
     if (confirmTimer) { clearTimeout(confirmTimer); confirmTimer = null }
   })
@@ -95,5 +99,6 @@ export function useEdgeExit(options = {}) {
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
+    handleTouchCancel,
   }
 }

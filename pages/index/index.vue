@@ -6,6 +6,7 @@
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
+    @touchcancel="edgeHandlers.handleTouchCancel"
   >
 
     <!-- 顶部：当前用户与切换 -->
@@ -142,9 +143,6 @@
             </view>
           </view>
         </view>
-        <view v-if="basicDisplayExpression" class="basic-expression-card">
-          <text class="basic-expression-text">{{ basicDisplayExpression }}</text>
-        </view>
       </view>
     </template>
 
@@ -219,6 +217,7 @@ import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { getLastMode, setLastMode } from '../../utils/prefs.js'
 import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
+import { exitApp } from '../../utils/navigation.js'
 
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
@@ -266,6 +265,18 @@ const settledResult = ref(null);         // 'success' | 'fail' | null
 const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
 
 const { hintState, showHint, hideHint } = useFloatingHint()
+
+const basicErrorMessages = {
+  SAME_INDEX: '请选择另一张牌',
+  INACTIVE_SLOT: '请选择有效的数字',
+  DIVIDE_BY_ZERO: '除数不能为 0',
+  INVALID_OPERATION: '无法进行该运算，请重试',
+}
+
+function showBasicError(code) {
+  const msg = basicErrorMessages[code] || '操作无效，请重试'
+  showHint(msg, 1600)
+}
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 
 const fmtMs = formatMs
@@ -455,7 +466,10 @@ function resetBasicStateFromCards() {
 
 function handleBasicOperator(op) {
   if (mode.value !== 'basic' || handSettled.value) return
-  if (basicSelection.value.first === null) return
+  if (basicSelection.value.first === null) {
+    showHint('请先选择一个数字', 1500)
+    return
+  }
   if (basicSelection.value.operator === op) {
     basicSelection.value.operator = null
     return
@@ -493,6 +507,9 @@ function applyBasicCombination(firstIdx, secondIdx, op) {
 
   if (!res.ok) {
     basicSelection.value = { first: null, operator: null }
+    if (res.err) {
+      showBasicError(res.err)
+    }
     return
   }
 
@@ -1046,7 +1063,9 @@ function showSolution() {
   }
   if (mode.value === 'basic') {
     handFailedOnce.value = true
-    basicDisplayExpression.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
+    const msg = solution.value ? ('答案：' + solution.value) : '暂无提示'
+    basicDisplayExpression.value = msg
+    showHint(msg, 2000)
   } else {
     exprOverrideText.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
   }
@@ -1097,34 +1116,22 @@ function exitGamePage() {
   if (!handRecorded.value) {
     showHint('本局进度将丢失', 1200)
   }
-  const fallback = () => {
-    try {
-      if (typeof uni.switchTab === 'function') {
-        uni.switchTab({ url: '/pages/stats/index' })
-        return
-      }
-    } catch (_) {}
-    try {
-      if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url: '/pages/stats/index' })
-        return
-      }
-    } catch (_) {}
-    try {
-      if (typeof plus !== 'undefined' && plus.runtime && typeof plus.runtime.quit === 'function') {
-        plus.runtime.quit()
-      }
-    } catch (_) {}
-  }
-  try {
-    if (typeof uni.navigateBack === 'function') {
-      uni.navigateBack({ delta: 1, fail: () => fallback() })
-    } else {
-      fallback()
-    }
-  } catch (_) {
-    fallback()
-  }
+  exitApp({
+    fallback: () => {
+      try {
+        if (typeof uni.switchTab === 'function') {
+          uni.switchTab({ url: '/pages/stats/index' })
+          return
+        }
+      } catch (_) {}
+      try {
+        if (typeof uni.reLaunch === 'function') {
+          uni.reLaunch({ url: '/pages/stats/index' })
+          return
+        }
+      } catch (_) {}
+    },
+  })
 }
 
 function goLogin(){ try { uni.reLaunch({ url:'/pages/login/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/login/index' }) } catch(_){} } }
@@ -1544,8 +1551,6 @@ function onSessionOver() {
 .basic-ops .btn-operator { height:110rpx; font-size:64rpx; }
 .basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
 .basic-face-toggle { margin-top:12rpx; white-space:normal;word-break: break-all;}
-.basic-expression-card { background:#fff; border-radius:18rpx; border:2rpx solid #e5e7eb; box-shadow:0 8rpx 24rpx rgba(15,23,42,.08); padding:24rpx; text-align:center; }
-.basic-expression-text { font-size:36rpx; font-weight:700; color:#111827; }
 .basic-actions { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
 .basic-actions .btn[disabled] { opacity:.6; }
 

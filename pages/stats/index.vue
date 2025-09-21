@@ -5,6 +5,7 @@
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
+    @touchcancel="edgeHandlers.handleTouchCancel"
   >
     <view class="section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
@@ -446,6 +447,7 @@ import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mi
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
+import { exitApp } from '../../utils/navigation.js'
 import {
   computeOverviewRows,
   computeNearMisses,
@@ -1040,38 +1042,27 @@ const overviewRowsSorted = computed(() => {
 })
 
 function exitStatsPage() {
-  const fallback = () => {
-    try {
-      if (typeof uni.switchTab === 'function') {
-        uni.switchTab({ url: '/pages/index/index' })
-        return
-      }
-    } catch (_) {}
-    try {
-      if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url: '/pages/index/index' })
-        return
-      }
-    } catch (_) {}
-    try {
-      if (typeof plus !== 'undefined' && plus.runtime && typeof plus.runtime.quit === 'function') {
-        plus.runtime.quit()
-      }
-    } catch (_) {}
-  }
-  try {
-    if (typeof uni.navigateBack === 'function') {
-      uni.navigateBack({ delta: 1, fail: () => fallback() })
-    } else {
-      fallback()
-    }
-  } catch (_) {
-    fallback()
-  }
+  exitApp({
+    fallback: () => {
+      try {
+        if (typeof uni.switchTab === 'function') {
+          uni.switchTab({ url: '/pages/index/index' })
+          return
+        }
+      } catch (_) {}
+      try {
+        if (typeof uni.reLaunch === 'function') {
+          uni.reLaunch({ url: '/pages/index/index' })
+          return
+        }
+      } catch (_) {}
+    },
+  })
 }
 </script>
 
 <style scoped>
+.page{ min-height:100vh; box-sizing:border-box; position:relative; }
 .section{ background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
 .section.title{ background:none; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
 .title{ font-size:32rpx; font-weight:800 }

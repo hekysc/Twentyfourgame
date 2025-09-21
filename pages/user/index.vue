@@ -2,7 +2,8 @@
   <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:16rpx;"
         @touchstart="edgeHandlers.handleTouchStart"
         @touchmove="edgeHandlers.handleTouchMove"
-        @touchend="edgeHandlers.handleTouchEnd">
+        @touchend="edgeHandlers.handleTouchEnd"
+        @touchcancel="edgeHandlers.handleTouchCancel">
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
       <button class="btn btn-primary" @tap="create">添加</button>
@@ -42,6 +43,7 @@ import { ensureInit, getUsers, addUser, renameUser, removeUser as rmUser, switch
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { saveAvatarForUser, removeAvatarForUser, consumeAvatarRestoreNotice } from '../../utils/avatar.js'
+import { exitApp } from '../../utils/navigation.js'
 
 const users = ref({ list: [], currentId: '' })
 const newName = ref('')
@@ -135,34 +137,22 @@ function avatarText(name){
 }
 
 function exitPage(){
-  const fallback = () => {
-    try {
-      if (typeof uni.switchTab === 'function') {
-        uni.switchTab({ url: '/pages/index/index' })
-        return
-      }
-    } catch (_) {}
-    try {
-      if (typeof uni.reLaunch === 'function') {
-        uni.reLaunch({ url: '/pages/index/index' })
-        return
-      }
-    } catch (_) {}
-    try {
-      if (typeof plus !== 'undefined' && plus.runtime && typeof plus.runtime.quit === 'function') {
-        plus.runtime.quit()
-      }
-    } catch (_) {}
-  }
-  try {
-    if (typeof uni.navigateBack === 'function') {
-      uni.navigateBack({ delta: 1, fail: () => fallback() })
-    } else {
-      fallback()
+  exitApp({
+    fallback: () => {
+      try {
+        if (typeof uni.switchTab === 'function') {
+          uni.switchTab({ url: '/pages/index/index' })
+          return
+        }
+      } catch (_) {}
+      try {
+        if (typeof uni.reLaunch === 'function') {
+          uni.reLaunch({ url: '/pages/index/index' })
+          return
+        }
+      } catch (_) {}
     }
-  } catch (_) {
-    fallback()
-  }
+  })
 }
 </script>
 
@@ -179,6 +169,7 @@ function exitPage(){
 .mini{ padding:8rpx 12rpx; border-radius:10rpx; background:#eef2f7; font-size:24rpx }
 .mini.danger{ background:#fee2e2; color:#b91c1c }
 .btn-primary{ background:#1677ff; color:#fff; border:none; padding:18rpx 24rpx; border-radius:12rpx }
+.page{ min-height:100vh; box-sizing:border-box; position:relative; }
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
 .floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
