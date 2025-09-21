@@ -4,6 +4,203 @@ import { writeAvatarMeta, clearAvatarMeta } from './prefs.js'
 export const MAX_AVATAR_SIZE = 2 * 1024 * 1024
 export const AVATAR_NOTICE_KEY = 'tf24_avatar_restore_notice'
 
+const DEFAULT_AVATAR_SIZE = 160
+
+const DEFAULT_THEME = Object.freeze({
+  uri: '',
+  palette: {
+    primary: '#e2e8f0',
+    secondary: '#cbd5f5',
+    soft: '#f8fafc',
+    accent: '#38bdf8',
+    overlay: '#0ea5e9',
+    border: '#cbd5f5',
+    badge: '#1d4ed8',
+    altBadge: '#6366f1',
+    badgeText: '#ffffff',
+    text: '#0f172a',
+    highlight: '#e0f2fe',
+    pattern: '#a5b4fc'
+  },
+  panelGradient: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 60%, #cbd5f5 100%)',
+  badgeGradient: 'linear-gradient(135deg, #38bdf8 0%, #1d4ed8 100%)',
+  altBadgeGradient: 'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)',
+  borderColor: '#cbd5f5',
+  shadow: '0 24rpx 48rpx rgba(148,163,184,0.35)',
+  badgeShadow: 'rgba(59,130,246,0.35)',
+  softShadow: 'rgba(148,163,184,0.25)'
+})
+
+const avatarThemeCache = new Map()
+
+function hashSeed(seed) {
+  const text = String(seed || 'tf24-default')
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 131 + text.charCodeAt(i)) >>> 0
+  }
+  return hash >>> 0
+}
+
+function hslToHex(h, s, l) {
+  let _h = h
+  while (_h < 0) _h += 360
+  _h = _h % 360
+  const _s = Math.max(0, Math.min(100, s)) / 100
+  const _l = Math.max(0, Math.min(100, l)) / 100
+  const c = (1 - Math.abs(2 * _l - 1)) * _s
+  const hp = _h / 60
+  const x = c * (1 - Math.abs((hp % 2) - 1))
+  let [r, g, b] = [0, 0, 0]
+  if (hp >= 0 && hp < 1) [r, g, b] = [c, x, 0]
+  else if (hp >= 1 && hp < 2) [r, g, b] = [x, c, 0]
+  else if (hp >= 2 && hp < 3) [r, g, b] = [0, c, x]
+  else if (hp >= 3 && hp < 4) [r, g, b] = [0, x, c]
+  else if (hp >= 4 && hp < 5) [r, g, b] = [x, 0, c]
+  else if (hp >= 5 && hp < 6) [r, g, b] = [c, 0, x]
+  const m = _l - c / 2
+  const toHex = (v) => {
+    const n = Math.round((v + m) * 255)
+    const hex = n.toString(16)
+    return hex.length === 1 ? `0${hex}` : hex
+  }
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+function hexToRgb(hex) {
+  const value = String(hex || '').trim()
+  if (!value) return { r: 0, g: 0, b: 0 }
+  let normalized = value.replace(/^#/, '')
+  if (normalized.length === 3) {
+    normalized = normalized.split('').map((c) => c + c).join('')
+  }
+  if (normalized.length !== 6) return { r: 0, g: 0, b: 0 }
+  const num = parseInt(normalized, 16)
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255
+  }
+}
+
+function hexToRgba(hex, alpha = 1) {
+  const { r, g, b } = hexToRgb(hex)
+  const a = Math.max(0, Math.min(1, alpha))
+  return `rgba(${r},${g},${b},${a})`
+}
+
+function encodeSvgDataUrl(svg) {
+  if (!svg) return ''
+  try {
+    if (typeof btoa === 'function') {
+      return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
+    }
+  } catch (_) {}
+  try {
+    if (typeof Buffer !== 'undefined') {
+      return `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`
+    }
+  } catch (_) {}
+  try {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+    let str = unescape(encodeURIComponent(svg))
+    let output = ''
+    for (let block = 0, charCode, i = 0, map = chars; str.charAt(i || 0);) {
+      charCode = str.charCodeAt(i += 1)
+      block = (block << 8) | charCode
+      const bitLength = i % 3 * 8
+      for (let j = 18; j >= bitLength; j -= 6) {
+        output += map.charAt((block >> j) & 63)
+      }
+    }
+    const padding = str.length % 3
+    return `data:image/svg+xml;base64,${output}${padding ? '='.repeat(3 - padding) : ''}`
+  } catch (_) {
+    return ''
+  }
+}
+
+export function generateDefaultAvatar(seed, options = {}) {
+  const size = Number.isFinite(options.size) ? Math.max(48, Math.min(512, options.size)) : DEFAULT_AVATAR_SIZE
+  const cacheKey = `${seed || 'default'}|${size}`
+  if (avatarThemeCache.has(cacheKey)) {
+    return avatarThemeCache.get(cacheKey)
+  }
+  try {
+    const hash = hashSeed(seed)
+    const baseHue = hash % 360
+    const accentHue = (baseHue + 180 + ((hash >> 5) % 30)) % 360
+    const overlayHue = (baseHue + 320 + ((hash >> 7) % 20)) % 360
+    const primary = hslToHex(baseHue, 65, 58)
+    const secondary = hslToHex((baseHue + 28) % 360, 68, 64)
+    const soft = hslToHex((baseHue + 10) % 360, 45, 90)
+    const accent = hslToHex(accentHue, 62, 52)
+    const overlay = hslToHex((accentHue + 40) % 360, 70, 68)
+    const border = hslToHex((accentHue + 310) % 360, 48, 42)
+    const badge = hslToHex(overlayHue, 68, 55)
+    const altBadge = hslToHex((overlayHue + 22) % 360, 62, 58)
+    const highlight = hslToHex((baseHue + 16) % 360, 60, 72)
+    const pattern = hslToHex((baseHue + 96) % 360, 60, 66)
+    const gradId = `g${hash.toString(16)}_${size}`
+    const radius = Math.round(size * 0.24)
+    const crestY = size * (0.52 + ((hash >> 11) % 18) / 100)
+    const crestCtrl = size * (0.18 + ((hash >> 14) % 20) / 100)
+    const accentRadius = size * (0.18 + ((hash >> 4) % 18) / 100)
+    const accentX = size * (0.28 + ((hash >> 18) % 20) / 100)
+    const accentY = size * (0.32 + ((hash >> 21) % 12) / 100)
+    const overlayPath = `M0 ${crestY} C ${size * 0.22} ${crestY - crestCtrl}, ${size * 0.64} ${crestY + crestCtrl}, ${size} ${crestY - crestCtrl * 0.6} L ${size} ${size} L 0 ${size} Z`
+    const patternPath = `M0 ${crestY + size * 0.08} C ${size * 0.35} ${crestY + crestCtrl * 0.6}, ${size * 0.68} ${crestY - crestCtrl * 0.35}, ${size} ${crestY + crestCtrl * 0.35} L ${size} ${size} L 0 ${size} Z`
+    const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" role="img">
+  <defs>
+    <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${soft}" />
+      <stop offset="${45 + (hash % 20)}%" stop-color="${primary}" />
+      <stop offset="100%" stop-color="${secondary}" />
+    </linearGradient>
+  </defs>
+  <rect width="${size}" height="${size}" rx="${radius}" fill="url(#${gradId})" />
+  <circle cx="${accentX}" cy="${accentY}" r="${accentRadius}" fill="${accent}" fill-opacity="0.82" />
+  <path d="${overlayPath}" fill="${overlay}" fill-opacity="0.45" />
+  <path d="${patternPath}" fill="${pattern}" fill-opacity="0.28" />
+  <circle cx="${size * 0.82}" cy="${size * 0.78}" r="${size * 0.22}" fill="${badge}" fill-opacity="0.36" />
+  <g transform="translate(${size * 0.12} ${size * 0.12}) rotate(${hash % 360} ${size * 0.25} ${size * 0.25})" opacity="0.18">
+    <rect width="${size * 0.28}" height="${size * 0.28}" rx="${size * 0.06}" fill="${pattern}" />
+    <rect x="${size * 0.18}" y="${size * 0.18}" width="${size * 0.18}" height="${size * 0.18}" rx="${size * 0.05}" fill="${accent}" />
+  </g>
+</svg>`
+    const uri = encodeSvgDataUrl(svg)
+    const theme = {
+      uri,
+      palette: {
+        primary,
+        secondary,
+        soft,
+        accent,
+        overlay,
+        border,
+        badge,
+        altBadge,
+        badgeText: '#ffffff',
+        text: '#0f172a',
+        highlight,
+        pattern
+      },
+      panelGradient: `linear-gradient(135deg, ${soft} 0%, ${highlight} 42%, ${primary} 100%)`,
+      badgeGradient: `linear-gradient(135deg, ${accent} 0%, ${badge} 100%)`,
+      altBadgeGradient: `linear-gradient(135deg, ${overlay} 0%, ${secondary} 100%)`,
+      borderColor: border,
+      shadow: `0 24rpx 48rpx ${hexToRgba(border, 0.32)}`,
+      badgeShadow: hexToRgba(accent, 0.35),
+      softShadow: hexToRgba(primary, 0.18)
+    }
+    avatarThemeCache.set(cacheKey, theme)
+    return theme
+  } catch (_) {
+    avatarThemeCache.set(cacheKey, DEFAULT_THEME)
+    return DEFAULT_THEME
+  }
+}
+
 function getFS() {
   try {
     if (typeof uni !== 'undefined' && typeof uni.getFileSystemManager === 'function') {
