@@ -428,7 +428,7 @@
       v-if="hintState.visible"
       class="floating-hint-layer"
       :class="{ interactive: hintState.interactive }"
-      @tap="hintState.interactive ? hideHint() : null"
+      @tap="hideHint"
     >
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>

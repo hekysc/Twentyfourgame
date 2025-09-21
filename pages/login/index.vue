@@ -1,5 +1,11 @@
 <template>
-  <view class="login-page">
+  <view
+    class="login-page"
+    @touchstart="edgeHandlers.handleTouchStart"
+    @touchmove="edgeHandlers.handleTouchMove"
+    @touchend="edgeHandlers.handleTouchEnd"
+    @touchcancel="edgeHandlers.handleTouchCancel"
+  >
     <!-- 顶部栏 -->
     <view class="login-topbar">
       <!-- <button class="icon-btn" @tap="goBack">←</button> -->
@@ -51,6 +57,14 @@
     </view>
 
     <!-- 底部区块：原“以游客登录”入口已移除 -->
+    <view
+      v-if="hintState.visible"
+      class="floating-hint-layer"
+      :class="{ interactive: hintState.interactive }"
+      @tap="hideHint"
+    >
+      <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
+    </view>
   </view>
 </template>
 
@@ -58,9 +72,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { ensureInit, getUsers, addUser, switchUser, resetAllData, touchLastPlayed } from '../../utils/store.js'
 import { saveAvatarForUser } from '../../utils/avatar.js'
+import { useFloatingHint } from '../../utils/hints.js'
+import { useEdgeExit } from '../../utils/edge-exit.js'
+import { exitApp } from '../../utils/navigation.js'
 
 const users = ref({ list: [], currentId: '' })
 const errMsg = ref('')
+
+const { hintState, showHint, hideHint } = useFloatingHint()
+const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitLoginPage() })
 
 onMounted(() => {
   ensureInit();
@@ -150,6 +170,17 @@ function finalizeCreate(name, avatar, size){
   touchLastPlayed(id)
   go('/pages/login/index')
 }
+function exitLoginPage(){
+  exitApp({
+    fallback: () => {
+      try { uni.navigateBack({ delta:1 }) }
+      catch (_) {
+        try { uni.reLaunch({ url:'/pages/index/index' }) }
+        catch (__) {}
+      }
+    },
+  })
+}
 function avatarText(name){
   if (!name) return 'U'
   const s = String(name).trim()
@@ -198,6 +229,9 @@ body {
 .login-topbar{ display:flex; align-items:center; padding:24rpx; gap:12rpx }
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
 .login-title{ flex:1; text-align:center; font-weight:900; font-size:36rpx; color:#0e141b; letter-spacing:-0.5rpx }
+.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
+.floating-hint-layer.interactive{ pointer-events:auto }
+.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
 .login-body {
   flex: 1;  /* 占据剩余空间 */
   padding: 10rpx 2.5rpx 0 2.5rpx;

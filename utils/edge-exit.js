@@ -70,7 +70,7 @@ export function useEdgeExit(options = {}) {
 
     if (typeof showHint === 'function') {
       try { uni.$emit && uni.$emit('edge_exit_hint_shown') } catch (_) {}
-      showHint('再次从屏幕边缘滑动即可退出', 2000)
+      showHint('再次从屏幕边缘滑动即可退出', { duration: 2000, interactive: false })
     }
   }
 

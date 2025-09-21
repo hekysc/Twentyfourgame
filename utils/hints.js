@@ -26,7 +26,21 @@ export function useFloatingHint() {
     }
   }
 
-  function showHint(text, duration = 1800, options = {}) {
+  function resolveOptions(durationOrOptions, maybeOptions) {
+    if (durationOrOptions && typeof durationOrOptions === 'object') {
+      return { ...(durationOrOptions || {}) }
+    }
+    const base = {}
+    if (Number.isFinite(durationOrOptions)) {
+      base.duration = durationOrOptions
+    }
+    if (maybeOptions && typeof maybeOptions === 'object') {
+      Object.assign(base, maybeOptions)
+    }
+    return base
+  }
+
+  function showHint(text, durationOrOptions = 1800, maybeOptions = {}) {
     const now = Date.now()
     if (now - lastStamp < 300) {
       return
@@ -34,14 +48,18 @@ export function useFloatingHint() {
     lastStamp = now
     try { setLastHintTimestamp(now) } catch (_) {}
 
+    const options = resolveOptions(durationOrOptions, maybeOptions)
+    const interactive = options.interactive === undefined ? false : !!options.interactive
+    const autoDuration = Number.isFinite(options.duration) ? options.duration : (Number.isFinite(durationOrOptions) ? durationOrOptions : 1800)
+    const shouldAutoDismiss = options.autoDismiss === undefined ? !interactive : !!options.autoDismiss
+
     state.text = typeof text === 'string' ? text : ''
     state.visible = !!state.text
-    state.interactive = !!options.interactive
+    state.interactive = interactive
     state.id = (state.id || 0) + 1
 
     if (timer) { clearTimeout(timer); timer = null }
-    const autoDuration = Number.isFinite(options.duration) ? options.duration : duration
-    if (!state.interactive && autoDuration > 0) {
+    if (shouldAutoDismiss && autoDuration > 0) {
       timer = setTimeout(() => { hideHint() }, autoDuration)
     }
   }

@@ -185,7 +185,7 @@
       v-if="hintState.visible"
       class="floating-hint-layer"
       :class="{ interactive: hintState.interactive }"
-      @tap="hintState.interactive ? hideHint() : null"
+      @tap="hideHint"
     >
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>
@@ -275,7 +275,7 @@ const basicErrorMessages = {
 
 function showBasicError(code) {
   const msg = basicErrorMessages[code] || '操作无效，请重试'
-  showHint(msg, 1600)
+  showHint(msg, { interactive: true })
 }
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 
@@ -467,7 +467,7 @@ function resetBasicStateFromCards() {
 function handleBasicOperator(op) {
   if (mode.value !== 'basic' || handSettled.value) return
   if (basicSelection.value.first === null) {
-    showHint('请先选择一个数字', 1500)
+    showHint('请先选择一个数字', { interactive: true })
     return
   }
   if (basicSelection.value.operator === op) {
