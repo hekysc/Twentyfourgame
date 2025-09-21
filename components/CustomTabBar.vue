@@ -1,19 +1,19 @@
 <template>
   <view class="ctb" :style="wrapStyle">
-    <button class="ctb-item" :class="{ active: isActive('stats') }" @click="go('/pages/stats/index')">
-      <text class="icon" :class="{ active: isActive('stats') }">📊</text>
-      <text class="label" :class="{ active: isActive('stats') }">统计</text>
-    </button>
-    <button class="ctb-item" :class="{ active: isActive('index') }" @click="go('/pages/index/index')">
-      <text class="icon" :class="{ active: isActive('index') }">🎮</text>
-      <text class="label" :class="{ active: isActive('index') }">程序</text>
-    </button>
-    <button class="ctb-item" :class="{ active: isActive('user') }" @click="go('/pages/user/index')">
-      <text class="icon" :class="{ active: isActive('user') }">👤</text>
-      <text class="label" :class="{ active: isActive('user') }">用户</text>
+    <button
+      v-for="item in tabs"
+      :key="item.key"
+      class="ctb-item"
+      :class="{ active: isActive(item.key) }"
+      @click="go(item.url)"
+    >
+      <view class="ctb-icon" :class="['icon-' + item.key, { active: isActive(item.key) }]">
+        <text>{{ item.icon }}</text>
+      </view>
+      <text class="label" :class="{ active: isActive(item.key) }">{{ item.label }}</text>
     </button>
   </view>
-  <view class="ctb-safe"/>
+  <view class="ctb-safe" />
 </template>
 
 <script setup>
@@ -21,6 +21,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 const currentPath = ref('')
 const wrapStyle = ref('')
+const tabs = [
+  { key: 'stats', label: '统计', icon: '📈', url: '/pages/stats/index' },
+  { key: 'index', label: '程序', icon: '🃏', url: '/pages/index/index' },
+  { key: 'user', label: '玩家', icon: '🎯', url: '/pages/user/index' },
+]
 
 onMounted(() => {
   try {
@@ -115,67 +120,76 @@ function go(url){
 </script>
 
 <style scoped>
-.ctb { 
-  position: fixed; 
-  left: 0; 
-  right: 0; 
-  bottom: 0; 
-  z-index: 999; 
-  display: grid; 
-  grid-template-columns: repeat(3, 1fr); 
-  background: #ffffff; 
-  box-shadow: 0 -6rpx 16rpx rgba(15,23,42,.06); 
-  padding: 10rpx 8rpx; 
-  transition: background-color 0.3s ease;
+.ctb {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: 24rpx;
+  z-index: 999;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 36rpx;
+  background: rgba(18, 32, 71, 0.58);
+  box-shadow: 0 24rpx 64rpx rgba(12, 20, 48, 0.36);
+  border: 2rpx solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: saturate(180%) blur(22px);
 }
-.ctb-safe { height: env(safe-area-inset-bottom); }
-.ctb-item { 
-  background: transparent; 
-  border: none; 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  justify-content: center; 
-  width: 25dvw;
-  padding: 10rpx 0; 
-  gap: 6rpx; 
-  transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  border-radius: 12rpx;
-  overflow: visible;
-  appearance: none;
-  -webkit-appearance: none;
-  outline: none;
+.ctb-safe {
+  height: calc(env(safe-area-inset-bottom) + 32rpx);
+}
+.ctb-item {
+  background: rgba(255, 255, 255, 0.08);
+  border: 2rpx solid rgba(255, 255, 255, 0.16);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 16rpx 0;
+  border-radius: 26rpx;
+  transition: transform 0.22s ease, box-shadow 0.24s ease, background 0.22s ease;
+  color: var(--text-invert);
   box-shadow: none;
 }
-.ctb-item::after {
-  border: none !important;
-  border-width: 0 !important;
-  background: transparent !important;
-}
 .ctb-item:active {
-  transform: scale(0.8);
-  background: rgba(58, 122, 254, 0.08);
+  transform: translateY(4rpx) scale(0.96);
 }
-.icon { 
-  font-size: 28rpx; 
-  line-height: 1; 
-  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  filter: grayscale(1) opacity(0.6);
+.ctb-item.active {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: var(--glow-primary);
 }
-.icon.active {
-  transform: scale(1.2);
-  filter: grayscale(0) opacity(1);
+.ctb-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34rpx;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.18);
+  transition: transform 0.24s ease, box-shadow 0.24s ease, background 0.24s ease;
 }
-.label { 
-  font-size: 28rpx; 
-  font-weight: 800; 
-  color: #94a3b8; /* 未选中为灰 */
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  overflow: visible;
+.ctb-icon.active {
+  transform: scale(1.08);
+  box-shadow: 0 18rpx 36rpx rgba(255, 255, 255, 0.18);
 }
-.label.active { 
-  transform: scale(1.2);
-  color: #0953e9; /* 选中为主色 */
+.ctb-icon.icon-stats { background: linear-gradient(135deg, rgba(111, 107, 255, 0.85), rgba(103, 232, 249, 0.9)); }
+.ctb-icon.icon-index { background: linear-gradient(135deg, rgba(255, 138, 167, 0.88), rgba(255, 176, 126, 0.88)); }
+.ctb-icon.icon-user { background: linear-gradient(135deg, rgba(124, 121, 255, 0.9), rgba(186, 201, 255, 0.85)); }
+.label {
+  font-size: 26rpx;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.68);
+  transition: color 0.18s ease, transform 0.18s ease;
+  letter-spacing: 1rpx;
+}
+.label.active {
+  color: #ffffff;
+  transform: translateY(-2rpx);
 }
 </style>

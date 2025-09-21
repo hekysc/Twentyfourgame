@@ -1,25 +1,97 @@
 /* 通用卡片与标题 */
-.card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
-.section { padding:16rpx }
-.title { font-size:32rpx; font-weight:800; color:#0f172a }
+.card {
+  background: var(--card-gradient);
+  border: 2rpx solid var(--card-border);
+  border-radius: 28rpx;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: var(--frost-blur);
+  color: var(--text-primary);
+}
+.section { padding: 24rpx 28rpx; }
+.title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: var(--font-title);
+  letter-spacing: 1rpx;
+}
 
-/* 通用按钮 */
-.btn-primary { background:#145751; color:#fff; border:none }
-.btn-ghost { background:transparent; color:#145751; border:2rpx solid #145751 }
+/* 通用按钮补充（与 uni.scss 中定义互补） */
+.btn-primary {
+  background-image: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: var(--text-invert);
+  border: 2rpx solid rgba(255, 255, 255, 0.28);
+}
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-invert);
+  border: 2rpx solid rgba(255, 255, 255, 0.24);
+  box-shadow: none;
+}
 
 /* 表格型网格容器（统计页通用） */
-.grid-table { border-radius:12rpx; overflow:hidden; border:1rpx solid #e5e7eb }
-.grid-table .thead, .grid-table .tbody { display:grid; align-items:center; grid-gap:6rpx; min-height:44rpx }
-.grid-table .thead { color:#6b7280; font-weight:700; padding:8rpx 12rpx; background:#f8fafc; font-size:24rpx }
-.grid-table .tr { padding:10rpx 12rpx; border-top:1rpx solid #f1f5f9; font-size:26rpx }
-.grid-table .td, .grid-table .th { text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4 }
-.ok { color:#16a34a; font-weight:700 }
-.fail { color:#dc2626; font-weight:700 }
+.grid-table {
+  border-radius: 24rpx;
+  overflow: hidden;
+  border: 2rpx solid rgba(111, 107, 255, 0.16);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: var(--frost-blur);
+}
+.grid-table .thead,
+.grid-table .tbody {
+  display: grid;
+  align-items: center;
+  grid-gap: 8rpx;
+  min-height: 56rpx;
+}
+.grid-table .thead {
+  color: var(--text-secondary);
+  font-weight: 700;
+  padding: 12rpx 18rpx;
+  background: rgba(111, 107, 255, 0.08);
+  font-size: 24rpx;
+}
+.grid-table .tr {
+  padding: 14rpx 18rpx;
+  border-top: 2rpx solid rgba(111, 107, 255, 0.12);
+  font-size: 26rpx;
+}
+.grid-table .td,
+.grid-table .th {
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+}
+.ok { color: var(--success); font-weight: 700; }
+.fail { color: var(--danger); font-weight: 700; }
 
 /* 迷你图形：条形与微火柴的基础样式 */
-.bar-track { position:relative; height:14rpx; background:#e5e7eb; border-radius:9999rpx; overflow:hidden }
-.bar-fill { position:absolute; left:0; top:0; bottom:0; background:#16a34a; border-radius:9999rpx }
-.spark { display:flex; align-items:flex-end; gap:2rpx }
-.spark .seg { width:6rpx; background:#94a3b8; border-radius:2rpx }
-.spark .seg.ok { background:#16a34a }
+.bar-track {
+  position: relative;
+  height: 16rpx;
+  background: rgba(111, 107, 255, 0.16);
+  border-radius: 9999rpx;
+  overflow: hidden;
+}
+.bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  border-radius: 9999rpx;
+}
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 3rpx;
+}
+.spark .seg {
+  width: 6rpx;
+  background: rgba(111, 107, 255, 0.3);
+  border-radius: 2rpx;
+}
+.spark .seg.ok { background: var(--success); }
 

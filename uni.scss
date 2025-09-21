@@ -1,15 +1,83 @@
 /* 自定义主题变量或全局样式（使用原生 CSS 变量，避免预处理器依赖） */
-:root { --primary: #3a7afe; --text: #333; }
+:root {
+  /* 主题主色与渐变 */
+  --primary: #6f6bff;
+  --primary-strong: #4f46e5;
+  --accent: #ff8ba7;
+  --accent-strong: #ff7a66;
+  --success: #34d399;
+  --danger: #f87171;
+  --warning: #facc15;
 
-/* 简易按钮样式（兼容 H5/APP/小程序） */
-.btn { padding: 20rpx 28rpx; border-radius: 12rpx; font-size: 28rpx; border:2rpx solid transparent; }
-.btn-primary { background-color: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-secondary { background-color: #fff; color: var(--primary); border: 2rpx solid var(--primary); }
+  /* 背景与表面 */
+  --app-bg: radial-gradient(140% 100% at 100% 0%, rgba(111, 107, 255, 0.28) 0%, rgba(14, 116, 144, 0.06) 38%, rgba(255, 255, 255, 0.1) 100%),
+    linear-gradient(160deg, #f8f9ff 0%, #f0f5ff 40%, #fef6ff 100%);
+  --surface-soft: rgba(255, 255, 255, 0.68);
+  --surface-strong: rgba(255, 255, 255, 0.92);
+  --surface-elevated: rgba(255, 255, 255, 0.82);
+  --surface-outline: rgba(255, 255, 255, 0.25);
+  --card-gradient: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+  --card-border: rgba(111, 107, 255, 0.18);
+  --card-shadow: 0 24rpx 68rpx rgba(86, 100, 255, 0.16);
+
+  /* 文本与描边 */
+  --text-primary: #162447;
+  --text-secondary: #4f5d7a;
+  --text-tertiary: #7b88a8;
+  --text-invert: #ffffff;
+  --divider: rgba(79, 93, 122, 0.14);
+
+  /* 动效与光晕 */
+  --glow-primary: 0 20rpx 64rpx rgba(111, 107, 255, 0.45);
+  --glow-accent: 0 20rpx 64rpx rgba(255, 138, 167, 0.32);
+  --frost-blur: saturate(180%) blur(18px);
+
+  /* 字体体系 */
+  --font-title: 'Baloo 2', 'Lilita One', 'Rounded Mplus 1c', 'Noto Sans SC', sans-serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', 'HarmonyOS Sans', sans-serif;
+}
+
+/* 全局布局辅样式 */
 .row { display: flex; flex-direction: row; align-items: center; }
 .col { display: flex; flex-direction: column; }
 .space-between { justify-content: space-between; }
 .gap-16 > * { margin-right: 16rpx; }
 .gap-16 > *:last-child { margin-right: 0; }
+
+/* 通用按钮样式（兼容 H5/APP/小程序） */
+.btn {
+  padding: 22rpx 32rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  border: 2rpx solid transparent;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  transition: transform 0.18s ease, box-shadow 0.2s ease, background 0.18s ease;
+  box-shadow: none;
+  backdrop-filter: var(--frost-blur);
+}
+.btn:active {
+  transform: scale(0.96);
+}
+.btn-primary {
+  background-image: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: var(--text-invert);
+  box-shadow: var(--glow-primary);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--primary-strong);
+  border: 2rpx solid rgba(111, 107, 255, 0.24);
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.12);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text-invert);
+  border: 2rpx solid rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
 
 /* 提升 tabBar 文案可读性（H5/App 生效；小程序需自定义 tabBar） */
 .uni-tabbar .uni-tabbar__label {

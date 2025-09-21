@@ -1,59 +1,92 @@
 ﻿<template>
   <view
-    class="page col"
+    class="page col game-page"
     :class="{ booted }"
-    style="padding: 24rpx; gap: 16rpx; position: relative;"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-
-    <!-- 顶部：当前用户与切换 -->
-    <view class="topbar" style="display:flex; align-items:center; justify-content:space-between; gap:12rpx; background:transparent; border:none;">
-      <text class="topbar-title" style="text-align:left; flex:1;">当前用户：{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
-      <button class="btn btn-secondary" style="padding:16rpx 20rpx; width:auto;" @click="goLogin">切换用户</button>
-    </view>
-
-    <view class="mode-bar">
-      <button
-        class="btn mode-toggle-btn"
-        :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
-        @click="toggleMode"
-      >{{ modeButtonLabel }}</button>
-      <view style="flex:1;">
-        <button
-          class="btn btn-secondary deck-toggle-btn"
-          @click="toggleDeckSource"
-        >{{ deckSourceLabel }}</button>
+    <!-- 顶部：当前玩家与操作 -->
+    <view class="hero-panel card">
+      <view class="player-chip">
+        <view class="player-avatar" :class="{ empty: !currentAvatar }" :style="{ backgroundColor: currentAvatar ? 'transparent' : playerColor }">
+          <image v-if="currentAvatar" class="player-avatar-img" :src="currentAvatar" mode="aspectFill" />
+          <text v-else class="player-avatar-text">{{ playerInitial }}</text>
+        </view>
+        <view class="player-meta">
+          <text class="player-label">当前玩家</text>
+          <text class="player-name">{{ currentUser && currentUser.name ? currentUser.name : '未选择' }}</text>
+          <view v-if="currentHandSource === 'mistake'" class="player-tag">错题轮次</view>
+        </view>
+      </view>
+      <view class="hero-actions">
+        <button class="btn hero-btn btn-secondary" @click="goLogin">切换用户</button>
+        <button class="btn hero-btn deck-btn" @click="toggleDeckSource">{{ deckSourceLabel }}</button>
       </view>
     </view>
 
-    <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
-      <view id="statsRow" class="card section stats-compact-table stats-card">
-        <view class="thead">
-        <text class="th">剩余</text>
-        <text class="th">局数</text>
-        <text class="th ok">成功</text>
-        <text class="th fail">失败</text>
-        <text class="th">胜率</text>
-        <text class="th">上一局</text>
-        <text class="th">本局</text>
+    <view class="mode-switch">
+      <view class="mode-switch-pills">
+        <button
+          v-for="opt in modeOptions"
+          :key="opt.key"
+          class="mode-pill"
+          :class="{ active: mode === opt.key }"
+          @click="setMode(opt.key)"
+        >
+          <text class="mode-pill-label">{{ opt.label }}</text>
+          <text class="mode-pill-desc">{{ opt.desc }}</text>
+        </button>
+      </view>
+      <view class="mode-switch-gutter">
+        <button class="btn face-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+      </view>
+    </view>
+
+    <!-- 本局状态条 -->
+    <view id="statsRow" class="status-panel card section">
+      <view class="status-grid">
+        <view class="status-chip">
+          <text class="chip-label">剩余牌</text>
+          <text class="chip-value">{{ remainingCards }}</text>
         </view>
-      <view class="tbody">
-        <text class="td">{{ remainingCards }}</text>
-        <text class="td">{{ handsPlayed }}</text>
-        <text class="td ok">{{ successCount }}</text>
-        <text class="td fail">{{ failCount }}</text>
-        <text class="td">{{ winRate }}%</text>
-        <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
-        <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
-          <block v-if="handElapsedMs < 120000">
-            <text>{{ fmtMs1(handElapsedMs) }}</text>
-          </block>
-          <block v-else>
-            <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
-          </block>
+        <view class="status-chip">
+          <text class="chip-label">局数</text>
+          <text class="chip-value">{{ handsPlayed }}</text>
+        </view>
+        <view class="status-chip ok">
+          <text class="chip-label">成功</text>
+          <text class="chip-value">{{ successCount }}</text>
+        </view>
+        <view class="status-chip fail">
+          <text class="chip-label">失败</text>
+          <text class="chip-value">{{ failCount }}</text>
+        </view>
+        <view class="status-chip status-winrate">
+          <text class="chip-label">胜率</text>
+          <text class="chip-value">{{ winRate }}%</text>
+          <view class="chip-progress">
+            <view class="chip-progress-fill" :style="{ width: Math.min(100, Math.max(0, winRate)) + '%' }"></view>
+          </view>
+        </view>
+        <view class="status-chip">
+          <text class="chip-label">上一局</text>
+          <text class="chip-value">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
+        </view>
+        <view class="status-chip status-timer" id="timerCell" @tap="handleTimerTap">
+          <text class="chip-label">本局</text>
+          <view class="chip-timer">
+            <template v-if="handElapsedMs < 120000">
+              <text class="chip-value">{{ fmtMs1(handElapsedMs) }}</text>
+              <view class="chip-progress">
+                <view class="chip-progress-fill danger" :style="{ width: Math.round(timerProgress * 100) + '%' }"></view>
+              </view>
+            </template>
+            <template v-else>
+              <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
+            </template>
+          </view>
         </view>
       </view>
     </view>
@@ -227,7 +260,10 @@ let initialMode = 'basic'
 try { const savedMode = getLastMode(); if (savedMode === 'pro' || savedMode === 'basic') initialMode = savedMode } catch (_) {}
 const mode = ref(initialMode)
 try { setLastMode(initialMode) } catch (_) {}
-const modeButtonLabel = computed(() => mode.value === 'pro' ? 'Pro模式' : 'Basic模式')
+const modeOptions = [
+  { key: 'basic', label: '新手', desc: '轻松上手' },
+  { key: 'pro', label: '挑战', desc: '高手进阶' },
+]
 const basicSlots = ref([])
 const basicSelection = ref({ first: null, operator: null })
 const basicHistory = ref([])
@@ -237,6 +273,21 @@ const faceUseHigh = ref(false)
 const handRecorded = ref(false)
 const exprZoneHeight = ref(200)
 const currentUser = ref(null)
+const currentAvatar = computed(() => {
+  const avatar = currentUser.value && currentUser.value.avatar
+  return avatar ? avatar : ''
+})
+const playerColor = computed(() => {
+  const color = currentUser.value && currentUser.value.color
+  if (color && typeof color === 'string') return color
+  return 'rgba(111, 107, 255, 0.28)'
+})
+const playerInitial = computed(() => {
+  const name = currentUser.value && currentUser.value.name
+  if (!name) return '？'
+  const trimmed = String(name).trim()
+  return trimmed ? trimmed.slice(0, 1) : '？'
+})
 const deck = ref([])
 const deckSource = ref('normal')
 const deckSourceLabel = computed(() => deckSource.value === 'mistake' ? '题库：错题' : '题库：整副')
@@ -382,6 +433,12 @@ const handElapsedMs = computed(() => {
   const now = nowTs.value || Date.now()
   const d = now - start
   return d > 0 ? d : 0
+})
+const timerProgress = computed(() => {
+  const ms = handElapsedMs.value || 0
+  const ratio = ms / 120000
+  if (!Number.isFinite(ratio)) return 0
+  return Math.min(1, Math.max(0, ratio))
 })
 
 let handTimer = null
@@ -564,7 +621,12 @@ function resetBasicBoard() {
   try { saveSession() } catch (_) {}
 }
 
-function toggleMode() { mode.value = mode.value === 'pro' ? 'basic' : 'pro' }
+function setMode(target) {
+  const normalized = target === 'pro' ? 'pro' : 'basic'
+  if (mode.value === normalized) return
+  mode.value = normalized
+}
+function toggleMode() { setMode(mode.value === 'pro' ? 'basic' : 'pro') }
 
 function refresh() { nextHand() }
 
@@ -1409,152 +1471,494 @@ function onSessionOver() {
 }
 </script>
 
-<style scoped> 
-.page { min-height: 100dvh; min-height: calc(var(--vh, 1vh) * 100); background: #f8fafc; display:flex; flex-direction: column; } 
-.page { opacity: 0; } 
-.page.booted { animation: page-fade-in .28s ease-out forwards; } 
-.topbar { padding: 12rpx 0; } 
-.topbar-title { font-size: 36rpx; font-weight: 700; color:#1f2937; text-align:center; width:100%; display:block; } 
- 
-/* 牌区 */ 
-.card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; } 
-.playing-card { background:None; border-radius:16rpx; overflow:hidden; box-shadow:0 8rpx 20rpx rgba(15,23,42,.08); border:1rpx solid #e5e7eb; } 
-.playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; } 
-.card-img { width:100%; height:auto; display:block; } 
-
-/* 运算符与按钮 */
-.ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:18rpx; }
-.ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:18rpx; align-items:stretch; }
-.ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.mode-bar { display:flex; align-items:stretch; gap:18rpx; margin: 8rpx 0 16rpx; }
-.mode-btn { width: 100%; white-space: nowrap; }
-.mode-toggle-btn { flex:1; width:100%; border:2rpx solid transparent; font-weight:700; }
-.mode-toggle-basic { background:#145751; color:#fff; border-color:#145751; }
-.mode-toggle-pro { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
-.deck-toggle-btn {
-  width:100%;
-  margin: 8rpx;
-  padding:28rpx 36rpx;
-  white-space:normal;
-  word-wrap: break-word;
-  font-weight:700;
-  border:2rpx solid #145751;
-  color:#fff;
-  background:#3d5714;
+<style scoped>
+.page {
+  min-height: 100dvh;
+  min-height: calc(var(--vh, 1vh) * 100);
+  display: flex;
+  flex-direction: column;
+  padding: 24rpx;
+  gap: 20rpx;
+  position: relative;
+  color: var(--text-primary);
+  opacity: 0;
 }
+.page.booted { animation: page-fade-in .32s ease-out forwards; }
+.game-page { padding-bottom: 220rpx; }
 
-.timer-cell { cursor: pointer; }
-.timer-popover-layer { position:fixed; inset:0; z-index:998; }
-.timer-popover { position:absolute; background:#fff; padding:18rpx 28rpx; border-radius:20rpx; box-shadow:0 16rpx 40rpx rgba(15,23,42,0.2); transform:translate(-50%, 0); display:flex; flex-direction:column; gap:12rpx; }
-.timer-popover-item { border:none; border-radius:12rpx; padding:16rpx 32rpx; background:#fee2e2; color:#b91c1c; font-size:28rpx; font-weight:700; }
-
-.floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
-.floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
-
-.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:64rpx;font-weight: bold;}
-.btn-primary { background:#145751; color:#fff; }
-/* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */
-
-/* 成功动画覆盖层 */
-.success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-.success-burst { background: rgba(34,197,94,0.92); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(34,197,94,.35); animation: success-pop .5s ease-out both; }
-.error-burst { background: rgba(239,68,68,0.92); color:#fff; font-weight:800; font-size:48rpx; padding:28rpx 40rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(239,68,68,.35); animation: success-pop .5s ease-out both; display:flex; flex-direction:column; align-items:center; gap:6rpx }
-.error-burst .err-title{ font-size:48rpx; font-weight:800 }
-.error-burst .err-val{ font-size:28rpx; font-weight:700; opacity:.95 }
-@keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-
-/* 表达式区 */
-.expr-card { background:#fff; padding:20rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); } 
-.expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
-.status-text { color:#1f2937; font-weight:700; }
-.expr-zone { --tok-card-h: 112rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:28rpx; overflow:hidden; position:relative;}
-.expr-override {
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  padding:0 32rpx;
-  color:#1f2937;
-  font-size:30rpx;
-  font-weight:700;
-  background:rgba(245,247,251,0.92);
-  pointer-events:none;
-  z-index:2;
+.hero-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 24rpx 32rpx;
+  flex-wrap: wrap;
 }
-.expr-zone-active { border-color:#3a7afe; }
-.expr-placeholder { color:#9ca3af; text-align:center; margin-top: 8rpx; }
-.expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:12rpx; align-items:center; }
-/* 只有在 empty 状态下显示提示 */
-.expr-zone.empty::after {
-  content: "表达式区域";
-  position: absolute;
-  inset: 0;                  /* 覆盖容器，但不改变布局 */
-  display: flex;             /* 仅用于居中文案 */
+.player-chip {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  min-width: 0;
+  flex: 1;
+}
+.player-avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;      /* 不拦截拖拽/点击 */
-  color: #9aa3af;            /* 轻提示色 */
+  box-shadow: var(--glow-primary);
+  border: 3rpx solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.28);
+}
+.player-avatar.empty {
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.26);
+}
+.player-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.player-avatar-text {
+  font-size: 42rpx;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+.player-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  min-width: 0;
+}
+.player-label {
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  letter-spacing: 1rpx;
+}
+.player-name {
+  font-size: 36rpx;
+  font-weight: 900;
+  max-width: 360rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-tag {
+  align-self: flex-start;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 138, 167, 0.22);
+  color: var(--accent-strong);
+  font-size: 22rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+.hero-actions {
+  display: flex;
+  gap: 16rpx;
+  flex-shrink: 0;
+}
+.hero-btn {
+  width: auto;
+  padding: 22rpx 32rpx;
+  box-shadow: none;
+}
+.deck-btn {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--primary-strong);
+  border-color: rgba(111, 107, 255, 0.35);
+}
+
+.mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 16rpx;
+}
+.mode-switch-pills {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 12rpx;
+}
+.mode-pill {
+  flex: 1;
+  min-width: 0;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.14);
+  padding: 22rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  color: var(--text-secondary);
+  transition: transform 0.22s ease, background 0.22s ease, border 0.22s ease, box-shadow 0.22s ease;
+}
+.mode-pill.active {
+  background: linear-gradient(135deg, rgba(111, 107, 255, 0.92), rgba(255, 138, 167, 0.82));
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: var(--glow-primary);
+  transform: translateY(-6rpx);
+}
+.mode-pill-label {
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 1rpx;
+}
+.mode-pill-desc {
+  font-size: 24rpx;
+  opacity: 0.88;
+}
+.mode-switch-gutter {
+  display: flex;
+  flex-shrink: 0;
+}
+.face-btn {
+  padding: 22rpx 32rpx;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--primary-strong);
+  border-color: rgba(111, 107, 255, 0.28);
+}
+
+.status-panel {
+  padding: 24rpx 28rpx;
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160rpx, 1fr));
+  gap: 16rpx;
+}
+.status-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  border-radius: 24rpx;
+  padding: 18rpx 22rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 2rpx rgba(255, 255, 255, 0.04);
+  min-height: 120rpx;
+}
+.status-chip.ok { border-color: rgba(52, 211, 153, 0.32); }
+.status-chip.fail { border-color: rgba(248, 113, 113, 0.32); }
+.chip-label {
+  font-size: 24rpx;
+  color: var(--text-tertiary);
+  letter-spacing: 1rpx;
+}
+.chip-value {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.status-chip.ok .chip-value { color: var(--success); }
+.status-chip.fail .chip-value { color: var(--danger); }
+.status-winrate .chip-value { color: var(--primary-strong); }
+.chip-progress {
+  position: relative;
+  height: 14rpx;
+  border-radius: 9999rpx;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.2);
+}
+.chip-progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+}
+.chip-progress-fill.danger {
+  background: linear-gradient(90deg, rgba(255, 138, 167, 0.9), rgba(248, 113, 113, 0.9));
+}
+.status-chip.status-timer {
+  cursor: pointer;
+}
+.status-chip.status-timer .chip-timer {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.status-chip.status-timer .chip-value {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', monospace;
+  letter-spacing: 1rpx;
+}
+.btn-reshuffle {
+  padding: 16rpx 0;
+  font-size: 26rpx;
+  line-height: 1;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20rpx;
+  padding-top: 8rpx;
+}
+.playing-card {
+  border-radius: 20rpx;
+  overflow: hidden;
+  border: 2rpx solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18rpx 42rpx rgba(18, 32, 71, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+}
+.playing-card:active {
+  transform: translateY(4rpx);
+}
+.playing-card.used {
+  filter: grayscale(1) saturate(0.2);
+  opacity: 0.42;
+  box-shadow: none;
+}
+.card-img { width: 100%; height: auto; display: block; }
+
+.ops-row-1,
+.ops-row-2 {
+  display: grid;
+  gap: 16rpx;
+}
+.ops-row-1 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ops-row-2 { grid-template-columns: 1fr 1fr; align-items: stretch; }
+.ops-left { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16rpx; }
+.pair-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18rpx; }
+
+.btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.btn-operator {
+  height: 120rpx;
+  font-size: 60rpx;
+  font-weight: 800;
+  background: linear-gradient(135deg, rgba(111, 107, 255, 0.92), rgba(255, 138, 167, 0.82));
+  color: #fff;
+  border: none;
+  box-shadow: var(--glow-primary);
+}
+.ops-row-1.ops-compact .btn-operator,
+.ops-row-2.ops-compact .btn-operator { font-size: 54rpx; height: 112rpx; }
+.ops-row-1.ops-tight .btn-operator,
+.ops-row-2.ops-tight .btn-operator { font-size: 48rpx; height: 106rpx; }
+.mode-btn { white-space: normal; }
+
+.timer-popover-layer { position: fixed; inset: 0; z-index: 998; }
+.timer-popover {
+  position: absolute;
+  background: var(--surface-strong);
+  border-radius: 22rpx;
+  padding: 20rpx 28rpx;
+  border: 2rpx solid rgba(111, 107, 255, 0.18);
+  box-shadow: 0 24rpx 48rpx rgba(15, 23, 42, 0.22);
+  transform: translate(-50%, 0);
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+.timer-popover-item {
+  border: none;
+  border-radius: 16rpx;
+  padding: 18rpx 36rpx;
+  background: rgba(248, 113, 113, 0.16);
+  color: var(--danger);
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.floating-hint-layer { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 999; }
+.floating-hint-layer.interactive { pointer-events: auto; }
+.floating-hint {
+  max-width: 70%;
+  background: rgba(16, 24, 54, 0.88);
+  color: #fff;
+  padding: 26rpx 38rpx;
+  border-radius: 26rpx;
+  text-align: center;
+  font-size: 30rpx;
+  box-shadow: 0 24rpx 48rpx rgba(12, 20, 48, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.success-overlay { position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.success-burst {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.92), rgba(59, 130, 246, 0.88));
+  color: #fff;
+  font-weight: 800;
+  font-size: 64rpx;
+  padding: 40rpx 64rpx;
+  border-radius: 9999rpx;
+  box-shadow: 0 20rpx 48rpx rgba(34, 197, 94, 0.42);
+  animation: success-pop .5s ease-out both;
+}
+.error-burst {
+  background: rgba(248, 113, 113, 0.95);
+  color: #fff;
+  font-weight: 800;
+  font-size: 48rpx;
+  padding: 32rpx 46rpx;
+  border-radius: 9999rpx;
+  box-shadow: 0 20rpx 48rpx rgba(248, 113, 113, 0.45);
+  animation: success-pop .5s ease-out both;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.error-burst .err-title { font-size: 48rpx; font-weight: 800; }
+.error-burst .err-val { font-size: 28rpx; font-weight: 700; opacity: .95; }
+
+@keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+.expr-card {
+  padding: 24rpx 28rpx;
+  border-radius: 28rpx;
+}
+.expr-zone {
+  --tok-card-h: 112rpx;
+  --card-w-ratio: 0.714;
+  margin-top: 8rpx;
+  background: rgba(111, 107, 255, 0.08);
+  border: 2rpx dashed rgba(111, 107, 255, 0.35);
+  border-radius: 28rpx;
+  padding: 32rpx;
+  overflow: hidden;
+  position: relative;
+}
+.expr-override {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 32rpx;
+  color: var(--text-primary);
+  font-size: 30rpx;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.88);
+  pointer-events: none;
+  z-index: 2;
+}
+.expr-zone-active { border-color: var(--primary); }
+.expr-zone.empty::after {
+  content: "拖入牌或运算符";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: rgba(79, 93, 122, 0.5);
   font-size: 26rpx;
   letter-spacing: 1rpx;
-  user-select: none;
-  /* 可以按需加淡入效果（可选）
-  opacity: 1;
-  transition: opacity .18s ease;
-  */
 }
-.tok { color:#1f3a93; border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
-.tok.num { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block; }
-.tok-card-img { width:100%; height:100%; object-fit: contain; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(15,23,42,.08); }
-.tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:#fff; border:2rpx solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(15,23,42,.06); box-sizing: border-box; }
-.tok.dragging { opacity:.6; box-shadow:0 6rpx 24rpx rgba(0,0,0,.18); }
+.expr-row {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 12rpx;
+  align-items: center;
+}
+.tok {
+  border-radius: 16rpx;
+  transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+}
+.tok.num {
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: calc(var(--tok-card-h) * var(--card-w-ratio));
+  height: var(--tok-card-h);
+  display: inline-block;
+}
+.tok-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: 16rpx;
+  box-shadow: 0 12rpx 28rpx rgba(18, 32, 71, 0.16);
+}
+.tok.op {
+  height: var(--tok-card-h);
+  width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2);
+  padding: 0;
+  font-size: calc(var(--tok-card-h) * 0.42);
+  background: rgba(255, 255, 255, 0.92);
+  border: 2rpx solid rgba(111, 107, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12rpx 24rpx rgba(18, 32, 71, 0.14);
+  box-sizing: border-box;
+  color: var(--primary-strong);
+}
+.tok.dragging { opacity: .6; box-shadow: 0 12rpx 24rpx rgba(0, 0, 0, .2); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
-.insert-placeholder { border-radius:14rpx; border:2rpx dashed #3a7afe; background:#eaf1ff; opacity:.9; position:relative; overflow:hidden; }
-.insert-placeholder.num { min-width: calc(var(--tok-card-h) * var(--card-w-ratio)); min-height: var(--tok-card-h); margin:2rpx; }
-.insert-placeholder.op { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin:2rpx; }
-.insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
-.drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
+.insert-placeholder {
+  border-radius: 16rpx;
+  border: 2rpx dashed rgba(111, 107, 255, 0.58);
+  background: rgba(111, 107, 255, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+.insert-placeholder.num { min-width: calc(var(--tok-card-h) * var(--card-w-ratio)); min-height: var(--tok-card-h); margin: 2rpx; }
+.insert-placeholder.op { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin: 2rpx; }
+.insert-placeholder::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(60deg, rgba(255, 255, 255, 0.08) 0, rgba(255, 255, 255, 0.08) 10rpx, rgba(111, 107, 255, 0.24) 10rpx, rgba(111, 107, 255, 0.24) 20rpx);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: #fff;
+  padding: 18rpx 24rpx;
+  border-radius: 14rpx;
+  font-size: 32rpx;
+  pointer-events: none;
+  box-shadow: var(--glow-primary);
+}
 
-/* 统计：单行紧凑 */
-.stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; } 
-.stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
-.stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(7, 1fr); align-items:center; column-gap:12rpx; }
-.stats-compact-table .thead { color:#6b7280; font-weight:700; font-size:26rpx; text-align: center;}
-.stats-compact-table .tbody { font-size:28rpx; text-align: center;}
-.stats-compact-table .ok { color:#16a34a; font-weight:700 }
-.stats-compact-table .fail { color:#dc2626; font-weight:700 }
-.stats-one-line .stats-item { display:flex; align-items:center; gap:6rpx; padding:4rpx 8rpx; border-right:2rpx solid #e5e7eb; }
-.stats-one-line .stats-item:last-child { border-right:none; }
-.stat-label { color:#6b7280; font-size:26rpx; }
-.stat-label.ok, .stat-value.ok { color:#16a34a; font-weight:700 }
-.stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
-.stat-value { font-weight:700; color:#111827; font-size:28rpx; }
+.basic-mode { display: flex; flex-direction: column; gap: 24rpx; }
+.basic-board { display: flex; gap: 24rpx; align-items: stretch; justify-content: center; }
+.basic-column { display: flex; flex-direction: column; gap: 24rpx; flex: 1; }
+.basic-card-wrapper { flex: 1; }
+.basic-card {
+  border-radius: 24rpx;
+  box-shadow: 0 18rpx 42rpx rgba(18, 32, 71, 0.18);
+  border: 2rpx solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320rpx;
+  background: rgba(255, 255, 255, 0.16);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.basic-card.hidden { visibility: hidden; pointer-events: none; }
+.basic-card.selected { border-color: rgba(111, 107, 255, 0.45); box-shadow: var(--glow-primary); transform: translateY(-6rpx); }
+.basic-card.result { background: linear-gradient(160deg, rgba(254, 243, 199, 0.92), rgba(253, 230, 138, 0.7)); }
+.basic-card-img { width: 100%; height: 100%; object-fit: contain; }
+.basic-card-value { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(255, 247, 222, 0.86)); }
+.basic-card-value-text { font-size: 72rpx; font-weight: 800; color: var(--text-primary); }
+.basic-ops { display: flex; flex-direction: column; gap: 20rpx; align-items: stretch; justify-content: center; flex: 0 0 160rpx; }
+.basic-ops .btn-operator { height: 110rpx; font-size: 60rpx; }
+.basic-ops .btn-operator.active { background: linear-gradient(135deg, rgba(111, 107, 255, 0.92), rgba(52, 211, 153, 0.8)); }
+.basic-face-toggle { margin-top: 12rpx; white-space: normal; word-break: break-all; }
+.basic-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18rpx; }
+.basic-actions .btn[disabled] { opacity: .55; }
 
-.btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
-
-.basic-mode { display:flex; flex-direction:column; gap:24rpx; }
-.basic-board { display:flex; gap:24rpx; align-items:stretch; justify-content:center; }
-.basic-column { display:flex; flex-direction:column; gap:24rpx; flex:1; }
-.basic-card-wrapper { flex:1; }
-.basic-card { background:None; border-radius:8rpx; box-shadow:0 12rpx 28rpx rgba(15,23,42,.12); border:2rpx solid transparent; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; min-height:320rpx; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
-.basic-card.hidden { visibility:hidden; pointer-events:none; }
-.basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
-.basic-card.result { background:#fef3c7; }
-.basic-card-img { width:100%; height:100%; object-fit:contain; }
-.basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
-.basic-card-value-text { font-size:72rpx; font-weight:700; color:#1f2937; }
-.basic-ops { display:flex; flex-direction:column; gap:20rpx; align-items:stretch; justify-content:center; flex:0 0 160rpx; }
-.basic-ops .btn-operator { height:110rpx; font-size:64rpx; }
-.basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
-.basic-face-toggle { margin-top:12rpx; white-space:normal;word-break: break-all;}
-.basic-actions { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; }
-.basic-actions .btn[disabled] { opacity:.6; }
-
-@keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
-@keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
+@keyframes pop-in { from { transform: scale(0.85); opacity: .2; } to { transform: scale(1); opacity: 1; } }
+@keyframes shimmer { from { background-position-x: 0%; } to { background-position-x: 200%; } }
 @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
 </style>
+
