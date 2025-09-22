@@ -17,10 +17,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, getCurrentInstance, nextTick } from 'vue'
+import { setTabBarHeight } from '../utils/tab-cache.js'
 
 const currentPath = ref('')
 const wrapStyle = ref('')
+const instance = getCurrentInstance()
+let offResize = null
 
 onMounted(() => {
   try {
@@ -31,13 +34,32 @@ onMounted(() => {
     const sys = uni.getSystemInfoSync && uni.getSystemInfoSync()
     const hb = (sys && sys.safeAreaInsets && sys.safeAreaInsets.bottom) || 0
     wrapStyle.value = `padding-bottom:${hb ? hb + 'px' : 'env(safe-area-inset-bottom)'}`
+    if (Number.isFinite(sys?.safeAreaInsets?.bottom)) {
+      setTabBarHeight((sys.safeAreaInsets.bottom || 0) + estimateSelfHeight())
+    }
   } catch (_) {}
+  measureHeight()
   // 监听全局路由同步事件，确保返回/手势返回后高亮状态更新
   try { uni.$off && uni.$off('tabbar:update', updatePath) } catch(_) {}
   try { uni.$on && uni.$on('tabbar:update', updatePath) } catch(_) {}
+  try {
+    if (typeof uni.onWindowResize === 'function') {
+      const handler = () => measureHeight()
+      uni.onWindowResize(handler)
+      offResize = () => {
+        try { uni.offWindowResize(handler) } catch (_) {}
+      }
+    }
+  } catch (_) { offResize = null }
 })
 
-onUnmounted(() => { try { uni.$off && uni.$off('tabbar:update', updatePath) } catch(_) {} })
+onUnmounted(() => {
+  try { uni.$off && uni.$off('tabbar:update', updatePath) } catch(_) {}
+  if (typeof offResize === 'function') {
+    try { offResize() } catch (_) {}
+    offResize = null
+  }
+})
 
 function updatePath(){
   try {
@@ -110,6 +132,39 @@ function go(url){
     })
   } else if (typeof uni.reLaunch === 'function') {
     uni.reLaunch({ url, success: done, fail: done })
+  }
+}
+
+function estimateSelfHeight() {
+  // 粗略估算：按钮高度 + 内边距
+  const base = 112
+  try {
+    if (typeof uni.upx2px === 'function') {
+      const px = uni.upx2px(base)
+      if (Number.isFinite(px)) return px
+    }
+  } catch (_) {
+    /* noop */
+  }
+  return base * 0.5
+}
+
+function measureHeight() {
+  try {
+    nextTick(() => {
+      const query = uni.createSelectorQuery()
+      if (query && instance?.proxy) query.in(instance.proxy)
+      query
+        ?.select('.ctb')
+        ?.boundingClientRect((rect) => {
+          if (rect && Number.isFinite(rect.height)) {
+            setTabBarHeight(rect.height)
+          }
+        })
+      query?.exec()
+    })
+  } catch (_) {
+    /* noop */
   }
 }
 </script>

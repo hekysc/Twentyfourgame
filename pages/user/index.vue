@@ -1,5 +1,6 @@
 ﻿<template>
-  <view class="page" style="padding:24rpx; display:flex; flex-direction:column; gap:16rpx;"
+  <view class="page"
+        :style="pageStyle"
         @touchstart="edgeHandlers.handleTouchStart"
         @touchmove="edgeHandlers.handleTouchMove"
         @touchend="edgeHandlers.handleTouchEnd"
@@ -44,35 +45,82 @@ import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { saveAvatarForUser, removeAvatarForUser, consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 import { exitApp } from '../../utils/navigation.js'
+import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
+import { getTabBarHeight, getCachedUsersState, setCachedUsersState, scheduleTabWarmup } from '../../utils/tab-cache.js'
 
 const users = ref({ list: [], currentId: '' })
 const newName = ref('')
 
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitPage() })
+const { safeTop, safeBottom } = useSafeArea()
+const basePaddingPx = rpxToPx(24) || 12
+const defaultTabPx = rpxToPx(120) || 60
+const tabBarHeightPx = ref(getTabBarHeight() || defaultTabPx)
+const pageStyle = computed(() => {
+  const safeTopPx = Math.max(0, safeTop.value || 0)
+  const safeBottomPx = Math.max(0, safeBottom.value || 0)
+  const tabPx = tabBarHeightPx.value || defaultTabPx
+  const base = basePaddingPx
+  return {
+    paddingTop: `${safeTopPx + base}px`,
+    paddingLeft: `${base}px`,
+    paddingRight: `${base}px`,
+    paddingBottom: `${base + safeBottomPx + tabPx}px`,
+    display: 'flex',
+    flexDirection: 'column',
+    rowGap: '16rpx',
+    backgroundColor: '#f8fafc',
+    boxSizing: 'border-box',
+    minHeight: 'calc(var(--vh, 1vh) * 100)',
+  }
+})
+
+function loadUsers() {
+  const cached = getCachedUsersState()
+  if (cached && Array.isArray(cached.list)) {
+    users.value = cached
+    return
+  }
+  const data = getUsers()
+  users.value = data
+  setCachedUsersState(data)
+}
 
 // 过滤掉游客账号（名称为 Guest 的历史记录）
 const visibleUsers = computed(() => (users.value.list || []).filter(u => String(u.name||'') !== 'Guest'))
 
-onMounted(() => { try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}; ensureInit(); users.value = getUsers() })
+onMounted(() => {
+  try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
+  ensureInit()
+  tabBarHeightPx.value = getTabBarHeight() || tabBarHeightPx.value
+  loadUsers()
+})
 
 onShow(() => {
+  tabBarHeightPx.value = getTabBarHeight() || tabBarHeightPx.value
+  loadUsers()
   try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
 })
 
-function refresh(){ users.value = getUsers() }
-function create(){ addUser(newName.value.trim()||undefined); newName.value=''; refresh() }
+function create(){
+  addUser(newName.value.trim()||undefined)
+  newName.value=''
+  loadUsers()
+  try { scheduleTabWarmup({ delay: 200 }) } catch (_) {}
+}
 function choose(id){
   switchUser(id)
-  refresh()
+  loadUsers()
+  try { scheduleTabWarmup({ delay: 200 }) } catch (_) {}
   try { uni.reLaunch({ url:'/pages/index/index' }) }
   catch(_){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(e) {} }
 }
 function rename(u){
-  uni.showModal({ title:'改名', editable:true, placeholderText:u.name, success(res){ if(res.confirm){ renameUser(u.id, res.content||u.name); refresh() } } })
+  uni.showModal({ title:'改名', editable:true, placeholderText:u.name, success(res){ if(res.confirm){ renameUser(u.id, res.content||u.name); loadUsers(); try { scheduleTabWarmup({ delay: 200 }) } catch (_) {} } } })
 }
 function remove(id){
   uni.showModal({
@@ -82,7 +130,8 @@ function remove(id){
       if(res.confirm){
         removeAvatarForUser(id).finally(() => {
           rmUser(id)
-          refresh()
+          loadUsers()
+          try { scheduleTabWarmup({ delay: 200 }) } catch (_) {}
         })
       }
     }
@@ -110,7 +159,8 @@ function changeAvatar(u){
                   } else {
                     showHint('头像已更新', 1200)
                   }
-                  refresh()
+                  loadUsers()
+                  try { scheduleTabWarmup({ delay: 240 }) } catch (_) {}
                 })
               },
               fail() {
@@ -122,7 +172,8 @@ function changeAvatar(u){
           removeAvatarForUser(u.id)
             .then(() => {
               showHint('已恢复默认头像', 1500)
-              refresh()
+              loadUsers()
+              try { scheduleTabWarmup({ delay: 240 }) } catch (_) {}
             })
             .catch(() => { showHint('头像清除失败，请重试', 1800) })
         }

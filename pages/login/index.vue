@@ -1,6 +1,7 @@
 <template>
   <view
     class="login-page"
+    :style="loginPageStyle"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
@@ -75,12 +76,15 @@ import { saveAvatarForUser } from '../../utils/avatar.js'
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { exitApp } from '../../utils/navigation.js'
+import { useSafeArea } from '../../utils/useSafeArea.js'
 
 const users = ref({ list: [], currentId: '' })
 const errMsg = ref('')
 
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitLoginPage() })
+const { safeTop } = useSafeArea()
+const loginPageStyle = computed(() => ({ paddingTop: `${Math.max(0, safeTop.value || 0)}px` }))
 
 onMounted(() => {
   ensureInit();
@@ -221,6 +225,12 @@ function resetData(){
   display: flex;
   flex-direction: column;
   overflow: hidden;  /* 防止整体滚动 */
+  box-sizing: border-box;
+  padding: 0 24rpx;
+  padding-bottom: calc(24rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
 }
 body {
   overflow: hidden;

@@ -2,72 +2,71 @@
   <view
     class="page col"
     :class="{ booted }"
-    style="position: relative;"
+    :style="pageInlineStyle"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <view class="game-shell">
-      <view class="game-header">
-        <!-- 顶部：当前用户 -->
-        <view class="topbar">
-          <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
-            <template v-if="currentUserAvatar && !avatarLoadFailed">
-              <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
-            </template>
-            <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
-            <text class="user-chip-name">{{ currentUserName }}</text>
-          </view>
-        </view>
-
-        <view class="mode-bar">
-          <button
-            class="btn mode-toggle-btn"
-            :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
-            @click="toggleMode"
-          >{{ modeButtonLabel }}</button>
-          <view style="flex:1;">
-            <button
-              class="btn btn-secondary deck-toggle-btn"
-              @click="toggleDeckSource"
-            >{{ deckSourceLabel }}</button>
-          </view>
-        </view>
-
-        <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
-        <view id="statsRow" class="card section stats-compact-table stats-card">
-          <view class="thead">
-            <text class="th">剩余</text>
-            <text class="th">局数</text>
-            <text class="th ok">成功</text>
-            <text class="th fail">失败</text>
-            <text class="th">胜率</text>
-            <text class="th">上一局</text>
-            <text class="th">本局</text>
-          </view>
-          <view class="tbody">
-            <text class="td">{{ remainingCards }}</text>
-            <text class="td">{{ handsPlayed }}</text>
-            <text class="td ok">{{ successCount }}</text>
-            <text class="td fail">{{ failCount }}</text>
-            <text class="td">{{ winRate }}%</text>
-            <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
-            <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
-              <block v-if="handElapsedMs < 120000">
-                <text>{{ fmtMs1(handElapsedMs) }}</text>
-              </block>
-              <block v-else>
-                <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
-              </block>
-            </view>
-          </view>
+    <view id="gameTopBox" class="game-header top-fixed">
+      <!-- 顶部：当前用户 -->
+      <view class="topbar">
+        <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
+          <template v-if="currentUserAvatar && !avatarLoadFailed">
+            <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
+          </template>
+          <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
+          <text class="user-chip-name">{{ currentUserName }}</text>
         </view>
       </view>
 
-      <view class="game-main">
-        <view class="mode-panels">
-          <view class="pro-mode mode-panel" v-show="mode === 'pro'">
+      <view class="mode-bar">
+        <button
+          class="btn mode-toggle-btn"
+          :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
+          @click="toggleMode"
+        >{{ modeButtonLabel }}</button>
+        <view style="flex:1;">
+          <button
+            class="btn btn-secondary deck-toggle-btn"
+            @click="toggleDeckSource"
+          >{{ deckSourceLabel }}</button>
+        </view>
+      </view>
+
+      <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
+      <view id="statsRow" class="card section stats-compact-table stats-card">
+        <view class="thead">
+          <text class="th">剩余</text>
+          <text class="th">局数</text>
+          <text class="th ok">成功</text>
+          <text class="th fail">失败</text>
+          <text class="th">胜率</text>
+          <text class="th">上一局</text>
+          <text class="th">本局</text>
+        </view>
+        <view class="tbody">
+          <text class="td">{{ remainingCards }}</text>
+          <text class="td">{{ handsPlayed }}</text>
+          <text class="td ok">{{ successCount }}</text>
+          <text class="td fail">{{ failCount }}</text>
+          <text class="td">{{ winRate }}%</text>
+          <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
+          <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
+            <block v-if="handElapsedMs < 120000">
+              <text>{{ fmtMs1(handElapsedMs) }}</text>
+            </block>
+            <block v-else>
+              <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
+            </block>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="game-middle" :style="{ height: middleHeight + 'px' }">
+      <view class="mode-panels">
+        <view class="pro-mode mode-panel" v-show="mode === 'pro'">
             <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
             <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
               <view v-for="(card, idx) in cards" :key="idx"
@@ -154,26 +153,25 @@
               </view>
             </view>
           </view>
-        </view>
+      </view>
+    </view>
 
-        <view class="game-footer">
-          <view id="submitRow" class="footer-row">
-            <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
-            <view v-show="mode !== 'pro'" class="basic-utility-grid">
-              <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
-              <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
-            </view>
-          </view>
-          <view id="failRow" class="footer-row">
-            <view class="pair-grid footer-pair" v-show="mode === 'pro'">
-              <button class="btn btn-secondary" @click="showSolution">提示</button>
-              <button class="btn btn-secondary" @click="skipHand">下一题</button>
-            </view>
-            <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
-              <button class="btn btn-secondary" @click="showSolution">提示</button>
-              <button class="btn btn-secondary" @click="skipHand">下一题</button>
-            </view>
-          </view>
+    <view id="gameBottomBox" class="game-footer bottom-fixed">
+      <view id="submitRow" class="footer-row">
+        <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
+        <view v-show="mode !== 'pro'" class="basic-utility-grid">
+          <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
+          <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
+        </view>
+      </view>
+      <view id="failRow" class="footer-row">
+        <view class="pair-grid footer-pair" v-show="mode === 'pro'">
+          <button class="btn btn-secondary" @click="showSolution">提示</button>
+          <button class="btn btn-secondary" @click="skipHand">下一题</button>
+        </view>
+        <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
+          <button class="btn btn-secondary" @click="showSolution">提示</button>
+          <button class="btn btn-secondary" @click="skipHand">下一题</button>
         </view>
       </view>
     </view>
@@ -218,6 +216,8 @@ import { onHide, onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
+import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
+import { scheduleTabWarmup, getTabBarHeight, mergeCachedStatsExt } from '../../utils/tab-cache.js'
 import {
   tokensToExpression,
   formatMs,
@@ -291,6 +291,18 @@ const handSettled = ref(false);          // 是否已对本手“结算”（成
 const settledResult = ref(null);         // 'success' | 'fail' | null
 const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
 
+const { safeTop, safeBottom, windowHeight, refreshSafeArea } = useSafeArea()
+const pageInlineStyle = computed(() => ({
+  paddingTop: `${Math.max(0, safeTop.value || 0)}px`,
+}))
+const FALLBACK_TOP_RPX = 520
+const FALLBACK_BOTTOM_RPX = 320
+const FALLBACK_TAB_RPX = 120
+const topFixedPx = ref(rpxToPx(FALLBACK_TOP_RPX))
+const bottomFixedPx = ref(rpxToPx(FALLBACK_BOTTOM_RPX))
+const middleHeight = ref(0)
+let layoutTimer = null
+
 const { hintState, showHint, hideHint } = useFloatingHint()
 
 const basicErrorMessages = {
@@ -309,6 +321,59 @@ const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort
 const cardImage = cardImagePath
+
+function requestLayoutMeasure() {
+  computeMiddleHeight()
+  if (layoutTimer) return
+  layoutTimer = setTimeout(() => {
+    layoutTimer = null
+    measureFixedSections()
+  }, 16)
+}
+
+function measureFixedSections() {
+  try {
+    nextTick(() => {
+      const query = uni.createSelectorQuery()
+      if (query && proxy) query.in(proxy)
+      query?.select('#gameTopBox')?.boundingClientRect((rect) => {
+        if (rect && Number.isFinite(rect.height)) {
+          topFixedPx.value = Math.max(rect.height, rpxToPx(FALLBACK_TOP_RPX))
+        }
+      })
+      query?.select('#gameBottomBox')?.boundingClientRect((rect) => {
+        if (rect && Number.isFinite(rect.height)) {
+          bottomFixedPx.value = Math.max(rect.height, rpxToPx(FALLBACK_BOTTOM_RPX))
+        }
+      })
+      query?.exec(() => {
+        computeMiddleHeight()
+      })
+    })
+  } catch (_) {
+    computeMiddleHeight()
+  }
+}
+
+function computeMiddleHeight() {
+  const fallbackWindow = (() => {
+    if (typeof window !== 'undefined' && Number.isFinite(window.innerHeight)) return window.innerHeight
+    return 0
+  })()
+  const wh = windowHeight.value || fallbackWindow
+  if (!wh) {
+    middleHeight.value = Math.max(0, middleHeight.value || 0)
+    return
+  }
+  const topPx = Math.max(topFixedPx.value || 0, rpxToPx(FALLBACK_TOP_RPX))
+  const bottomPx = Math.max(bottomFixedPx.value || 0, rpxToPx(FALLBACK_BOTTOM_RPX))
+  const safeTopPx = Math.max(0, safeTop.value || 0)
+  const safeBottomPx = Math.max(0, safeBottom.value || 0)
+  const measuredTab = getTabBarHeight()
+  const tabHeight = measuredTab && measuredTab > 0 ? measuredTab : (rpxToPx(FALLBACK_TAB_RPX) + safeBottomPx)
+  const available = wh - safeTopPx - topPx - bottomPx - tabHeight
+  middleHeight.value = Math.max(0, available)
+}
 
 function avatarInitial(name) {
   if (!name) return 'U'
@@ -452,6 +517,8 @@ const currentHandNums = computed(() => {
   const arr = (cards.value || []).map(c => c.rank)
   return arr.sort((a, b) => a - b)
 })
+
+watch([safeTop, windowHeight, safeBottom], () => { requestLayoutMeasure() })
 
 watch(selectedUserId, (newId, oldId) => {
   if (newId === oldId) return
@@ -892,6 +959,7 @@ onMounted(() => {
   if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
   updateLastSuccess()
   startHandTimer()
+  requestLayoutMeasure()
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
@@ -901,13 +969,22 @@ onShow(() => {
   currentUser.value = getCurrentUser() || null
   loadSession()
   startHandTimer()
+  try { refreshSafeArea() } catch (_) {}
+  requestLayoutMeasure()
+  try { scheduleTabWarmup({ delay: 180 }) } catch (_) {}
   try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
 })
 onHide(() => { saveSession(); stopHandTimer(); closeTimerPopover() })
-onUnmounted(() => { stopHandTimer() })
+onUnmounted(() => {
+  stopHandTimer()
+  if (layoutTimer) {
+    try { clearTimeout(layoutTimer) } catch (_) {}
+    layoutTimer = null
+  }
+})
 
 // 已移除“清空表达式”功能，避免误触清空
 
@@ -916,6 +993,9 @@ function updateLastSuccess() {
     const cu = getCurrentUser && getCurrentUser()
     if (!cu || !cu.id) { lastSuccessMs.value = null; return }
     const ext = readStatsExtended && readStatsExtended(cu.id)
+    if (ext && cu?.id) {
+      try { mergeCachedStatsExt({ [cu.id]: ext }) } catch (_) {}
+    }
     const r = (ext && Array.isArray(ext.rounds) ? ext.rounds.slice().reverse() : []).find(x => x && x.success && Number.isFinite(x.timeMs))
     lastSuccessMs.value = r ? r.timeMs : null
   } catch (_) { lastSuccessMs.value = null }
@@ -960,6 +1040,7 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
         hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
         expr: exprStr,
       })
+      try { scheduleTabWarmup({ delay: 200 }) } catch (_) {}
       if (success) updateLastSuccess()
     } catch (_) {}
   }
@@ -1359,6 +1440,7 @@ watch(mode, (m) => {
     nextTick(() => { updateExprScale(); recomputeExprHeight() })
   }
   closeTimerPopover()
+  requestLayoutMeasure()
 })
 
 watch(cards, () => {
@@ -1469,29 +1551,34 @@ function onSessionOver() {
 
 <style scoped> 
 .page {
-  min-height: 100dvh;
+  height: 100dvh;
   min-height: calc(var(--vh, 1vh) * 100);
   background: #f8fafc;
   display:flex;
   flex-direction: column;
   box-sizing:border-box;
-  padding:24rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom) + var(--tf24-tabbar-height, 120rpx) + (var(--tf24-footer-row-height, 120rpx) * 2) + var(--tf24-footer-gap, 16rpx));
+  padding: 0 24rpx;
+  position: relative;
+  overflow: hidden;
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
 }
 .page { opacity: 0; }
 .page.booted { animation: page-fade-in .28s ease-out forwards; }
-.game-shell {
-  flex:1;
-  min-height:100%;
-  display:grid;
-  grid-template-rows:auto 1fr auto;
-  gap:24rpx;
-}
+.top-fixed { flex:0 0 auto; padding:24rpx 0; }
+.bottom-fixed { flex:0 0 auto; }
 .game-header { display:flex; flex-direction:column; gap:16rpx; }
-.game-main { display:flex; flex-direction:column; min-height:400rpx; }
-.mode-panels { flex:1; display:flex; flex-direction:column; gap:18rpx; }
-.mode-panel { display:flex; flex-direction:column; gap:18rpx; }
-.pro-mode { flex:1; }
+.game-middle {
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  overflow:hidden;
+  padding-bottom:24rpx;
+}
+.mode-panels { flex:1; display:flex; flex-direction:column; gap:18rpx; min-height:0; overflow:hidden; }
+.mode-panel { display:flex; flex-direction:column; gap:18rpx; min-height:0; overflow:hidden; }
+.pro-mode { flex:1; min-height:0; }
 .topbar { padding: 12rpx 0; }
 .user-chip {
   display:flex;
@@ -1562,9 +1649,7 @@ function onSessionOver() {
 }
 
 .game-footer {
-  position:sticky;
-  bottom: calc(var(--tf24-tabbar-height, 120rpx) + env(safe-area-inset-bottom));
-  z-index:20;
+  flex:0 0 auto;
   display:flex;
   flex-direction:column;
   gap:var(--tf24-footer-gap, 16rpx);
@@ -1573,6 +1658,8 @@ function onSessionOver() {
   box-shadow:0 -8rpx 20rpx rgba(15,23,42,0.12);
   border-radius:24rpx;
   min-height: var(--tf24-footer-total, calc(var(--tf24-footer-row-height, 120rpx) * 2 + var(--tf24-footer-gap, 16rpx)));
+  position: relative;
+  z-index:20;
 }
 .footer-row {
   display:flex;
@@ -1688,7 +1775,7 @@ function onSessionOver() {
 
 .btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
 
-.basic-mode { display:flex; flex-direction:column; gap:24rpx; flex:1; }
+.basic-mode { display:flex; flex-direction:column; gap:24rpx; flex:1; min-height:0; overflow:hidden; }
 .basic-board { display:flex; gap:24rpx; align-items:stretch; justify-content:center; }
 .basic-column { display:flex; flex-direction:column; gap:24rpx; flex:1; }
 .basic-card-wrapper { flex:1; }

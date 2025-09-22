@@ -1,7 +1,7 @@
 <template>
   <view
     class="page"
-    style="padding:24rpx; display:flex; flex-direction:column; gap:18rpx;"
+    :style="pageStyle"
     @touchstart="edgeHandlers.handleTouchStart"
     @touchmove="edgeHandlers.handleTouchMove"
     @touchend="edgeHandlers.handleTouchEnd"
@@ -277,8 +277,33 @@ import {
   computeDailySeries,
   computeSpeedBuckets,
 } from '../../utils/stats.js'
+import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
+import { getTabBarHeight, getCachedOverviewRows, setCachedOverviewRows, getCachedStatsExt, mergeCachedStatsExt } from '../../utils/tab-cache.js'
 
 const SELECTED_USER_STORE_KEY = 'tf24_stats_selected_user_v1'
+
+const { safeTop, safeBottom } = useSafeArea()
+const basePaddingPx = rpxToPx(24) || 12
+const defaultTabPx = rpxToPx(120) || 60
+const tabBarHeightPx = ref(getTabBarHeight() || defaultTabPx)
+const pageStyle = computed(() => {
+  const safeTopPx = Math.max(0, safeTop.value || 0)
+  const safeBottomPx = Math.max(0, safeBottom.value || 0)
+  const tabPx = tabBarHeightPx.value || defaultTabPx
+  const base = basePaddingPx
+  return {
+    paddingTop: `${safeTopPx + base}px`,
+    paddingLeft: `${base}px`,
+    paddingRight: `${base}px`,
+    paddingBottom: `${base + safeBottomPx + tabPx}px`,
+    display: 'flex',
+    flexDirection: 'column',
+    rowGap: '18rpx',
+    backgroundColor: '#f8fafc',
+    boxSizing: 'border-box',
+    minHeight: 'calc(var(--vh, 1vh) * 100)',
+  }
+})
 
 const rows = ref([]) // 基础用户列表（不含筛选数据）
 const overviewRange = ref(1) // 默认“今天”：1 / 3 / 7 / 30 / 0（0=全部；其余为“今天+前N-1天”）
@@ -355,6 +380,7 @@ const mistakeDisplayRows = computed(() => {
 onMounted(() => {
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   ensureInit();
+  tabBarHeightPx.value = getTabBarHeight() || tabBarHeightPx.value
   load();
   loadExt()
   if (consumeAvatarRestoreNotice()) {
@@ -365,6 +391,7 @@ onMounted(() => {
 onShow(() => {
   load();
   loadExt();
+  tabBarHeightPx.value = getTabBarHeight() || tabBarHeightPx.value
   try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
@@ -381,16 +408,34 @@ onPullDownRefresh(() => {
 })
 
 function load(){
-  const list = allUsersWithStats()
+  let list = getCachedOverviewRows()
+  if (Array.isArray(list) && list.length) {
+    list = list.map(item => ({ ...item }))
+  } else {
+    list = allUsersWithStats()
+  }
   list.sort((a,b)=> (b.winRate - a.winRate) || (b.totals.total - a.totals.total))
   rows.value = list
+  setCachedOverviewRows(list)
   applyDefaultSelectedUser(list)
 }
 function loadExt(){
   // 总览与趋势都需要：始终加载所有用户扩展数据
   const map = {}
+  const updates = {}
   for (const u of rows.value) {
-    map[u.id] = readStatsExtended(u.id)
+    if (!u || !u.id) continue
+    const cached = getCachedStatsExt(u.id)
+    if (cached) {
+      map[u.id] = cached
+      continue
+    }
+    const ext = readStatsExtended(u.id)
+    map[u.id] = ext
+    updates[u.id] = ext
+  }
+  if (Object.keys(updates).length) {
+    mergeCachedStatsExt(updates)
   }
   userExtMap.value = map
   // 兼容 ext：用于单用户场景下的直接绑定
