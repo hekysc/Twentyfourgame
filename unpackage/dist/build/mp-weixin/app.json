@@ -6,8 +6,9 @@
     "pages/stats/index"
   ],
   "window": {
+    "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "TF24",
+    "navigationBarTitleText": "无敌24点程序·观测",
     "navigationBarBackgroundColor": "#F8F8F8",
     "backgroundColor": "#F8F8F8"
   },
