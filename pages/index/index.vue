@@ -1794,7 +1794,7 @@ function onSessionOver() {
 .basic-card.hidden { visibility:hidden; pointer-events:none; }
 .basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
 .basic-card.result { background:#fef3c7; }
-.basic-card-img { width:100%; height:100%; object-fit:contain; }
+.basic-card-img { width:80%; height:80%; object-fit:contain; }
 .basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
 .basic-card-value-text { font-size:64rpx; font-weight:700; color:#1f2937; }
 .basic-ops { display:flex; flex-direction:column; gap:16rpx; align-items:stretch; justify-content:center; flex:0 0 150rpx; }
