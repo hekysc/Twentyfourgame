@@ -26,7 +26,6 @@ pnpm-debug.log*
 .env.*.local
 
 # HBuilderX / Uni-App 构建产物与缓存
-unpackage/
 uniapp.compile-cache/
 
 # IDE / 编辑器配置（团队可按需取消注释）
