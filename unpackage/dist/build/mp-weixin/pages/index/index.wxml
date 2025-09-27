@@ -1,1 +1,106 @@
-<view class="{{['page', 'col', 'data-v-6ede79c0', L && 'booted']}}" style="padding:24rpx;gap:16rpx;position:relative"><view class="topbar data-v-6ede79c0" style="display:flex;align-items:center;justify-content:space-between;gap:12rpx;background:transparent;border:none"><text class="topbar-title data-v-6ede79c0" style="text-align:left;flex:1">当前用户：{{a}}</text><button class="btn btn-secondary data-v-6ede79c0" style="padding:16rpx 20rpx;width:auto" bindtap="{{b}}">切换用户</button></view><view id="statsRow" class="card section stats-compact-table stats-card data-v-6ede79c0"><view class="thead data-v-6ede79c0"><text class="th data-v-6ede79c0">剩余</text><text class="th data-v-6ede79c0">局数</text><text class="th ok data-v-6ede79c0">成功</text><text class="th fail data-v-6ede79c0">失败</text><text class="th data-v-6ede79c0">胜率</text><text class="th data-v-6ede79c0">上一局</text><text class="th data-v-6ede79c0">本局</text></view><view class="tbody data-v-6ede79c0"><text class="td data-v-6ede79c0">{{c}}</text><text class="td data-v-6ede79c0">{{d}}</text><text class="td ok data-v-6ede79c0">{{e}}</text><text class="td fail data-v-6ede79c0">{{f}}</text><text class="td data-v-6ede79c0">{{g}}%</text><text class="td data-v-6ede79c0">{{h}}</text><view class="td data-v-6ede79c0"><block wx:if="{{i}}"><text class="data-v-6ede79c0">{{j}}</text></block><block wx:else><button class="btn btn-secondary btn-reshuffle data-v-6ede79c0" bindtap="{{k}}">洗牌</button></block></view></view></view><view id="cardGrid" class="card-grid data-v-6ede79c0" style="padding-top:0rpx"><view wx:for="{{l}}" wx:for-item="card" wx:key="b" class="{{['playing-card', 'data-v-6ede79c0', card.c && 'used']}}" catchtouchstart="{{card.d}}" catchtouchmove="{{card.e}}" catchtouchend="{{card.f}}"><image class="card-img data-v-6ede79c0" src="{{card.a}}" mode="widthFix"/></view></view><view id="opsRow1" class="{{['data-v-6ede79c0', 'ops-row-1', n]}}"><button wx:for="{{m}}" wx:for-item="op" wx:key="b" class="btn btn-operator data-v-6ede79c0" catchtouchstart="{{op.c}}" catchtouchmove="{{op.d}}" catchtouchend="{{op.e}}">{{op.a}}</button></view><view id="opsRow2" class="{{['data-v-6ede79c0', 'ops-row-2', r]}}"><view class="ops-left data-v-6ede79c0"><button wx:for="{{o}}" wx:for-item="op" wx:key="b" class="btn btn-operator data-v-6ede79c0" catchtouchstart="{{op.c}}" catchtouchmove="{{op.d}}" catchtouchend="{{op.e}}">{{op.a}}</button></view><button class="btn btn-secondary mode-btn data-v-6ede79c0" bindtap="{{q}}">{{p}}</button></view><view wx:if="{{s}}" class="drag-ghost data-v-6ede79c0" style="{{v}}">{{t}}</view><view class="expr-card card section data-v-6ede79c0"><view id="exprZone" class="{{['expr-zone', 'data-v-6ede79c0', A && 'expr-zone-active']}}" style="{{'height:' + B}}"><view id="exprRow" class="row expr-row data-v-6ede79c0" style="{{'transform:' + z + ';' + ('transform-origin:' + 'left center')}}"><block wx:for="{{w}}" wx:for-item="t" wx:key="k"><view wx:if="{{t.a}}" class="{{['insert-placeholder', 'data-v-6ede79c0', t.b]}}"></view><view class="{{['tok', 'data-v-6ede79c0', t.f, t.g]}}" catchtouchstart="{{t.h}}" catchtouchmove="{{t.i}}" catchtouchend="{{t.j}}"><image wx:if="{{t.c}}" class="tok-card-img data-v-6ede79c0" src="{{t.d}}" mode="heightFix"/><text wx:else class="tok-op-text data-v-6ede79c0">{{t.e}}</text></view></block><view wx:if="{{x}}" class="{{['insert-placeholder', 'data-v-6ede79c0', y]}}"></view></view></view></view><text id="hintText" class="{{['hint-text', 'data-v-6ede79c0', D && 'error']}}">{{C}}</text><view class="data-v-6ede79c0" id="submitRow"><button class="btn btn-primary data-v-6ede79c0" style="width:100%" bindtap="{{E}}">提交答案</button></view><view id="failRow" class="pair-grid data-v-6ede79c0"><button class="btn btn-secondary data-v-6ede79c0" bindtap="{{F}}">提示</button><button class="btn btn-secondary data-v-6ede79c0" bindtap="{{G}}">下一题</button></view><view wx:if="{{H}}" class="success-overlay data-v-6ede79c0"><view class="success-burst data-v-6ede79c0">24!</view></view><view wx:if="{{I}}" class="success-overlay data-v-6ede79c0"><view class="error-burst data-v-6ede79c0"><text class="err-title data-v-6ede79c0">计算错误</text><text wx:if="{{J}}" class="err-val data-v-6ede79c0">{{K}}</text></view></view></view><custom-tab-bar class="data-v-6ede79c0" u-i="6ede79c0-0" bind:__l="__l"/>
+<view class="{{['page', 'col', 'data-v-1cf27b2a', az && 'booted']}}" style="{{aA}}" bindtouchstart="{{aB}}" bindtouchmove="{{aC}}" bindtouchend="{{aD}}" bindtouchcancel="{{aE}}">
+  <view id="gameTopBox" class="game-header top-fixed data-v-1cf27b2a">
+    <view class="topbar data-v-1cf27b2a">
+      <view class="user-chip data-v-1cf27b2a" hover-class="user-chip-hover" bindtap="{{g}}">
+        <block wx:if="{{a}}">
+          <image class="user-chip-avatar data-v-1cf27b2a" src="{{b}}" mode="aspectFill" binderror="{{c}}" />
+        </block>
+        <view wx:else class="user-chip-fallback data-v-1cf27b2a" style="{{'background-color:' + e}}">{{d}}</view><text class="user-chip-name data-v-1cf27b2a">{{f}}</text>
+      </view>
+    </view>
+    <view class="mode-bar data-v-1cf27b2a"><button class="{{['btn', 'mode-toggle-btn', 'data-v-1cf27b2a', i]}}" bindtap="{{j}}">{{h}}</button>
+      <view class="data-v-1cf27b2a" style="flex:1"><button class="btn btn-secondary deck-toggle-btn data-v-1cf27b2a" bindtap="{{l}}">{{k}}</button></view>
+    </view>
+    <view id="statsRow" class="card section stats-compact-table stats-card data-v-1cf27b2a">
+      <view class="thead data-v-1cf27b2a"><text class="th data-v-1cf27b2a">剩余</text><text class="th data-v-1cf27b2a">局数</text><text class="th ok data-v-1cf27b2a">成功</text><text class="th fail data-v-1cf27b2a">失败</text><text class="th data-v-1cf27b2a">胜率</text><text class="th data-v-1cf27b2a">上一局</text><text class="th data-v-1cf27b2a">本局</text></view>
+      <view class="tbody data-v-1cf27b2a"><text class="td data-v-1cf27b2a">{{m}}</text><text class="td data-v-1cf27b2a">{{n}}</text><text class="td ok data-v-1cf27b2a">{{o}}</text><text class="td fail data-v-1cf27b2a">{{p}}</text><text class="td data-v-1cf27b2a">{{q}}%</text><text class="td data-v-1cf27b2a">{{r}}</text>
+        <view class="td timer-cell data-v-1cf27b2a" id="timerCell" bindtap="{{w}}">
+          <block wx:if="{{s}}"><text class="data-v-1cf27b2a">{{t}}</text></block>
+          <block wx:else><button class="btn btn-secondary btn-reshuffle data-v-1cf27b2a" catchtap="{{v}}">洗牌</button></block>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="game-middle data-v-1cf27b2a" style="{{'height:' + X}}">
+    <view class="mode-panels data-v-1cf27b2a">
+      <!-- 互斥渲染：同一时间只挂载一个面板 -->
+      <view wx:if="{{Q}}" class="pro-mode mode-panel data-v-1cf27b2a">
+        <view id="cardGrid" class="card-grid data-v-1cf27b2a" style="padding-top:0rpx">
+          <view wx:for="{{x}}" wx:for-item="card" wx:key="c" class="{{['playing-card', 'data-v-1cf27b2a', card.d && 'used']}}" catchtouchstart="{{card.e}}" catchtouchmove="{{card.f}}" catchtouchend="{{card.g}}">
+            <playing-card wx:if="{{card.b}}" class="playing-card-visual data-v-1cf27b2a" u-i="{{card.a}}" bind:__l="__l" u-p="{{card.b}}" />
+          </view>
+        </view>
+        <view id="opsRow1" class="{{['data-v-1cf27b2a', 'ops-row-1', z]}}"><button wx:for="{{y}}" wx:for-item="op" wx:key="b" class="btn btn-operator data-v-1cf27b2a" catchtouchstart="{{op.c}}" catchtouchmove="{{op.d}}" catchtouchend="{{op.e}}">{{op.a}}</button></view>
+        <view id="opsRow2" class="{{['data-v-1cf27b2a', 'ops-row-2', D]}}">
+          <view class="ops-left data-v-1cf27b2a"><button wx:for="{{A}}" wx:for-item="op" wx:key="b" class="btn btn-operator data-v-1cf27b2a" catchtouchstart="{{op.c}}" catchtouchmove="{{op.d}}" catchtouchend="{{op.e}}">{{op.a}}</button></view><button class="btn btn-secondary mode-btn data-v-1cf27b2a" bindtap="{{C}}">{{B}}</button>
+        </view>
+        <view wx:if="{{E}}" class="drag-ghost data-v-1cf27b2a" style="{{G}}">{{F}}</view>
+        <view class="expr-card card section data-v-1cf27b2a">
+          <view id="exprZone" class="{{['expr-zone', 'data-v-1cf27b2a', N && 'expr-zone-active', O && 'empty']}}" style="{{'height:' + P}}">
+            <view wx:if="{{H}}" class="expr-override data-v-1cf27b2a">{{I}}</view>
+            <view id="exprRow" class="row expr-row data-v-1cf27b2a" style="{{'transform:' + M + ';' + ('transform-origin:' + 'left center')}}">
+              <block wx:for="{{J}}" wx:for-item="t" wx:key="l">
+                <view wx:if="{{t.a}}" class="{{['insert-placeholder', 'data-v-1cf27b2a', t.b]}}"></view>
+                <view class="{{['tok', 'data-v-1cf27b2a', t.g, t.h]}}" catchtouchstart="{{t.i}}" catchtouchmove="{{t.j}}" catchtouchend="{{t.k}}">
+                  <playing-card wx:if="{{t.c}}" class="tok-card-visual data-v-1cf27b2a" u-i="{{t.d}}" bind:__l="__l" u-p="{{t.e}}" /><text wx:else class="tok-op-text data-v-1cf27b2a">{{t.f}}</text>
+                </view>
+              </block>
+              <view wx:if="{{K}}" class="{{['insert-placeholder', 'data-v-1cf27b2a', L]}}"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view wx:elif="{{W}}" class="basic-mode mode-panel data-v-1cf27b2a">
+        <view class="basic-board data-v-1cf27b2a">
+          <view class="basic-column data-v-1cf27b2a">
+            <view wx:for="{{R}}" wx:for-item="i" wx:key="h" class="basic-card-wrapper data-v-1cf27b2a">
+              <view class="{{['data-v-1cf27b2a', 'basic-card', i.f]}}" bindtap="{{i.g}}">
+                <playing-card wx:if="{{i.a}}" class="basic-card-visual data-v-1cf27b2a" u-i="{{i.b}}" bind:__l="__l" u-p="{{i.c}}" />
+                <view wx:elif="{{i.d}}" class="basic-card-value data-v-1cf27b2a"><text class="basic-card-value-text data-v-1cf27b2a">{{i.e}}</text></view>
+              </view>
+            </view>
+          </view>
+          <view class="basic-ops data-v-1cf27b2a"><button wx:for="{{S}}" wx:for-item="op" wx:key="b" class="{{['btn', 'btn-operator', 'data-v-1cf27b2a', op.c && 'active']}}" bindtap="{{op.d}}">{{op.a}}</button><button class="btn btn-secondary mode-btn basic-face-toggle data-v-1cf27b2a" bindtap="{{U}}">{{T}}</button></view>
+          <view class="basic-column data-v-1cf27b2a">
+            <view wx:for="{{V}}" wx:for-item="i" wx:key="h" class="basic-card-wrapper data-v-1cf27b2a">
+              <view class="{{['data-v-1cf27b2a', 'basic-card', i.f]}}" bindtap="{{i.g}}">
+                <playing-card wx:if="{{i.a}}" class="basic-card-visual data-v-1cf27b2a" u-i="{{i.b}}" bind:__l="__l" u-p="{{i.c}}" />
+                <view wx:elif="{{i.d}}" class="basic-card-value data-v-1cf27b2a"><text class="basic-card-value-text data-v-1cf27b2a">{{i.e}}</text></view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view id="gameBottomBox" class="game-footer bottom-fixed data-v-1cf27b2a">
+    <view wx:if="{{Q}}" id="submitRow" class="footer-row data-v-1cf27b2a">
+      <button hidden="{{!Y}}" class="btn btn-primary footer-primary-btn data-v-1cf27b2a" bindtap="{{Z}}">提交答案</button>
+    </view>
+    <view wx:elif="{{W}}" hidden="{{!ad}}" class="basic-utility-grid data-v-1cf27b2a"><button class="btn btn-secondary data-v-1cf27b2a" disabled="{{aa}}" bindtap="{{ab}}">后退</button><button class="btn btn-secondary data-v-1cf27b2a" bindtap="{{ac}}">重置</button>
+    </view>
+    <view id="failRow" class="footer-row data-v-1cf27b2a">
+      <view wx:if="{{Q}}" class="pair-grid footer-pair data-v-1cf27b2a" hidden="{{!ag}}">
+        <button class="btn btn-secondary data-v-1cf27b2a" bindtap="{{ae}}">提示</button>
+        <button class="btn btn-secondary data-v-1cf27b2a" bindtap="{{af}}">下一题</button>
+      </view>
+      <view wx:elif="{{W}}" class="pair-grid footer-pair data-v-1cf27b2a" hidden="{{!aj}}">
+        <button class="btn btn-secondary data-v-1cf27b2a" bindtap="{{ah}}">提示</button>
+        <button class="btn btn-secondary data-v-1cf27b2a" bindtap="{{ai}}">下一题</button>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{ak}}" class="success-overlay data-v-1cf27b2a">
+    <view class="success-burst data-v-1cf27b2a">24!</view>
+  </view>
+  <view wx:if="{{al}}" class="success-overlay data-v-1cf27b2a">
+    <view class="error-burst data-v-1cf27b2a"><text class="err-title data-v-1cf27b2a">计算错误</text><text wx:if="{{am}}" class="err-val data-v-1cf27b2a">{{an}}</text></view>
+  </view>
+  <view wx:if="{{ao}}" class="timer-popover-layer data-v-1cf27b2a" bindtap="{{as}}">
+    <view class="timer-popover data-v-1cf27b2a" style="{{aq}}" catchtap="{{ar}}"><button class="timer-popover-item data-v-1cf27b2a" bindtap="{{ap}}">重新发牌</button></view>
+  </view>
+  <view wx:if="{{at}}" class="{{['floating-hint-layer', 'data-v-1cf27b2a', ax && 'interactive']}}" bindtap="{{ay}}">
+    <view class="floating-hint data-v-1cf27b2a" catchtap="{{aw}}">{{av}}</view>
+  </view>
+  <custom-tab-bar class="data-v-1cf27b2a" u-i="1cf27b2a-4" bind:__l="__l"></custom-tab-bar>
+</view>
