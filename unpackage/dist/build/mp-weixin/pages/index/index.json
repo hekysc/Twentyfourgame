@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "TF24",
+  "usingComponents": {
+    "custom-tab-bar": "../../components/CustomTabBar"
+  }
+}

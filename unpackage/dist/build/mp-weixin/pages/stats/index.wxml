@@ -1,0 +1,106 @@
+<view class="page data-v-e1f0ada9" style="padding:24rpx;display:flex;flex-direction:column;gap:18rpx">
+  <view class="section data-v-e1f0ada9">
+    <view class="row data-v-e1f0ada9" style="justify-content:space-between;align-items:center;gap:12rpx;flex-wrap:wrap">
+      <text class="title data-v-e1f0ada9">玩家总览</text>
+      <view class="row data-v-e1f0ada9" style="display:flex;align-items:center;gap:12rpx">
+        <view class="seg data-v-e1f0ada9">
+          <button class="{{['seg-btn', 'data-v-e1f0ada9', a && 'active']}}" bindtap="{{b}}">今天</button>
+          <button class="{{['seg-btn', 'data-v-e1f0ada9', c && 'active']}}" bindtap="{{d}}">3天</button>
+          <button class="{{['seg-btn', 'data-v-e1f0ada9', e && 'active']}}" bindtap="{{f}}">7天</button>
+          <button class="{{['seg-btn', 'data-v-e1f0ada9', g && 'active']}}" bindtap="{{h}}">30天</button>
+          <button class="{{['seg-btn', 'data-v-e1f0ada9', i && 'active']}}" bindtap="{{j}}">全部</button>
+        </view>
+      </view>
+    </view>
+    <view class="table data-v-e1f0ada9">
+      <view class="thead data-v-e1f0ada9">
+        <text class="th rank data-v-e1f0ada9">名</text>
+        <text class="th user data-v-e1f0ada9">用户</text>
+        <text class="th data-v-e1f0ada9">总局数</text>
+        <text class="th ok data-v-e1f0ada9">成功/失败</text>
+        <text class="th data-v-e1f0ada9">🎯胜率</text>
+        <text class="th data-v-e1f0ada9">平均</text>
+        <text class="th data-v-e1f0ada9">🏆最佳</text>
+      </view>
+      <view class="tbody data-v-e1f0ada9">
+        <view wx:for="{{k}}" wx:for-item="row" wx:key="i" class="tr data-v-e1f0ada9" bindtap="{{row.j}}">
+          <text class="td rank data-v-e1f0ada9">{{row.a}}</text>
+          <text class="td user data-v-e1f0ada9">{{row.b}}</text>
+          <text class="td data-v-e1f0ada9">{{row.c}}</text>
+          <text class="td ok data-v-e1f0ada9">{{row.d}}/{{row.e}}</text>
+          <text class="td data-v-e1f0ada9">{{row.f}}%</text>
+          <text class="td data-v-e1f0ada9">{{row.g}}</text>
+          <text class="td data-v-e1f0ada9">{{row.h}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  
+  <view wx:if="{{l}}" class="section data-v-e1f0ada9">
+    <view class="row data-v-e1f0ada9" style="justify-content:space-between;align-items:center;gap:12rpx;flex-wrap:wrap">
+      <text class="title data-v-e1f0ada9">📈个人趋势</text>
+      <view class="user-picker data-v-e1f0ada9" style="display:flex;align-items:center;gap:8rpx">
+        <text class="data-v-e1f0ada9" style="color:#6b7280;font-size:26rpx">查看</text>
+        <picker class="data-v-e1f0ada9" range="{{n}}" range-key="name" bindchange="{{o}}">
+          <view class="picker-trigger data-v-e1f0ada9">{{m}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="trend data-v-e1f0ada9" style="margin-top:12rpx;height:160rpx;display:flex;align-items:flex-end;gap:6rpx">
+      <view wx:for="{{p}}" wx:for-item="d" wx:key="a" class="bar data-v-e1f0ada9" style="height:{{d.b}};background:{{d.c}}"></view>
+    </view>
+    <view class="trend-legend data-v-e1f0ada9" style="margin-top:8rpx;color:#6b7280;font-size:24rpx">绿色=成功占比，灰色=无数据</view>
+    <view class="table data-v-e1f0ada9" style="margin-top:12rpx">
+      <view class="thead data-v-e1f0ada9" style="display:grid;grid-template-columns:repeat(4, 1fr)">
+        <text class="th data-v-e1f0ada9">当前连胜</text>
+        <text class="th data-v-e1f0ada9">最长连胜</text>
+        <text class="th data-v-e1f0ada9">当前连败</text>
+        <text class="th data-v-e1f0ada9">最长连败</text>
+      </view>
+      <view class="tbody data-v-e1f0ada9">
+        <view class="tr data-v-e1f0ada9" style="display:grid;grid-template-columns:repeat(4, 1fr)">
+          <text class="td ok data-v-e1f0ada9">{{q}}</text>
+          <text class="td ok data-v-e1f0ada9">{{r}}</text>
+          <text class="td fail data-v-e1f0ada9">{{s}}</text>
+          <text class="td fail data-v-e1f0ada9">{{t}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  
+  <view wx:if="{{v}}" class="section data-v-e1f0ada9">
+    <view class="row data-v-e1f0ada9" style="justify-content:space-between;align-items:center">
+      <text class="title data-v-e1f0ada9">最近战绩</text>
+    </view>
+    <view class="rounds data-v-e1f0ada9">
+      <view wx:for="{{w}}" wx:for-item="r" wx:key="f" class="round-item compact3 data-v-e1f0ada9">
+        <text class="r-time data-v-e1f0ada9">{{r.a}}</text>
+        <text class="{{['r-result', 'data-v-e1f0ada9', r.c && 'ok', r.d && 'fail']}}">{{r.b}}</text>
+        <text class="r-timeMs data-v-e1f0ada9">{{r.e}}</text>
+      </view>
+    </view>
+  </view>
+  
+  <view wx:if="{{x}}" class="section data-v-e1f0ada9">
+    <view class="row data-v-e1f0ada9" style="justify-content:space-between;align-items:center">
+      <text class="title data-v-e1f0ada9">差一点榜（错误近似度）</text>
+    </view>
+    <view wx:if="{{y}}" class="table data-v-e1f0ada9">
+      <view class="thead data-v-e1f0ada9" style="display:grid;grid-template-columns:200rpx 1fr 160rpx 160rpx">
+        <text class="th data-v-e1f0ada9" style="width:200rpx">时间</text>
+        <text class="th data-v-e1f0ada9">表达式</text>
+        <text class="th data-v-e1f0ada9">结果</text>
+        <text class="th data-v-e1f0ada9">偏差</text>
+      </view>
+      <view class="tbody data-v-e1f0ada9">
+        <view wx:for="{{z}}" wx:for-item="m" wx:key="f" class="tr data-v-e1f0ada9" style="display:grid;grid-template-columns:200rpx 1fr 160rpx 160rpx">
+          <text class="td data-v-e1f0ada9">{{m.a}}</text>
+          <text class="td data-v-e1f0ada9">{{m.b}}</text>
+          <text class="td data-v-e1f0ada9">{{m.c}}</text>
+          <text class="td data-v-e1f0ada9">{{m.d}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="data-v-e1f0ada9" style="text-align:center;color:#6b7280;padding:24rpx">暂无数据</view>
+  </view>
+</view>
