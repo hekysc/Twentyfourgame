@@ -75,7 +75,7 @@
                     @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
                     @touchmove.stop.prevent="onDrag($event)"
                     @touchend.stop.prevent="endDrag()">
-                <image class="card-img" :src="cardImage(card)" mode="widthFix"/>
+                <PlayingCard class="playing-card-visual" :card="card" />
               </view>
             </view>
 
@@ -115,7 +115,7 @@
                           @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
                           @touchmove.stop.prevent="onDrag($event)"
                           @touchend.stop.prevent="endDrag()">
-                      <image v-if="t.type==='num'" class="tok-card-img" :src="cardImage({ rank: t.rank || +t.value, suit: t.suit || 'S'})" mode="heightFix"/>
+                      <PlayingCard v-if="t.type==='num'" class="tok-card-visual" :card="{ rank: t.rank != null ? t.rank : Number(t.value), suit: t.suit || 'S', value: t.value }" size="sm" :fill="true" />
                       <text v-else class="tok-op-text">{{ t.value }}</text>
                     </view>
                   </block>
@@ -130,7 +130,7 @@
               <view class="basic-column">
                 <view v-for="i in [0, 2]" :key="'basic-left-' + i" class="basic-card-wrapper">
                   <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
-                    <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
+                    <PlayingCard v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-visual" :card="basicSlots[i].card" size="md" />
                     <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
                       <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
                     </view>
@@ -144,7 +144,7 @@
               <view class="basic-column">
                 <view v-for="i in [1, 3]" :key="'basic-right-' + i" class="basic-card-wrapper">
                   <view :class="['basic-card', basicCardClass(i)]" @tap="handleBasicCardTap(i)">
-                    <image v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-img" :src="cardImage(basicSlots[i].card)" mode="widthFix" />
+                    <PlayingCard v-if="basicSlots[i] && basicSlots[i].alive && basicSlots[i].source === 'card'" class="basic-card-visual" :card="basicSlots[i].card" size="md" />
                     <view v-else-if="basicSlots[i] && basicSlots[i].alive" class="basic-card-value">
                       <text class="basic-card-value-text">{{ basicSlots[i].label }}</text>
                     </view>
@@ -214,6 +214,7 @@
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
+import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
@@ -222,7 +223,6 @@ import {
   tokensToExpression,
   formatMs,
   formatMsShort,
-  cardImagePath,
   labelForRank,
   mapCardRank,
   computeExprStats,
@@ -320,7 +320,6 @@ const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort
-const cardImage = cardImagePath
 
 function requestLayoutMeasure() {
   computeMiddleHeight()
@@ -1626,9 +1625,12 @@ function onSessionOver() {
  
 /* 牌区 */ 
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
-.playing-card { background:None; border-radius:16rpx; overflow:hidden; box-shadow:0 8rpx 20rpx rgba(15,23,42,.08); border:1rpx solid #e5e7eb; }
+.playing-card { background:none; border-radius:16rpx; display:block; }
 .playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
-.card-img { width:100%; height:auto; display:block; }
+.playing-card .card-visual { width:100%; height:100%; }
+.tok-card-visual { width:100%; height:100%; display:block; }
+.tok-card-visual.card-visual--fill { height:100%; }
+.basic-card-visual { width:80%; margin:0 auto; max-width:320rpx; display:block; }
 
 /* 运算符与按钮 */
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:16rpx; }
@@ -1763,7 +1765,6 @@ function onSessionOver() {
 }
 .tok { color:#1f3a93; border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
 .tok.num { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block; }
-.tok-card-img { width:100%; height:100%; object-fit: contain; display:block; border-radius:14rpx; box-shadow:0 6rpx 20rpx rgba(15,23,42,.08); }
 .tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:#fff; border:2rpx solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(15,23,42,.06); box-sizing: border-box; }
 .tok.dragging { opacity:.6; box-shadow:0 6rpx 24rpx rgba(0,0,0,.18); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
@@ -1798,7 +1799,6 @@ function onSessionOver() {
 .basic-card.hidden { visibility:hidden; pointer-events:none; }
 .basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
 .basic-card.result { background:#fef3c7; }
-.basic-card-img { width:80%; height:80%; object-fit:contain; }
 .basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
 .basic-card-value-text { font-size:64rpx; font-weight:700; color:#1f2937; }
 .basic-ops { display:flex; flex-direction:column; gap:16rpx; align-items:stretch; justify-content:center; flex:0 0 150rpx; }

@@ -25,10 +25,11 @@
 - `components/` 组件 
   - `components/MiniBar.vue` 百分比小条形图 
   - `components/MicroSpark.vue` 微火柴趋势图 
+  - `components/PlayingCard.vue` 扑克牌渲染组件（渲染内置扑克牌 UI）
 - `utils/` 工具 
   - `utils/solver.js` 24 点求解与分数计算 
   - `utils/store.js` 本地存储封装（用户与统计） 
-- `static/cards/` 牌面资源（如 `SpadeA.png`、`Heart10.png`）
+- `static/` 静态资源（背景/图标等常规资源；扑克牌 PNG 已移除）
 - `pages.json` 路由与 TabBar 配置
 - `manifest.json` 应用配置（打包信息）
 

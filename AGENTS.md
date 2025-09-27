@@ -19,7 +19,7 @@
   - `utils/`：通用逻辑
     - `utils/solver.js`：24 点求解与表达式计算（分数精度，避免浮点误差）
     - `utils/store.js`：本地存储封装（用户与统计）
-  - `static/cards/`：牌面素材（`<花色><点数>.png`）
+  - `components/PlayingCard.vue`：扑克牌渲染组件（纯样式绘制）
   - `pages.json`：页面与 TabBar 配置
   - `manifest.json`：应用配置（App 打包信息）
   - `unpackage/`：构建输出（请勿手工修改）
@@ -45,8 +45,8 @@
 - 面牌规则切换：`J/Q/K` 可按两种模式映射（`faceUseHigh`）：
   - 低位：`J/Q/K = 1`
   - 高位：`J=11 / Q=12 / K=13`
-  - 相关函数位于 `pages/index/index.vue`：`evalRank`、`labelFor`、`cardImage`。
-- 资源规范：图片命名遵循 `static/cards/<SuitName><Rank>.png`，如 `SpadeA.png`、`Heart10.png`。
+  - 相关逻辑位于 `pages/index/index.vue` 与 `components/PlayingCard.vue`：`evalRank`、`labelFor` 以及组件内的渲染样式。
+- 资源规范：扑克牌图案由 `PlayingCard` 组件绘制，无需静态图片。
 - UI 单位：以 `rpx` 为主，注意小程序/H5/App 端兼容性。
 
 ## 核心逻辑说明

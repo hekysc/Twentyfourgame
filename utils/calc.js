@@ -26,19 +26,6 @@ export function labelForRank(rank) {
 }
 
 /**
- * 根据牌面返回图片路径。
- * @param {{rank: number, suit: 'S'|'H'|'D'|'C'}} card
- * @returns {string}
- */
-export function cardImagePath(card) {
-  const suitMap = { S: 'Spade', H: 'Heart', D: 'Diamond', C: 'Club' }
-  const faceMap = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
-  const suitName = suitMap[card.suit] || 'Spade'
-  const rankName = faceMap[card.rank] || String(card.rank)
-  return `/static/cards/${suitName}${rankName}.png`
-}
-
-/**
  * 将分数值格式化为字符串。
  * @param {{n:number,d:number}|Fraction|null} frac
  * @returns {string}
