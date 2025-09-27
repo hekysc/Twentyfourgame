@@ -73,9 +73,11 @@ export function setTabBarHeight(heightPx) {
   const cache = getGlobalData()
   if (cache.tabBarHeight !== heightPx) cache.tabBarHeight = heightPx
   try {
+    // #ifndef MP-WEIXIN
     if (typeof document !== 'undefined' && document.documentElement && document.documentElement.style) {
       document.documentElement.style.setProperty('--tf24-tabbar-height-px', `${heightPx}px`)
     }
+    // #endif
   } catch (_) {
     /* noop */
   }

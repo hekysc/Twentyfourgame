@@ -97,9 +97,11 @@ function updateVHVar(){
   try {
     const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
     const h = sys.windowHeight || (typeof window !== 'undefined' ? window.innerHeight : 0) || 0
+    // #ifndef MP-WEIXIN
     if (h && typeof document !== 'undefined' && document.documentElement && document.documentElement.style) {
       document.documentElement.style.setProperty('--vh', (h * 0.01) + 'px')
     }
+    // #endif
   } catch (_) { /* noop */ }
 }
 

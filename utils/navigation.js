@@ -66,6 +66,7 @@ export function exitApp(options = {}) {
   }
 
   try {
+    // #ifndef MP-WEIXIN
     if (typeof window !== 'undefined') {
       if (window.history && window.history.length > 1) {
         window.history.back()
@@ -76,6 +77,7 @@ export function exitApp(options = {}) {
         return false
       }
     }
+    // #endif
   } catch (_) {}
 
   return false
