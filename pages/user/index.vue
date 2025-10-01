@@ -5,6 +5,7 @@
         @touchmove="edgeHandlers.handleTouchMove"
         @touchend="edgeHandlers.handleTouchEnd"
         @touchcancel="edgeHandlers.handleTouchCancel">
+    <AppNavBar title="用户管理" :showBack="true" :with-safe-top="false" />
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
       <button class="btn btn-primary" @tap="create">添加</button>
@@ -40,6 +41,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import CustomTabBar from '../../components/CustomTabBar.vue'
+import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, getUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'

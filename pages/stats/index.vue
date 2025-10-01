@@ -7,6 +7,7 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
+    <AppNavBar title="历史统计" :showBack="true" :with-safe-top="false" />
     <view class="section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">玩家总览</text>
@@ -264,6 +265,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import MiniBar from '../../components/MiniBar.vue'
+import AppNavBar from '../../components/AppNavBar.vue'
 import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended, getCurrentUser } from '../../utils/store.js'
 import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mistakes.js'

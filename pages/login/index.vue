@@ -7,12 +7,7 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <!-- 顶部栏 -->
-    <view class="login-topbar">
-      <!-- <button class="icon-btn" @tap="goBack">←</button> -->
-      <text class="login-title">无敌24点程序·观测</text>
-      <!-- <view style="width:40rpx"></view> -->
-    </view>
+    <AppNavBar title="无敌24点程序·观测" :showBack="false" :with-safe-top="false" />
 
     <!-- 主体 -->
     <view class="login-body">
@@ -77,6 +72,7 @@ import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { exitApp } from '../../utils/navigation.js'
 import { useSafeArea } from '../../utils/useSafeArea.js'
+import AppNavBar from '../../components/AppNavBar.vue'
 
 const users = ref({ list: [], currentId: '' })
 const errMsg = ref('')
@@ -238,9 +234,7 @@ body {
   overflow: hidden;
   height: 100vh;
 }
-.login-topbar{ display:flex; align-items:center; padding:24rpx; gap:12rpx }
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
-.login-title{ flex:1; text-align:center; font-weight:900; font-size:36rpx; color:#0e141b; letter-spacing:-0.5rpx }
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
 .floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }

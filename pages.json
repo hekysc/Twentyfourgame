@@ -45,6 +45,17 @@
           }
         }
       }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置",
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": false
+          }
+        }
+      }
     }
   ],
   "globalStyle": {

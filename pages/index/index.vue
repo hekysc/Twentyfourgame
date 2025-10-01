@@ -9,7 +9,17 @@
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
     <view id="gameTopBox" class="game-header top-fixed">
-      <!-- 顶部：当前用户 -->
+      <AppNavBar :showBack="false" :with-safe-top="false">
+        <template #title>
+          <view class="nav-title-stack">
+            <text class="nav-title-main">无敌24点程序</text>
+          </view>
+        </template>
+        <template #right>
+          <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
+        </template>
+      </AppNavBar>
+
       <view class="topbar">
         <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
           <template v-if="currentUserAvatar && !avatarLoadFailed">
@@ -17,20 +27,6 @@
           </template>
           <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
           <text class="user-chip-name">{{ currentUserName }}</text>
-        </view>
-      </view>
-
-      <view class="mode-bar">
-        <button
-          class="btn mode-toggle-btn"
-          :class="mode === 'pro' ? 'mode-toggle-pro' : 'mode-toggle-basic'"
-          @click="toggleMode"
-        >{{ modeButtonLabel }}</button>
-        <view style="flex:1;">
-          <button
-            class="btn btn-secondary deck-toggle-btn"
-            @click="toggleDeckSource"
-          >{{ deckSourceLabel }}</button>
         </view>
       </view>
 
@@ -157,22 +153,16 @@
     </view>
 
     <view id="gameBottomBox" class="game-footer bottom-fixed">
-      <view id="submitRow" class="footer-row">
-        <button v-show="mode === 'pro'" class="btn btn-primary footer-primary-btn" @click="check">提交答案</button>
-        <view v-show="mode !== 'pro'" class="basic-utility-grid">
-          <button class="btn btn-secondary" :disabled="!basicHistory.length" @click="undoBasicStep">后退</button>
-          <button class="btn btn-secondary" @click="resetBasicBoard">重置</button>
-        </view>
-      </view>
-      <view id="failRow" class="footer-row">
-        <view class="pair-grid footer-pair" v-show="mode === 'pro'">
-          <button class="btn btn-secondary" @click="showSolution">提示</button>
-          <button class="btn btn-secondary" @click="skipHand">下一题</button>
-        </view>
-        <view class="pair-grid footer-pair" v-show="mode !== 'pro'">
-          <button class="btn btn-secondary" @click="showSolution">提示</button>
-          <button class="btn btn-secondary" @click="skipHand">下一题</button>
-        </view>
+      <view class="action-grid">
+        <CircleActionButton icon="swap_horiz" label="模式切换" @tap="toggleMode" />
+        <CircleActionButton icon="undo" label="撤销" :disabled="undoDisabled" @tap="handleUndo" />
+        <CircleActionButton icon="refresh" label="重置" :disabled="resetDisabled" @tap="handleReset" />
+        <CircleActionButton icon="check" label="提交" primary :disabled="submitDisabled" @tap="handleSubmit" />
+        <CircleActionButton icon="lightbulb" label="提示" @tap="handleHint" />
+        <CircleActionButton icon="skip_next" label="下一题" @tap="skipHand" />
+        <CircleActionButton icon="insights" label="统计" @tap="goStats" />
+        <CircleActionButton icon="account_circle" label="用户" @tap="goUser" />
+        <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
       </view>
     </view>
 
@@ -213,6 +203,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
+import AppNavBar from '../../components/AppNavBar.vue'
+import CircleActionButton from '../../components/CircleActionButton.vue'
 import CustomTabBar from '../../components/CustomTabBar.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
@@ -234,7 +226,7 @@ import { drawSolvableHand, newDeck } from '../../core/game-engine.js'
 import { getActivePool, recordRoundResult } from '../../utils/mistakes.js'
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
-import { getLastMode, setLastMode } from '../../utils/prefs.js'
+import { getGameplayPrefs, getLastMode, setLastMode, setGameplayPrefs, consumeRankMigrationNotice } from '../../utils/prefs.js'
 import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 import { exitApp } from '../../utils/navigation.js'
 
@@ -246,13 +238,32 @@ let initialMode = 'basic'
 try { const savedMode = getLastMode(); if (savedMode === 'pro' || savedMode === 'basic') initialMode = savedMode } catch (_) {}
 const mode = ref(initialMode)
 try { setLastMode(initialMode) } catch (_) {}
-const modeButtonLabel = computed(() => mode.value === 'pro' ? 'Pro模式' : 'Basic模式')
 const basicSlots = ref([])
 const basicSelection = ref({ first: null, operator: null })
 const basicHistory = ref([])
 const basicExpression = ref('')
 const basicDisplayExpression = ref('')
-const faceUseHigh = ref(false)
+const gameplayDefaults = (() => {
+  try {
+    const prefs = getGameplayPrefs()
+    return {
+      rankMode: prefs.rankMode || 'jqk-11-12-13',
+      deckSource: prefs.deckSource || 'regular',
+      mixWeight: Number.isFinite(prefs.mixWeight) ? prefs.mixWeight : 50,
+      haptics: !!prefs.haptics,
+      sfx: !!prefs.sfx,
+      reducedMotion: !!prefs.reducedMotion,
+    }
+  } catch (_) {
+    return { rankMode: 'jqk-11-12-13', deckSource: 'regular', mixWeight: 50, haptics: true, sfx: true, reducedMotion: false }
+  }
+})()
+const appliedGameplay = ref({ ...gameplayDefaults })
+const pendingGameplay = ref({ ...gameplayDefaults })
+const faceUseHigh = ref(appliedGameplay.value.rankMode === 'jqk-11-12-13')
+const hapticsEnabled = ref(!!appliedGameplay.value.haptics)
+const sfxEnabled = ref(!!appliedGameplay.value.sfx)
+const reducedMotion = ref(!!appliedGameplay.value.reducedMotion)
 const handRecorded = ref(false)
 const exprZoneHeight = ref(200)
 const currentUser = ref(null)
@@ -265,11 +276,11 @@ const currentUserAvatar = computed(() => (currentUser.value && currentUser.value
 const currentUserInitial = computed(() => avatarInitial(currentUserName.value))
 const currentUserColor = computed(() => colorFromUser(currentUser.value))
 const deck = ref([])
-const deckSource = ref('normal')
-const deckSourceLabel = computed(() => deckSource.value === 'mistake' ? '题库：错题' : '题库：整副')
+const deckSource = ref(appliedGameplay.value.deckSource || 'regular')
+const mixWeight = ref(appliedGameplay.value.mixWeight ?? 50)
 const mistakeRunUsed = ref(new Set())
 const mistakeRunStamp = ref(0)
-const currentHandSource = ref('normal')
+const currentHandSource = ref('regular')
 const currentMistakeKey = ref('')
 const handsPlayed = ref(0)
 const successCount = ref(0)
@@ -320,6 +331,56 @@ const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
 
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort
+
+function normalizeRankMode(mode) {
+  return mode === 'jqk-1' ? 'jqk-1' : 'jqk-11-12-13'
+}
+
+function normalizeDeckSourceValue(value) {
+  if (value === 'mistakes' || value === 'mix') return value
+  if (value === 'mistake') return 'mistakes'
+  return 'regular'
+}
+
+function clampMixWeightValue(value) {
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : 50
+}
+
+function normalizeGameplaySnapshot(prefs) {
+  const snapshot = prefs && typeof prefs === 'object' ? prefs : {}
+  return {
+    rankMode: normalizeRankMode(snapshot.rankMode),
+    deckSource: normalizeDeckSourceValue(snapshot.deckSource),
+    mixWeight: clampMixWeightValue(snapshot.mixWeight),
+    haptics: typeof snapshot.haptics === 'boolean' ? snapshot.haptics : true,
+    sfx: typeof snapshot.sfx === 'boolean' ? snapshot.sfx : true,
+    reducedMotion: typeof snapshot.reducedMotion === 'boolean' ? snapshot.reducedMotion : false,
+  }
+}
+
+function syncPendingGameplayPrefs() {
+  try {
+    const prefs = getGameplayPrefs()
+    if (prefs && prefs.rankMigrationNotice) {
+      try { uni.showToast({ title: '已迁移到新规则：JQK 仅支持 1 或 11/12/13', icon: 'none', duration: 2400 }) } catch (_) {}
+      try { consumeRankMigrationNotice() } catch (_) {}
+      prefs.rankMigrationNotice = false
+    }
+    const latest = normalizeGameplaySnapshot(prefs)
+    pendingGameplay.value = { ...latest }
+  } catch (_) {}
+}
+
+function applyPendingGameplayPrefs() {
+  const latest = pendingGameplay.value || gameplayDefaults
+  appliedGameplay.value = { ...latest }
+  faceUseHigh.value = appliedGameplay.value.rankMode === 'jqk-11-12-13'
+  deckSource.value = appliedGameplay.value.deckSource
+  mixWeight.value = appliedGameplay.value.mixWeight
+  hapticsEnabled.value = appliedGameplay.value.haptics
+  sfxEnabled.value = appliedGameplay.value.sfx
+  reducedMotion.value = appliedGameplay.value.reducedMotion
+}
 
 function requestLayoutMeasure() {
   computeMiddleHeight()
@@ -403,6 +464,7 @@ function saveSession() {
       tokens: (tokens.value || []).map(t => ({ type: t.type, value: t.value, rank: t.rank, suit: t.suit })),
       usedByCard: usedByCard.value || [],
       faceUseHigh: !!faceUseHigh.value,
+      rankMode: appliedGameplay.value.rankMode,
       handRecorded: !!handRecorded.value,
       handStartTs: handStartTs.value || 0,
       hintWasUsed: !!hintWasUsed.value,
@@ -412,10 +474,14 @@ function saveSession() {
       failCount: failCount.value || 0,
       handFailedOnce: !!handFailedOnce.value,
       solution: solution.value || null, // persisted solution to avoid "暂无提示" after restore
-      deckSource: deckSource.value || 'normal',
+      deckSource: deckSource.value || 'regular',
+      mixWeight: mixWeight.value,
+      haptics: hapticsEnabled.value,
+      sfx: sfxEnabled.value,
+      reducedMotion: reducedMotion.value,
       mistakeRunUsed: Array.from(mistakeRunUsed.value || []),
       mistakeRunStamp: mistakeRunStamp.value || 0,
-      currentHandSource: currentHandSource.value || 'normal',
+      currentHandSource: currentHandSource.value || 'regular',
       currentMistakeKey: currentMistakeKey.value || '',
       mode: mode.value || 'basic',
     }
@@ -435,7 +501,23 @@ function loadSession() {
       resetBasicStateFromCards()
       tokens.value = Array.isArray(data.tokens) ? data.tokens : []
       usedByCard.value = Array.isArray(data.usedByCard) ? data.usedByCard : [0,0,0,0]
-      faceUseHigh.value = !!data.faceUseHigh
+      const restoredRankMode = normalizeRankMode(data.rankMode || (data.faceUseHigh ? 'jqk-11-12-13' : 'jqk-1'))
+      const restoredGameplay = normalizeGameplaySnapshot({
+        rankMode: restoredRankMode,
+        deckSource: data.deckSource,
+        mixWeight: data.mixWeight,
+        haptics: data.haptics,
+        sfx: data.sfx,
+        reducedMotion: data.reducedMotion,
+      })
+      appliedGameplay.value = { ...restoredGameplay }
+      pendingGameplay.value = { ...pendingGameplay.value, ...restoredGameplay }
+      faceUseHigh.value = restoredGameplay.rankMode === 'jqk-11-12-13'
+      deckSource.value = restoredGameplay.deckSource
+      mixWeight.value = restoredGameplay.mixWeight
+      hapticsEnabled.value = restoredGameplay.haptics
+      sfxEnabled.value = restoredGameplay.sfx
+      reducedMotion.value = restoredGameplay.reducedMotion
       handRecorded.value = !!data.handRecorded
       handStartTs.value = data.handStartTs || Date.now()
       hintWasUsed.value = !!data.hintWasUsed
@@ -446,10 +528,9 @@ function loadSession() {
       handFailedOnce.value = !!data.handFailedOnce
       // 恢复 solution（向后兼容老会话）
       solution.value = data.solution || null
-      deckSource.value = data.deckSource === 'mistake' ? 'mistake' : 'normal'
       mistakeRunUsed.value = new Set(Array.isArray(data.mistakeRunUsed) ? data.mistakeRunUsed : [])
       mistakeRunStamp.value = data.mistakeRunStamp || 0
-      currentHandSource.value = data.currentHandSource === 'mistake' ? 'mistake' : 'normal'
+      currentHandSource.value = data.currentHandSource === 'mistake' ? 'mistake' : 'regular'
       currentMistakeKey.value = typeof data.currentMistakeKey === 'string' ? data.currentMistakeKey : ''
       const restoredMode = data.mode === 'pro' ? 'pro' : 'basic'
       mode.value = restoredMode
@@ -470,7 +551,7 @@ function loadSession() {
 }
 
 const remainingCards = computed(() => {
-  if (deckSource.value === 'mistake') {
+  if (deckSource.value === 'mistakes') {
     const uid = selectedUserId.value
     if (!uid) return 0
     const pool = getActivePool(uid) || []
@@ -521,10 +602,10 @@ watch([safeTop, windowHeight, safeBottom], () => { requestLayoutMeasure() })
 
 watch(selectedUserId, (newId, oldId) => {
   if (newId === oldId) return
-  const inMistake = deckSource.value === 'mistake'
+  const inMistake = deckSource.value === 'mistakes'
   resetMistakeRun(inMistake ? Date.now() : 0)
   if (!newId && inMistake) {
-    deckSource.value = 'normal'
+    switchDeckSource('regular', { scheduleNext: false })
     resetMistakeRun(0)
     nextTick(() => { nextHand() })
   } else if (inMistake && newId) {
@@ -552,6 +633,10 @@ const placeholderSizeClass = computed(() => {
   if (dt.type === 'tok') return (/^(10|11|12|13|[1-9])$/).test(dt.value) ? 'num' : 'op'
   return 'op'
 })
+
+const undoDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : (basicHistory.value.length === 0))
+const resetDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : false)
+const submitDisabled = computed(() => mode.value !== 'pro' || tokens.value.length === 0)
 
 function clearExprOverride() {
   if (exprOverrideText.value) exprOverrideText.value = ''
@@ -678,6 +763,39 @@ function resetBasicBoard() {
   try { saveSession() } catch (_) {}
 }
 
+function handleUndo() {
+  if (mode.value === 'pro') {
+    if (!tokens.value.length) return
+    removeTokenAt(tokens.value.length - 1)
+    try { saveSession() } catch (_) {}
+  } else {
+    undoBasicStep()
+  }
+}
+
+function handleReset() {
+  if (mode.value === 'pro') {
+    if (!tokens.value.length && usedByCard.value.every(v => !v)) return
+    tokens.value = []
+    usedByCard.value = [0, 0, 0, 0]
+    exprOverrideText.value = ''
+    errorValueText.value = ''
+    nextTick(() => { updateExprScale(); recomputeExprHeight() })
+    try { saveSession() } catch (_) {}
+  } else {
+    resetBasicBoard()
+  }
+}
+
+function handleSubmit() {
+  if (submitDisabled.value) return
+  check()
+}
+
+function handleHint() {
+  showSolution()
+}
+
 function toggleMode() { mode.value = mode.value === 'pro' ? 'basic' : 'pro' }
 
 function refresh() { nextHand() }
@@ -725,6 +843,7 @@ function redealHand() {
 }
 
 async function nextHand() {
+  applyPendingGameplayPrefs()
   closeTimerPopover()
   const res = await getNextDraw()
   if (!res) return
@@ -732,7 +851,7 @@ async function nextHand() {
   resetHandStateForNext()
   if (Array.isArray(res.deck)) deck.value = res.deck
   cards.value = Array.isArray(res.cards) ? res.cards : []
-  currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'normal'
+  currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'regular'
   currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
   solution.value = res.solution || null
   tokens.value = []
@@ -746,8 +865,20 @@ async function nextHand() {
 }
 
 async function getNextDraw() {
-  if (deckSource.value === 'mistake') {
-    return await drawFromMistakePool()
+  if (deckSource.value === 'mistakes') {
+    const res = await drawFromMistakePool()
+    if (res) return res
+    return await drawFromNormalDeck()
+  }
+  if (deckSource.value === 'mix') {
+    const preferMistake = Math.random() * 100 < clampMixWeightValue(mixWeight.value)
+    if (preferMistake) {
+      const res = await drawFromMistakePool({ silent: true })
+      if (res) return res
+    }
+    const normal = await drawFromNormalDeck()
+    if (normal) return normal
+    return await drawFromMistakePool({ silent: true })
   }
   return await drawFromNormalDeck()
 }
@@ -768,19 +899,24 @@ async function drawFromNormalDeck() {
   return { source: 'normal', cards: res.data.cards, deck: res.data.deck, solution: res.data.solution }
 }
 
-async function drawFromMistakePool() {
+async function drawFromMistakePool(options = {}) {
+  const silent = !!options.silent
   const uid = selectedUserId.value
   if (!uid) {
-    showHint('请先选择用户', 1600)
-    deckSource.value = 'normal'
-    try { saveSession() } catch (_) {}
-    return await drawFromNormalDeck()
+    if (!silent) {
+      showHint('请先选择用户', 1600)
+      switchDeckSource('regular', { scheduleNext: false })
+    }
+    return null
   }
   const pool = getActivePool(uid) || []
   if (!Array.isArray(pool) || pool.length === 0) {
+    if (silent) {
+      return null
+    }
     await new Promise(resolve => {
       const fallback = () => {
-        switchDeckSource('normal')
+        switchDeckSource('regular')
         resolve(null)
       }
       try {
@@ -801,6 +937,9 @@ async function drawFromMistakePool() {
   const used = mistakeRunUsed.value instanceof Set ? mistakeRunUsed.value : new Set()
   const available = pool.filter(item => item && item.key && !used.has(item.key))
   if (!available.length) {
+    if (silent) {
+      return null
+    }
     await new Promise(resolve => {
       const fallback = () => {
         restartMistakeRun()
@@ -815,7 +954,7 @@ async function drawFromMistakePool() {
             if (idx === 0) {
               restartMistakeRun()
             } else if (idx === 1) {
-              switchDeckSource('normal')
+              switchDeckSource('regular')
             } else if (idx === 2) {
               goStats()
             } else {
@@ -866,33 +1005,31 @@ function resetMistakeRun(stamp = 0) {
 function restartMistakeRun() {
   resetMistakeRun(Date.now())
   try { saveSession() } catch (_) {}
-  nextTick(() => { if (deckSource.value === 'mistake') nextHand() })
+  nextTick(() => { if (deckSource.value === 'mistakes') nextHand() })
 }
 
-function toggleDeckSource() {
-  const next = deckSource.value === 'mistake' ? 'normal' : 'mistake'
-  switchDeckSource(next)
-}
-
-function switchDeckSource(target) {
-  const next = target === 'mistake' ? 'mistake' : 'normal'
+function switchDeckSource(target, options = {}) {
+  const next = normalizeDeckSourceValue(target)
   if (deckSource.value === next) return
-  if (next === 'mistake') {
-    if (!selectedUserId.value) {
-      showHint('请先选择用户', 1600)
-      return
-    }
-    deckSource.value = 'mistake'
-    // 不再在切换到错题库时重置错题运行集合，保留进度
-    try { saveSession() } catch (_) {}
-    nextTick(() => { nextHand() })
+  if (next === 'mistakes' && !selectedUserId.value) {
+    showHint('请先选择用户', 1600)
     return
   }
-  deckSource.value = 'normal'
-  // 切换到整副时也不重置错题运行集合，便于切回后继续减少剩余
-  if (!Array.isArray(deck.value) || deck.value.length < 4) initDeck()
+  deckSource.value = next
+  pendingGameplay.value = { ...pendingGameplay.value, deckSource: next }
+  appliedGameplay.value = { ...appliedGameplay.value, deckSource: next }
+  if (next !== 'mix') {
+    pendingGameplay.value.mixWeight = mixWeight.value
+  }
+  if (options.persist !== false) {
+    try { setGameplayPrefs({ deckSource: next }) } catch (_) {}
+    syncPendingGameplayPrefs()
+  }
+  if (next === 'regular' && (!Array.isArray(deck.value) || deck.value.length < 4)) initDeck()
   try { saveSession() } catch (_) {}
-  nextTick(() => { nextHand() })
+  if (options.scheduleNext !== false) {
+    nextTick(() => { nextHand() })
+  }
 }
 
 function promptDeckReshuffle() {
@@ -925,6 +1062,7 @@ function promptDeckReshuffle() {
 }
 
 onMounted(() => {
+  syncPendingGameplayPrefs()
   ensureInit()
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   try {
@@ -965,6 +1103,7 @@ onMounted(() => {
 })
 
 onShow(() => {
+  syncPendingGameplayPrefs()
   currentUser.value = getCurrentUser() || null
   loadSession()
   startHandTimer()
@@ -1272,6 +1411,7 @@ function goLogin(){
 function goStats(){ try { uni.reLaunch({ url:'/pages/stats/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} } }
 function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(_){} } }
 function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} } }
+function goSettings(){ try { uni.navigateTo({ url: '/pages/settings/index' }) } catch(e1){ try { uni.reLaunch({ url: '/pages/settings/index' }) } catch(_){} } }
 
 function startDrag(token, e) {
   drag.value.active = true
@@ -1642,58 +1782,21 @@ function onSessionOver() {
 .ops-row-1.ops-tight,
 .ops-row-2.ops-tight { gap:10rpx; }
 .ops-row-2.ops-tight .ops-left { gap:10rpx; }
-.pair-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18rpx; width:100%; }
-.mode-bar { display:flex; align-items:stretch; gap:18rpx; margin: 8rpx 0 16rpx; }
-.mode-btn { width: 100%; white-space: nowrap; }
-.mode-toggle-btn { flex:1; width:100%; border:2rpx solid transparent; font-weight:700; }
-.mode-toggle-basic { background:#145751; color:#fff; border-color:#145751; }
-.mode-toggle-pro { background:#1d4ed8; color:#fff; border-color:#1d4ed8; }
-.deck-toggle-btn {
-  width:100%;
-  margin: 8rpx;
-  padding:28rpx 36rpx;
-  white-space:normal;
-  word-wrap: break-word;
-  font-weight:700;
-  border:2rpx solid #145751;
-  color:#fff;
-  background:#3d5714;
-}
+.nav-title-stack { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.nav-title-main { font-size:32rpx; font-weight:700; color:#0f172a; }
 
 .game-footer {
   flex:0 0 auto;
-  display:flex;
-  flex-direction:column;
-  gap:var(--tf24-footer-gap, 16rpx);
-  padding:12rpx 0;
+  padding:12rpx 0 32rpx;
   background: var(--tf24-footer-bg, #f8fafc);
   box-shadow:0 -8rpx 20rpx rgba(15,23,42,0.12);
-  border-radius:24rpx;
-  min-height: var(--tf24-footer-total, calc(var(--tf24-footer-row-height, 120rpx) * 2 + var(--tf24-footer-gap, 16rpx)));
+  border-radius:32rpx 32rpx 0 0;
   position: relative;
   z-index:20;
-}
-.footer-row {
   display:flex;
-  align-items:stretch;
-  gap:18rpx;
-  min-height:var(--tf24-footer-row-height, 120rpx);
+  justify-content:center;
 }
-.footer-row .btn {
-  width:100%;
-  height:100%;
-  min-height:var(--tf24-footer-row-height, 120rpx);
-  padding:0;
-}
-.footer-primary-btn { width:100%; }
-.basic-utility-grid {
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:18rpx;
-  width:100%;
-}
-.basic-utility-grid .btn[disabled] { opacity:.6; }
-.footer-pair { height:100%; }
+.action-grid { display:flex; flex-wrap:wrap; justify-content:center; padding:8rpx 0 0; max-width:640rpx; }
 
 .timer-cell { cursor: pointer; }
 .timer-popover-layer { position:fixed; inset:0; z-index:998; }
