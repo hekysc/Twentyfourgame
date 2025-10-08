@@ -15,12 +15,10 @@
             <text class="nav-title-main">无敌24点程序</text>
           </view>
         </template>
-        <template #right>
-          <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
-        </template>
       </AppNavBar>
 
       <view class="topbar">
+        <!-- 用户头像和名字 -->
         <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
           <template v-if="currentUserAvatar && !avatarLoadFailed">
             <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
@@ -28,7 +26,15 @@
           <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
           <text class="user-chip-name">{{ currentUserName }}</text>
         </view>
+
+        <!-- 按钮组 -->
+        <view class="topbar-actions">
+          <CircleActionButton icon="account_circle" label="用户" @tap="goUser" />
+          <CircleActionButton icon="insights" label="统计" @tap="goStats" />
+          <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
+        </view>
       </view>
+
 
       <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
       <view id="statsRow" class="card section stats-compact-table stats-card">
@@ -83,13 +89,10 @@
                       @touchend.stop.prevent="endDrag()">{{ op }}</button>
             </view>
             <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
-              <view class="ops-left">
-                <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
-                        @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
-                        @touchmove.stop.prevent="onDrag($event)"
-                        @touchend.stop.prevent="endDrag()">{{ op }}</button>
-              </view>
-              <button class="btn btn-secondary mode-btn" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
+              <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                      @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+                      @touchmove.stop.prevent="onDrag($event)"
+                      @touchend.stop.prevent="endDrag()">{{ op }}</button>
             </view>
 
             <!-- 拖拽中的浮层 -->
@@ -135,7 +138,6 @@
               </view>
               <view class="basic-ops">
                 <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
-                <button class="btn btn-secondary mode-btn basic-face-toggle" @click="toggleFaceMode">{{ faceUseHigh ? 'J/Q/K=11/12/13' : 'J/Q/K=1' }}</button>
               </view>
               <view class="basic-column">
                 <view v-for="i in [1, 3]" :key="'basic-right-' + i" class="basic-card-wrapper">
@@ -160,9 +162,6 @@
         <CircleActionButton icon="check" label="提交" primary :disabled="submitDisabled" @tap="handleSubmit" />
         <CircleActionButton icon="lightbulb" label="提示" @tap="handleHint" />
         <CircleActionButton icon="skip_next" label="下一题" @tap="skipHand" />
-        <CircleActionButton icon="insights" label="统计" @tap="goStats" />
-        <CircleActionButton icon="account_circle" label="用户" @tap="goUser" />
-        <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
       </view>
     </view>
 
@@ -195,8 +194,6 @@
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>
 
-    <!-- ✅ 把自闭合组件改为成对闭合，避免误报 -->
-    <CustomTabBar></CustomTabBar>
   </view>
 </template>
 
@@ -205,12 +202,11 @@ import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextT
 import { onHide, onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import CircleActionButton from '../../components/CircleActionButton.vue'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
-import { scheduleTabWarmup, getTabBarHeight, mergeCachedStatsExt } from '../../utils/tab-cache.js'
+import { scheduleTabWarmup, mergeCachedStatsExt } from '../../utils/tab-cache.js'
 import {
   tokensToExpression,
   formatMs,
@@ -308,7 +304,6 @@ const pageInlineStyle = computed(() => ({
 }))
 const FALLBACK_TOP_RPX = 520
 const FALLBACK_BOTTOM_RPX = 320
-const FALLBACK_TAB_RPX = 120
 const topFixedPx = ref(rpxToPx(FALLBACK_TOP_RPX))
 const bottomFixedPx = ref(rpxToPx(FALLBACK_BOTTOM_RPX))
 const middleHeight = ref(0)
@@ -429,8 +424,7 @@ function computeMiddleHeight() {
   const bottomPx = Math.max(bottomFixedPx.value || 0, rpxToPx(FALLBACK_BOTTOM_RPX))
   const safeTopPx = Math.max(0, safeTop.value || 0)
   const safeBottomPx = Math.max(0, safeBottom.value || 0)
-  const measuredTab = getTabBarHeight()
-  const tabHeight = measuredTab && measuredTab > 0 ? measuredTab : (rpxToPx(FALLBACK_TAB_RPX) + safeBottomPx)
+  const tabHeight = safeBottomPx
   const available = wh - safeTopPx - topPx - bottomPx - tabHeight
   middleHeight.value = Math.max(0, available)
 }
@@ -1110,7 +1104,6 @@ onShow(() => {
   try { refreshSafeArea() } catch (_) {}
   requestLayoutMeasure()
   try { scheduleTabWarmup({ delay: 180 }) } catch (_) {}
-  try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
@@ -1338,8 +1331,6 @@ function showSolution() {
   }
   try { saveSession() } catch (_) {}
 }
-
-function toggleFaceMode() { faceUseHigh.value = !faceUseHigh.value }
 
 function skipHand() {
   if (!handRecorded.value) {
@@ -1722,7 +1713,10 @@ function onSessionOver() {
 .mode-panels { flex:1; display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .mode-panel { display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .pro-mode { flex:1; min-height:0; }
-.topbar { padding: 12rpx 0; }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:0 24rpx; }
+.topbar-actions { display:flex; align-items:center; gap:12rpx; margin-left:auto; }
+.topbar-actions .circle-button { margin:0; }
+
 .user-chip {
   display:flex;
   align-items:center;
@@ -1775,13 +1769,10 @@ function onSessionOver() {
 /* 运算符与按钮 */
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:16rpx; }
 .ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16rpx; align-items:stretch; }
-.ops-left { display:grid; grid-template-columns:repeat(2,1fr); gap:16rpx; }
 .ops-row-1.ops-compact,
 .ops-row-2.ops-compact { gap:12rpx; }
-.ops-row-2.ops-compact .ops-left { gap:12rpx; }
 .ops-row-1.ops-tight,
 .ops-row-2.ops-tight { gap:10rpx; }
-.ops-row-2.ops-tight .ops-left { gap:10rpx; }
 .nav-title-stack { display:flex; flex-direction:column; align-items:center; justify-content:center; }
 .nav-title-main { font-size:32rpx; font-weight:700; color:#0f172a; }
 
@@ -1907,7 +1898,6 @@ function onSessionOver() {
 .basic-ops { display:flex; flex-direction:column; gap:16rpx; align-items:stretch; justify-content:center; flex:0 0 150rpx; }
 .basic-ops .btn-operator { height:96rpx; padding:16rpx 0; font-size:56rpx; }
 .basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
-.basic-face-toggle { margin-top:8rpx; white-space:normal;word-break: break-all;}
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }

@@ -33,14 +33,12 @@
       <view class="floating-hint" @tap.stop>{{ hintState.text }}</view>
     </view>
   </view>
-  <CustomTabBar />
   
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import CustomTabBar from '../../components/CustomTabBar.vue'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, getUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
 import { useFloatingHint } from '../../utils/hints.js'
@@ -48,7 +46,7 @@ import { useEdgeExit } from '../../utils/edge-exit.js'
 import { saveAvatarForUser, removeAvatarForUser, consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 import { exitApp } from '../../utils/navigation.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
-import { getTabBarHeight, getCachedUsersState, setCachedUsersState, scheduleTabWarmup } from '../../utils/tab-cache.js'
+import { getCachedUsersState, setCachedUsersState, scheduleTabWarmup } from '../../utils/tab-cache.js'
 
 const users = ref({ list: [], currentId: '' })
 const newName = ref('')
@@ -57,18 +55,15 @@ const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitPage() })
 const { safeTop, safeBottom } = useSafeArea()
 const basePaddingPx = rpxToPx(24) || 12
-const defaultTabPx = rpxToPx(120) || 60
-const tabBarHeightPx = ref(getTabBarHeight() || defaultTabPx)
 const pageStyle = computed(() => {
   const safeTopPx = Math.max(0, safeTop.value || 0)
   const safeBottomPx = Math.max(0, safeBottom.value || 0)
-  const tabPx = tabBarHeightPx.value || defaultTabPx
   const base = basePaddingPx
   return {
     paddingTop: `${safeTopPx + base}px`,
     paddingLeft: `${base}px`,
     paddingRight: `${base}px`,
-    paddingBottom: `${base + safeBottomPx + tabPx}px`,
+    paddingBottom: `${base + safeBottomPx}px`,
     display: 'flex',
     flexDirection: 'column',
     rowGap: '16rpx',
@@ -95,14 +90,11 @@ const visibleUsers = computed(() => (users.value.list || []).filter(u => String(
 onMounted(() => {
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   ensureInit()
-  tabBarHeightPx.value = getTabBarHeight() || tabBarHeightPx.value
   loadUsers()
 })
 
 onShow(() => {
-  tabBarHeightPx.value = getTabBarHeight() || tabBarHeightPx.value
   loadUsers()
-  try { uni.$emit && uni.$emit('tabbar:update') } catch (_) {}
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }

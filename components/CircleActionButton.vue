@@ -1,20 +1,23 @@
 <template>
   <view class="circle-button" :class="{ disabled }">
-    <view
-      class="circle-button-core"
-      :class="[{ danger, primary }, disabled ? 'circle-button-disabled' : '']"
-      hover-class="circle-button-hover"
-      :hover-start-time="20"
-      :hover-stay-time="120"
-      @tap="handleTap"
-      @touchstart="handleTouchStart"
-      @touchend="handleTouchEnd"
-      @touchcancel="handleTouchEnd"
-      @longpress="showTooltip"
-    >
-      <uni-icons :type="icon" :color="iconColor" :size="iconSize" />
+    <view class="circle-button-shell">
+      <view
+        class="circle-button-core"
+        :class="[{ danger, primary }, disabled ? 'circle-button-disabled' : '']"
+        hover-class="circle-button-hover"
+        :hover-start-time="20"
+        :hover-stay-time="120"
+        @tap="handleTap"
+        @touchstart="handleTouchStart"
+        @touchend="handleTouchEnd"
+        @touchcancel="handleTouchEnd"
+        @longpress="showTooltip"
+      >
+        <uni-icons :type="icon" :color="iconColor" :size="iconSize" />
+      </view>
+      <view v-if="tooltipVisible" class="circle-button-tooltip">{{ label }}</view>
     </view>
-    <view v-if="tooltipVisible" class="circle-button-tooltip">{{ label }}</view>
+    <text v-if="label" class="circle-button-label">{{ label }}</text>
   </view>
 </template>
 
@@ -73,8 +76,18 @@ onBeforeUnmount(() => clearTimer())
 .circle-button {
   position: relative;
   width: 88rpx;
-  height: 88rpx;
+  min-height: 88rpx;
   margin: 12rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.circle-button-shell {
+  position: relative;
+  width: 88rpx;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,6 +134,15 @@ onBeforeUnmount(() => clearTimer())
 
 .circle-button-hover {
   transform: scale(0.98);
+}
+
+.circle-button-label {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #1f2937;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .circle-button-tooltip {

@@ -43,10 +43,20 @@ const navStyle = computed(() => {
 
 function handleBack() {
   if (emit) emit('back')
+  const fallbackToGame = () => {
+    try {
+      uni.switchTab({ url: '/pages/index/index' })
+    } catch (err) {
+      try { uni.reLaunch({ url: '/pages/index/index' }) } catch (_) {}
+    }
+  }
   try {
-    uni.switchTab({ url: '/pages/index/index' })
+    uni.navigateBack({
+      delta: 1,
+      fail: fallbackToGame,
+    })
   } catch (err) {
-    try { uni.reLaunch({ url: '/pages/index/index' }) } catch (_) {}
+    fallbackToGame()
   }
 }
 </script>
