@@ -279,7 +279,9 @@ const hapticsEnabled = ref(!!appliedGameplay.value.haptics)
 const sfxEnabled = ref(!!appliedGameplay.value.sfx)
 const reducedMotion = ref(!!appliedGameplay.value.reducedMotion)
 const handRecorded = ref(false)
-const exprZoneHeight = ref(initialMode === 'pro' ? getProExprHeightPx() : BASIC_EXPR_HEIGHT_PX)
+const BASIC_EXPR_HEIGHT_PX = 70
+const PRO_EXPR_HEIGHT_PX = 80
+const exprZoneHeight = ref(initialMode === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX)
 const currentUser = ref(null)
 const avatarLoadFailed = ref(false)
 const currentUserName = computed(() => {
@@ -323,9 +325,6 @@ const pageInlineStyle = computed(() => ({
 }))
 const FALLBACK_TOP_RPX = 520
 const FALLBACK_BOTTOM_RPX = 320
-const BASIC_EXPR_HEIGHT_PX = 40
-const PRO_EXPR_HEIGHT_RPX = 360
-const PRO_EXPR_HEIGHT_FALLBACK_PX = 200
 const MODE_CHANGE_EVENT = 'tf24:mode-changed'
 const topFixedPx = ref(rpxToPx(FALLBACK_TOP_RPX))
 const bottomFixedPx = ref(rpxToPx(FALLBACK_BOTTOM_RPX))
@@ -402,6 +401,7 @@ function applyPendingGameplayPrefs() {
   hapticsEnabled.value = appliedGameplay.value.haptics
   sfxEnabled.value = appliedGameplay.value.sfx
   reducedMotion.value = appliedGameplay.value.reducedMotion
+  updateExprHeight()
 }
 
 function requestLayoutMeasure() {
@@ -518,6 +518,14 @@ function loadSession() {
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (!data || !Array.isArray(data.deck) || !Array.isArray(data.cards)) return false
     if ((data.cards || []).length === 4) {
+      const restoredMode = data.mode === 'pro' ? 'pro' : 'basic'
+      let preferredMode = null
+      try { preferredMode = getLastMode ? getLastMode() : null } catch (_) { preferredMode = null }
+      if (preferredMode && preferredMode !== restoredMode) {
+        applyModeFromPreference(preferredMode)
+        closeTimerPopover()
+        return false
+      }
       deck.value = data.deck
       cards.value = data.cards
       resetBasicStateFromCards()
@@ -554,14 +562,6 @@ function loadSession() {
       mistakeRunStamp.value = data.mistakeRunStamp || 0
       currentHandSource.value = data.currentHandSource === 'mistake' ? 'mistake' : 'regular'
       currentMistakeKey.value = typeof data.currentMistakeKey === 'string' ? data.currentMistakeKey : ''
-      const restoredMode = data.mode === 'pro' ? 'pro' : 'basic'
-      let preferredMode = null
-      try { preferredMode = getLastMode ? getLastMode() : null } catch (_) { preferredMode = null }
-      if (preferredMode && preferredMode !== restoredMode) {
-        applyModeFromPreference(preferredMode)
-        closeTimerPopover()
-        return false
-      }
       mode.value = restoredMode
       closeTimerPopover()
       // 如果没有 solution，则基于当前 cards 即时计算一份（兜底）
@@ -571,7 +571,7 @@ function loadSession() {
           solution.value = mapped.length === 4 ? solve24(mapped) : null
         } catch (_) { solution.value = null }
       }
-      nextTick(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
+      nextTick(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
       return true
     }
     return false
@@ -647,11 +647,25 @@ const exprScale = ref(1)
 const opsDensity = ref('normal') // normal | compact | tight
 const opsDensityClass = computed(() => opsDensity.value === 'tight' ? 'ops-tight' : (opsDensity.value === 'compact' ? 'ops-compact' : ''))
 
-// 将 rpx 转换为 px，保证在不同平台上保持相近的视觉高度
-function getProExprHeightPx() {
-  const px = rpxToPx(PRO_EXPR_HEIGHT_RPX)
-  return Number.isFinite(px) && px > 0 ? px : PRO_EXPR_HEIGHT_FALLBACK_PX
+function updateExprHeight() {
+  exprZoneHeight.value = mode.value === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX
+  try {
+    const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+    const winH = sys.windowHeight || sys.screenHeight || 0
+    if (mode.value !== 'pro') {
+      opsDensity.value = 'normal'
+      return
+    }
+    if (winH && winH < 640) opsDensity.value = 'tight'
+    else if (winH && winH < 740) opsDensity.value = 'compact'
+    else opsDensity.value = 'normal'
+  } catch (_) {
+    opsDensity.value = 'normal'
+  }
 }
+
+updateExprHeight()
+
 const ghostText = computed(() => {
   const t = drag.value.token
   if (!t) return ''
@@ -673,6 +687,7 @@ function applyModeFromPreference(prefMode) {
   if (mode.value !== normalized) {
     mode.value = normalized
   }
+  updateExprHeight()
 }
 
 function handleExternalModeChange(newMode) {
@@ -833,7 +848,7 @@ function handleReset() {
     usedByCard.value = [0, 0, 0, 0]
     exprOverrideText.value = ''
     errorValueText.value = ''
-    nextTick(() => { updateExprScale(); recomputeExprHeight() })
+    nextTick(() => { updateExprHeight(); updateExprScale() })
     try { saveSession() } catch (_) {}
   } else {
     resetBasicBoard()
@@ -913,7 +928,7 @@ async function nextHand() {
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
-  nextTick(() => recomputeExprHeight())
+  nextTick(() => updateExprHeight())
   try { saveSession() } catch (_) {}
 }
 
@@ -1152,8 +1167,8 @@ onMounted(() => {
   applyLatestModePreference()
   if (!restored) { initDeck(); nextHand() }
   setTimeout(() => { booted.value = true }, 0)
-  nextTick(() => { updateVHVar(); recomputeExprHeight(); updateExprScale() })
-  if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprScale(); recomputeExprHeight() })
+  nextTick(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
+  if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
   updateLastSuccess()
   startHandTimer()
   requestLayoutMeasure()
@@ -1636,17 +1651,16 @@ watch(currentUser, () => {
 watch(mode, (m) => {
   const normalized = m === 'pro' ? 'pro' : 'basic'
   try { setLastMode(normalized) } catch (_) {}
+  updateExprHeight()
   if (normalized === 'basic') {
-    exprZoneHeight.value = BASIC_EXPR_HEIGHT_PX
     resetBasicStateFromCards()
     basicSelection.value = { first: null, operator: null }
   } else {
-    exprZoneHeight.value = getProExprHeightPx()
     tokens.value = []
     usedByCard.value = [0, 0, 0, 0]
     exprOverrideText.value = ''
     errorValueText.value = ''
-    nextTick(() => { updateExprScale(); recomputeExprHeight() })
+    nextTick(() => { updateExprHeight(); updateExprScale() })
   }
   closeTimerPopover()
   requestLayoutMeasure()
@@ -1701,20 +1715,6 @@ function updateVHVar() {
     }
     // #endif
   } catch (e) { /* noop */ }
-}
-
-// 表达式区域高度：basic 模式固定 70px，pro 模式使用固定高度，并依据窗口高度调整运算符密度
-function recomputeExprHeight() {
-  if (mode.value !== 'pro') {
-    exprZoneHeight.value = BASIC_EXPR_HEIGHT_PX
-    return
-  }
-  const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
-  const winH = sys.windowHeight || sys.screenHeight || 0
-  if (winH && winH < 640) opsDensity.value = 'tight'
-  else if (winH && winH < 740) opsDensity.value = 'compact'
-  else opsDensity.value = 'normal'
-  exprZoneHeight.value = getProExprHeightPx()
 }
 
 function onSessionOver() {
