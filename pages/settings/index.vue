@@ -3,6 +3,16 @@
     <AppNavBar title="设置" :showBack="true" />
     <view class="settings-body" :style="bodyStyle">
       <view class="section">
+        <view class="section-title">默认模式</view>
+        <radio-group class="radio-group" @change="onModeChange" :value="playMode">
+          <label class="radio-item" v-for="item in modeOptions" :key="item.value">
+            <radio :value="item.value" :checked="playMode === item.value" />
+            <text class="radio-label">{{ item.label }}</text>
+          </label>
+        </radio-group>
+        <view class="section-tip">切换后返回题目页时会自动应用</view>
+      </view>
+      <view class="section">
         <view class="section-title">JQK 数值</view>
         <radio-group class="radio-group" @change="onRankModeChange" :value="rankMode">
           <label class="radio-item" v-for="item in rankOptions" :key="item.value">
@@ -62,16 +72,23 @@ import { computed, ref, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { useSafeArea } from '../../utils/useSafeArea.js'
-import { getGameplayPrefs, setGameplayPrefs, consumeRankMigrationNotice } from '../../utils/prefs.js'
+import { getGameplayPrefs, setGameplayPrefs, consumeRankMigrationNotice, getLastMode, setLastMode } from '../../utils/prefs.js'
 
 const { safeBottom } = useSafeArea()
+const MODE_CHANGE_EVENT = 'tf24:mode-changed'
 
+const playMode = ref(getLastMode ? getLastMode() : 'basic')
 const rankMode = ref('jqk-11-12-13')
 const deckSource = ref('regular')
 const mixWeight = ref(50)
 const haptics = ref(true)
 const sfx = ref(true)
 const reducedMotion = ref(false)
+
+const modeOptions = [
+  { value: 'basic', label: '基础模式（点选）' },
+  { value: 'pro', label: '专业模式（拖拽）' },
+]
 
 const rankOptions = [
   { value: 'jqk-1', label: 'JQK 记作 1' },
@@ -111,6 +128,7 @@ const toggles = computed(() => ([
 
 function syncFromStorage(showMigration = false) {
   const prefs = getGameplayPrefs()
+  playMode.value = getLastMode ? getLastMode() : playMode.value
   rankMode.value = prefs.rankMode
   deckSource.value = prefs.deckSource
   mixWeight.value = prefs.mixWeight
@@ -136,6 +154,27 @@ onMounted(() => {
 onShow(() => {
   syncFromStorage(false)
 })
+
+function onModeChange(e) {
+  const raw = e?.detail?.value ?? e?.target?.value ?? ''
+  const normalized = raw === 'pro' ? 'pro' : 'basic'
+  if (playMode.value !== normalized) {
+    playMode.value = normalized
+  }
+  try { setLastMode(normalized) } catch (_) {}
+  try {
+    if (typeof uni.$emit === 'function') {
+      uni.$emit(MODE_CHANGE_EVENT, normalized)
+    }
+  } catch (_) {}
+  try {
+    uni.showToast({
+      title: normalized === 'pro' ? '已切换为专业模式' : '已切换为基础模式',
+      icon: 'none',
+      duration: 1600,
+    })
+  } catch (_) {}
+}
 
 function onRankModeChange(e) {
   const value = e?.detail?.value || 'jqk-11-12-13'

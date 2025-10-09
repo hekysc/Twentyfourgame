@@ -1,4 +1,11 @@
-﻿<template>
+﻿<!--
+  页面整体结构说明：
+  1. 顶部区域：导航栏、用户信息、即时统计。
+  2. 中部区域：根据当前模式（pro/basic）展示拖拽或点选式的牌面编辑界面。
+  3. 底部区域：提供撤销、提交等全局操作按钮。
+  设计上遵循“先信息再操作”的流程，用户可先观察统计，再进行操作。
+-->
+<template>
   <view
     class="page col"
     :class="{ booted }"
@@ -17,6 +24,7 @@
         </template>
       </AppNavBar>
 
+      <!-- 顶部工具栏：显示当前用户信息与快速跳转按钮 -->
       <view class="topbar">
         <!-- 用户头像和名字 -->
         <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
@@ -36,7 +44,7 @@
       </view>
 
 
-      <!-- 本局统计：紧凑表格（1行表头 + 1行数据） -->
+      <!-- 本局统计：紧凑表格（1行表头 + 1行数据），实时展示当前对局表现 -->
       <view id="statsRow" class="card section stats-compact-table stats-card">
         <view class="thead">
           <text class="th">剩余</text>
@@ -68,6 +76,7 @@
 
     <view class="game-middle" :style="{ height: middleHeight + 'px' }">
       <view class="mode-panels">
+        <!-- Pro 模式：拖拽式编辑区，提供更高自由度 -->
         <view class="pro-mode mode-panel" v-show="mode === 'pro'">
             <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
             <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
@@ -88,6 +97,7 @@
                       @touchmove.stop.prevent="onDrag($event)"
                       @touchend.stop.prevent="endDrag()">{{ op }}</button>
             </view>
+            <!-- 运算符第二行：括号操作，密度根据屏幕高度动态调整 -->
             <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
               <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
                       @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
@@ -124,6 +134,7 @@
             </view>
           </view>
 
+          <!-- Basic 模式：简化操作，面向快速输入 -->
           <view class="basic-mode mode-panel" v-show="mode !== 'pro'">
             <view class="basic-board">
               <view class="basic-column">
@@ -136,6 +147,7 @@
                   </view>
                 </view>
               </view>
+              <!-- Basic 操作区：点击一次选牌、二次选操作 -->
               <view class="basic-ops">
                 <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
               </view>
@@ -154,9 +166,9 @@
       </view>
     </view>
 
+    <!-- 底部操作按钮：集中放置与局相关的快捷操作 -->
     <view id="gameBottomBox" class="game-footer bottom-fixed">
       <view class="action-grid">
-        <CircleActionButton icon="swap_horiz" label="模式切换" @tap="toggleMode" />
         <CircleActionButton icon="undo" label="撤销" :disabled="undoDisabled" @tap="handleUndo" />
         <CircleActionButton icon="refresh" label="重置" :disabled="resetDisabled" @tap="handleReset" />
         <CircleActionButton icon="check" label="提交" primary :disabled="submitDisabled" @tap="handleSubmit" />
@@ -198,6 +210,8 @@
 </template>
 
 <script setup>
+// ==================== 依赖引入 ====================
+// 注意：按功能分组，便于查找对应模块
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
@@ -226,6 +240,9 @@ import { getGameplayPrefs, getLastMode, setLastMode, setGameplayPrefs, consumeRa
 import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 import { exitApp } from '../../utils/navigation.js'
 
+// --------------------
+// 状态：牌面、模式与表达式
+// --------------------
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
 const usedByCard = ref([0,0,0,0])
@@ -239,6 +256,7 @@ const basicSelection = ref({ first: null, operator: null })
 const basicHistory = ref([])
 const basicExpression = ref('')
 const basicDisplayExpression = ref('')
+// 读取本地偏好：包含 JQK 映射、牌源、震动等用户个性化设置
 const gameplayDefaults = (() => {
   try {
     const prefs = getGameplayPrefs()
@@ -261,7 +279,7 @@ const hapticsEnabled = ref(!!appliedGameplay.value.haptics)
 const sfxEnabled = ref(!!appliedGameplay.value.sfx)
 const reducedMotion = ref(!!appliedGameplay.value.reducedMotion)
 const handRecorded = ref(false)
-const exprZoneHeight = ref(200)
+const exprZoneHeight = ref(initialMode === 'pro' ? getProExprHeightPx() : BASIC_EXPR_HEIGHT_PX)
 const currentUser = ref(null)
 const avatarLoadFailed = ref(false)
 const currentUserName = computed(() => {
@@ -299,11 +317,16 @@ const settledResult = ref(null);         // 'success' | 'fail' | null
 const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
 
 const { safeTop, safeBottom, windowHeight, refreshSafeArea } = useSafeArea()
+// 根据安全区（刘海、状态栏）动态调整页面内边距
 const pageInlineStyle = computed(() => ({
   paddingTop: `${Math.max(0, safeTop.value || 0)}px`,
 }))
 const FALLBACK_TOP_RPX = 520
 const FALLBACK_BOTTOM_RPX = 320
+const BASIC_EXPR_HEIGHT_PX = 40
+const PRO_EXPR_HEIGHT_RPX = 360
+const PRO_EXPR_HEIGHT_FALLBACK_PX = 200
+const MODE_CHANGE_EVENT = 'tf24:mode-changed'
 const topFixedPx = ref(rpxToPx(FALLBACK_TOP_RPX))
 const bottomFixedPx = ref(rpxToPx(FALLBACK_BOTTOM_RPX))
 const middleHeight = ref(0)
@@ -363,6 +386,10 @@ function syncPendingGameplayPrefs() {
     }
     const latest = normalizeGameplaySnapshot(prefs)
     pendingGameplay.value = { ...latest }
+    try {
+      const latestMode = getLastMode && getLastMode()
+      if (latestMode) applyModeFromPreference(latestMode)
+    } catch (_) {}
   } catch (_) {}
 }
 
@@ -410,6 +437,7 @@ function measureFixedSections() {
   }
 }
 
+// 计算中部区域高度：确保上/下固定区后剩余空间可展示牌面
 function computeMiddleHeight() {
   const fallbackWindow = (() => {
     if (typeof window !== 'undefined' && Number.isFinite(window.innerHeight)) return window.innerHeight
@@ -527,8 +555,14 @@ function loadSession() {
       currentHandSource.value = data.currentHandSource === 'mistake' ? 'mistake' : 'regular'
       currentMistakeKey.value = typeof data.currentMistakeKey === 'string' ? data.currentMistakeKey : ''
       const restoredMode = data.mode === 'pro' ? 'pro' : 'basic'
+      let preferredMode = null
+      try { preferredMode = getLastMode ? getLastMode() : null } catch (_) { preferredMode = null }
+      if (preferredMode && preferredMode !== restoredMode) {
+        applyModeFromPreference(preferredMode)
+        closeTimerPopover()
+        return false
+      }
       mode.value = restoredMode
-      try { setLastMode(restoredMode) } catch (_) {}
       closeTimerPopover()
       // 如果没有 solution，则基于当前 cards 即时计算一份（兜底）
       if (!solution.value) {
@@ -612,6 +646,12 @@ const ghostStyle = computed(() => `left:${drag.value.x}px; top:${drag.value.y}px
 const exprScale = ref(1)
 const opsDensity = ref('normal') // normal | compact | tight
 const opsDensityClass = computed(() => opsDensity.value === 'tight' ? 'ops-tight' : (opsDensity.value === 'compact' ? 'ops-compact' : ''))
+
+// 将 rpx 转换为 px，保证在不同平台上保持相近的视觉高度
+function getProExprHeightPx() {
+  const px = rpxToPx(PRO_EXPR_HEIGHT_RPX)
+  return Number.isFinite(px) && px > 0 ? px : PRO_EXPR_HEIGHT_FALLBACK_PX
+}
 const ghostText = computed(() => {
   const t = drag.value.token
   if (!t) return ''
@@ -628,6 +668,25 @@ const placeholderSizeClass = computed(() => {
   return 'op'
 })
 
+function applyModeFromPreference(prefMode) {
+  const normalized = prefMode === 'pro' ? 'pro' : 'basic'
+  if (mode.value !== normalized) {
+    mode.value = normalized
+  }
+}
+
+function handleExternalModeChange(newMode) {
+  applyModeFromPreference(newMode)
+}
+
+function applyLatestModePreference() {
+  try {
+    const latestMode = getLastMode ? getLastMode() : null
+    if (latestMode) applyModeFromPreference(latestMode)
+  } catch (_) {
+    /* noop */
+  }
+}
 const undoDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : (basicHistory.value.length === 0))
 const resetDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : false)
 const submitDisabled = computed(() => mode.value !== 'pro' || tokens.value.length === 0)
@@ -781,6 +840,7 @@ function handleReset() {
   }
 }
 
+// 校验流程：将 tokens 转换为表达式并比对结果
 function handleSubmit() {
   if (submitDisabled.value) return
   check()
@@ -789,8 +849,6 @@ function handleSubmit() {
 function handleHint() {
   showSolution()
 }
-
-function toggleMode() { mode.value = mode.value === 'pro' ? 'basic' : 'pro' }
 
 function refresh() { nextHand() }
 
@@ -836,6 +894,7 @@ function redealHand() {
   nextHand()
 }
 
+// 核心流程：生成下一题并初始化计时器/状态
 async function nextHand() {
   applyPendingGameplayPrefs()
   closeTimerPopover()
@@ -1057,6 +1116,12 @@ function promptDeckReshuffle() {
 
 onMounted(() => {
   syncPendingGameplayPrefs()
+  try {
+    if (typeof uni.$on === 'function') {
+      try { uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange) } catch (_) {}
+      uni.$on(MODE_CHANGE_EVENT, handleExternalModeChange)
+    }
+  } catch (_) {}
   ensureInit()
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   try {
@@ -1084,6 +1149,7 @@ onMounted(() => {
 
   currentUser.value = getCurrentUser() || null
   const restored = loadSession()
+  applyLatestModePreference()
   if (!restored) { initDeck(); nextHand() }
   setTimeout(() => { booted.value = true }, 0)
   nextTick(() => { updateVHVar(); recomputeExprHeight(); updateExprScale() })
@@ -1100,6 +1166,7 @@ onShow(() => {
   syncPendingGameplayPrefs()
   currentUser.value = getCurrentUser() || null
   loadSession()
+  applyLatestModePreference()
   startHandTimer()
   try { refreshSafeArea() } catch (_) {}
   requestLayoutMeasure()
@@ -1110,6 +1177,11 @@ onShow(() => {
 })
 onHide(() => { saveSession(); stopHandTimer(); closeTimerPopover() })
 onUnmounted(() => {
+  try {
+    if (typeof uni.$off === 'function') {
+      uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange)
+    }
+  } catch (_) {}
   stopHandTimer()
   if (layoutTimer) {
     try { clearTimeout(layoutTimer) } catch (_) {}
@@ -1392,6 +1464,9 @@ function exitGamePage() {
   })
 }
 
+// --------------------
+// 导航函数：统一处理页面跳转与回退逻辑
+// --------------------
 function goLogin(){
   try {
     uni.navigateTo({ url:'/pages/login/index' })
@@ -1551,6 +1626,9 @@ function updateExprScale() {
   })
 }
 
+// --------------------
+// 监听器：根据用户操作动态更新界面
+// --------------------
 watch(currentUser, () => {
   avatarLoadFailed.value = false
 })
@@ -1559,10 +1637,11 @@ watch(mode, (m) => {
   const normalized = m === 'pro' ? 'pro' : 'basic'
   try { setLastMode(normalized) } catch (_) {}
   if (normalized === 'basic') {
-    exprZoneHeight.value = 70
+    exprZoneHeight.value = BASIC_EXPR_HEIGHT_PX
     resetBasicStateFromCards()
     basicSelection.value = { first: null, operator: null }
   } else {
+    exprZoneHeight.value = getProExprHeightPx()
     tokens.value = []
     usedByCard.value = [0, 0, 0, 0]
     exprOverrideText.value = ''
@@ -1624,10 +1703,10 @@ function updateVHVar() {
   } catch (e) { /* noop */ }
 }
 
-// 表达式区域高度：页面高度扣除（提示、运算符两行、提交/清空、提示/换题）后的剩余；至少 120
+// 表达式区域高度：basic 模式固定 70px，pro 模式使用固定高度，并依据窗口高度调整运算符密度
 function recomputeExprHeight() {
   if (mode.value !== 'pro') {
-    exprZoneHeight.value = 70
+    exprZoneHeight.value = BASIC_EXPR_HEIGHT_PX
     return
   }
   const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
@@ -1635,26 +1714,7 @@ function recomputeExprHeight() {
   if (winH && winH < 640) opsDensity.value = 'tight'
   else if (winH && winH < 740) opsDensity.value = 'compact'
   else opsDensity.value = 'normal'
-  nextTick(() => {
-    const q = uni.createSelectorQuery().in(proxy)
-    q.select('#exprZone').boundingClientRect()
-     .select('#opsRow1').boundingClientRect()
-     .select('#opsRow2').boundingClientRect()
-     .select('#submitRow').boundingClientRect()
-     .select('#failRow').boundingClientRect()
-     .exec(res => {
-       const [exprRect, ops1Rect, ops2Rect, submitRect, failRect] = res || []
-       if (!exprRect) return
-       const hOps1 = (ops1Rect && ops1Rect.height) || 0
-       const hOps2 = (ops2Rect && ops2Rect.height) || 0
-       const hSubmit = (submitRect && submitRect.height) || 0
-       const hFail = (failRect && failRect.height) || 0
-       // 閫傚綋鐣欑櫧 12px
-       let avail = winH - (exprRect.top || 0) - (hOps1 + hOps2 + hSubmit + hFail) - 12
-       if (!isFinite(avail) || avail <= 0) avail = 120
-       exprZoneHeight.value = Math.max(120, Math.floor(avail))
-    })
-  })
+  exprZoneHeight.value = getProExprHeightPx()
 }
 
 function onSessionOver() {
@@ -1684,6 +1744,11 @@ function onSessionOver() {
 </script>
 
 <style scoped> 
+/* 样式说明：
+   1. 采用 flex 布局保证多端自适应。
+   2. 关键尺寸使用 rpx，兼容小程序与 App。
+   3. 通过自定义变量配合脚本测量，实现表达式区缩放。
+*/
 .page {
   height: 100dvh;
   min-height: calc(var(--vh, 1vh) * 100);
@@ -1713,7 +1778,7 @@ function onSessionOver() {
 .mode-panels { flex:1; display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .mode-panel { display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .pro-mode { flex:1; min-height:0; }
-.topbar { display:flex; align-items:center; justify-content:space-between; padding:0 24rpx; }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:16rpx; padding:0 24rpx; }
 .topbar-actions { display:flex; align-items:center; gap:12rpx; margin-left:auto; }
 .topbar-actions .circle-button { margin:0; }
 
@@ -1779,7 +1844,8 @@ function onSessionOver() {
 .game-footer {
   flex:0 0 auto;
   padding:12rpx 0 32rpx;
-  background: var(--tf24-footer-bg, #f8fafc);
+  /* background: var(--tf24-footer-bg, #f8fafc); */
+  background-color: transparent;
   box-shadow:0 -8rpx 20rpx rgba(15,23,42,0.12);
   border-radius:32rpx 32rpx 0 0;
   position: relative;
