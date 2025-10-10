@@ -13,7 +13,7 @@
         @touchcancel="handleTouchEnd"
         @longpress="showTooltip"
       >
-        <uni-icons :type="icon" :color="iconColor" :size="iconSize" />
+        <text class="circle-icon" :style="iconStyle">{{ iconGlyph }}</text>
       </view>
       <view v-if="tooltipVisible" class="circle-button-tooltip">{{ label }}</view>
     </view>
@@ -22,7 +22,7 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, onBeforeUnmount, computed } from "vue"
 
 const props = defineProps({
   icon: { type: String, default: 'help' },
@@ -35,6 +35,17 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['tap'])
+
+const ICON_GLYPHS = {
+  account_circle: 'O',
+  insights: '=',
+  settings: '*',
+  undo: 'U',
+  refresh: 'R',
+  lightbulb: 'L',
+  skip_next: '>',
+  help: '?'
+}
 
 const tooltipVisible = ref(false)
 let tooltipTimer = null
@@ -61,6 +72,9 @@ function handleTouchEnd() {
   clearTimer()
   tooltipVisible.value = false
 }
+
+const iconGlyph = computed(() => ICON_GLYPHS[props.icon] || '?')
+const iconStyle = computed(() => ({ fontSize: props.iconSize + 'px', color: props.iconColor }))
 
 function clearTimer() {
   if (tooltipTimer) {
@@ -105,6 +119,10 @@ onBeforeUnmount(() => clearTimer())
   box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.08);
 }
 
+.circle-icon {
+  line-height: 1;
+}
+
 .circle-button-core.circle-button-disabled {
   opacity: 0.4;
   box-shadow: none;
@@ -115,17 +133,14 @@ onBeforeUnmount(() => clearTimer())
   border-color: transparent;
 }
 
-.circle-button-core.primary uni-icons {
-  color: #ffffff !important;
+.circle-button-core.primary {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-color: transparent;
 }
 
 .circle-button-core.danger {
   background: linear-gradient(135deg, #ef4444, #f87171);
   border-color: transparent;
-}
-
-.circle-button-core.danger uni-icons {
-  color: #ffffff !important;
 }
 
 .circle-button.disabled {

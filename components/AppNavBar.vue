@@ -3,7 +3,7 @@
     <view class="nav-inner">
       <view class="nav-side nav-left">
         <view v-if="showBack" class="back-btn" hover-class="back-btn-hover" @tap="handleBack">
-          <uni-icons type="back" color="#111827" size="24" />
+          <text class="back-icon">←</text>
         </view>
         <slot name="left"></slot>
       </view>
@@ -137,5 +137,12 @@ function handleBack() {
 
 .back-btn-hover {
   background: rgba(17, 24, 39, 0.16);
+}
+
+.back-icon {
+  font-size: 34rpx;
+  color: #111827;
+  font-weight: 700;
+  transform: translateX(-4rpx);
 }
 </style>
