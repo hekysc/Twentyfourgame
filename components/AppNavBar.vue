@@ -3,7 +3,7 @@
     <view class="nav-inner">
       <view class="nav-side nav-left">
         <view v-if="showBack" class="back-btn" hover-class="back-btn-hover" @tap="handleBack">
-          <uni-icons type="back" color="#1f2937" size="22" />
+          <uni-icons type="back" color="#111827" size="24" />
         </view>
         <slot name="left"></slot>
       </view>
@@ -27,7 +27,8 @@ const props = defineProps({
   title: { type: String, default: '' },
   showBack: { type: Boolean, default: false },
   withSafeTop: { type: Boolean, default: true },
-  background: { type: String, default: '#f8f8f8' },
+  background: { type: String, default: '#ffffff' },
+  backToIndex: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['back'])
@@ -50,6 +51,10 @@ function handleBack() {
       try { uni.reLaunch({ url: '/pages/index/index' }) } catch (_) {}
     }
   }
+  if (props.backToIndex) {
+    fallbackToGame()
+    return
+  }
   try {
     uni.navigateBack({
       delta: 1,
@@ -64,9 +69,20 @@ function handleBack() {
 <style scoped>
 .app-nav-bar {
   width: 100%;
-  padding-bottom: 16rpx;
   box-sizing: border-box;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  position: relative;
+  background: #ffffff;
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.08);
+}
+
+.app-nav-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .nav-inner {
@@ -74,7 +90,7 @@ function handleBack() {
   align-items: center;
   justify-content: space-between;
   min-height: 96rpx;
-  padding: 0 24rpx;
+  padding: 0 20rpx;
   box-sizing: border-box;
 }
 
@@ -83,13 +99,18 @@ function handleBack() {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 64rpx;
+  height: 100%;
+  text-align: center;
 }
 
 .nav-title-text {
-  font-size: 32rpx;
+  max-width: 70%;
+  font-size: 34rpx;
   font-weight: 600;
   color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nav-side {
@@ -104,16 +125,17 @@ function handleBack() {
 }
 
 .back-btn {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 72rpx;
-  background: rgba(15, 23, 42, 0.06);
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 80rpx;
+  background: rgba(17, 24, 39, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.18s ease;
 }
 
 .back-btn-hover {
-  background: rgba(15, 23, 42, 0.12);
+  background: rgba(17, 24, 39, 0.16);
 }
 </style>

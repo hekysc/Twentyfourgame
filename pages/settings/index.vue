@@ -1,6 +1,6 @@
 <template>
   <view class="settings-page">
-    <AppNavBar title="设置" :showBack="true" />
+    <AppNavBar title="设置" :show-back="true" :back-to-index="true" />
     <view class="settings-body" :style="bodyStyle">
       <view class="section">
         <view class="section-title">默认模式</view>

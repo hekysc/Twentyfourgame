@@ -7,7 +7,7 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <AppNavBar title="历史统计" :showBack="true" :with-safe-top="false" />
+    <AppNavBar title="历史统计" :show-back="true" :with-safe-top="false" :back-to-index="true" />
     <view class="section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">玩家总览</text>

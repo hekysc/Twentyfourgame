@@ -5,7 +5,7 @@
         @touchmove="edgeHandlers.handleTouchMove"
         @touchend="edgeHandlers.handleTouchEnd"
         @touchcancel="edgeHandlers.handleTouchCancel">
-    <AppNavBar title="用户管理" :showBack="true" :with-safe-top="false" />
+    <AppNavBar title="用户管理" :show-back="true" :with-safe-top="false" :back-to-index="true" />
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
       <button class="btn btn-primary" @tap="create">添加</button>

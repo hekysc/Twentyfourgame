@@ -103,6 +103,13 @@
                       @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
                       @touchmove.stop.prevent="onDrag($event)"
                       @touchend.stop.prevent="endDrag()">{{ op }}</button>
+              <button v-if="mode === 'pro'"
+                      class="btn btn-submit-pro"
+                      :class="{ disabled: submitDisabled }"
+                      :disabled="submitDisabled"
+                      @tap="handleSubmit">
+                提交
+              </button>
             </view>
 
             <!-- 拖拽中的浮层 -->
@@ -171,7 +178,6 @@
       <view class="action-grid">
         <CircleActionButton icon="undo" label="撤销" :disabled="undoDisabled" @tap="handleUndo" />
         <CircleActionButton icon="refresh" label="重置" :disabled="resetDisabled" @tap="handleReset" />
-        <CircleActionButton icon="check" label="提交" primary :disabled="submitDisabled" @tap="handleSubmit" />
         <CircleActionButton icon="lightbulb" label="提示" @tap="handleHint" />
         <CircleActionButton icon="skip_next" label="下一题" @tap="skipHand" />
       </view>
@@ -1824,16 +1830,19 @@ function onSessionOver() {
  
 /* 牌区 */ 
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
-.playing-card { background:none; border-radius:16rpx; display:block; }
+.playing-card { position:relative; width:100%; background:none; border-radius:16rpx; overflow:visible; }
+.playing-card::before { content:""; display:block; padding-top:140%; }
 .playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
-.playing-card .card-visual { width:100%; height:100%; }
+.playing-card .card-visual { position:absolute; inset:0; width:100%; height:100%; }
 .tok-card-visual { width:100%; height:100%; display:block; }
 .tok-card-visual.card-visual--fill { height:100%; }
-.basic-card-visual { width:80%; margin:0 auto; max-width:320rpx; display:block; }
+.basic-card { position:relative; width:100%; background:none; border-radius:8rpx; border:none; box-shadow:none; overflow:visible; display:block; }
+.basic-card::before { content:""; display:block; padding-top:140%; }
+.basic-card-visual { position:absolute; inset:0; width:100%; margin:0 auto; max-width:none; display:block; }
 
 /* 运算符与按钮 */
 .ops-row-1 { display:grid; grid-template-columns:repeat(4,1fr); gap:16rpx; }
-.ops-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16rpx; align-items:stretch; }
+.ops-row-2 { display:grid; grid-template-columns:repeat(2, 1fr) auto; gap:16rpx; align-items:stretch; }
 .ops-row-1.ops-compact,
 .ops-row-2.ops-compact { gap:12rpx; }
 .ops-row-1.ops-tight,
@@ -1843,17 +1852,23 @@ function onSessionOver() {
 
 .game-footer {
   flex:0 0 auto;
-  padding:12rpx 0 32rpx;
-  /* background: var(--tf24-footer-bg, #f8fafc); */
-  background-color: transparent;
-  box-shadow:0 -8rpx 20rpx rgba(15,23,42,0.12);
-  border-radius:32rpx 32rpx 0 0;
+  padding:24rpx 0 36rpx;
+  background: transparent;
   position: relative;
   z-index:20;
   display:flex;
   justify-content:center;
+  pointer-events:none;
 }
-.action-grid { display:flex; flex-wrap:wrap; justify-content:center; padding:8rpx 0 0; max-width:640rpx; }
+.action-grid {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  padding:8rpx 24rpx 0;
+  max-width:640rpx;
+  pointer-events:auto;
+  gap:16rpx;
+}
 
 .timer-cell { cursor: pointer; }
 .timer-popover-layer { position:fixed; inset:0; z-index:998; }
@@ -1871,6 +1886,30 @@ function onSessionOver() {
 .ops-row-2.ops-compact .btn-operator { padding:18rpx 0; font-size:54rpx; }
 .ops-row-1.ops-tight .btn-operator,
 .ops-row-2.ops-tight .btn-operator { padding:16rpx 0; font-size:50rpx; }
+.btn-submit-pro {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #fff;
+  border: none;
+  padding: 0 36rpx;
+  border-radius: 9999rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 160rpx;
+  height: 100%;
+  box-shadow: 0 12rpx 28rpx rgba(37, 99, 235, 0.25);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.btn-submit-pro:active {
+  transform: scale(0.97);
+}
+.btn-submit-pro.disabled,
+.btn-submit-pro:disabled {
+  opacity: .45;
+  box-shadow: none;
+}
 .btn-primary { background:#145751; color:#fff; }
 /* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */
 
@@ -1954,15 +1993,17 @@ function onSessionOver() {
 .basic-mode { display:flex; flex-direction:column; gap:18rpx; flex:1; min-height:0; overflow:hidden; }
 .basic-board { display:flex; gap:18rpx; align-items:stretch; justify-content:center; }
 .basic-column { display:flex; flex-direction:column; gap:18rpx; flex:1; }
-.basic-card-wrapper { flex:1; }
-.basic-card { background:None; border-radius:8rpx; box-shadow:0 12rpx 28rpx rgba(15,23,42,.12); border:2rpx solid transparent; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; min-height:280rpx; transition:border-color 0.2s ease, box-shadow 0.2s ease; }
+.basic-card-wrapper { flex:1; position:relative; }
+.basic-card { position:relative; width:100%; background:none; border-radius:8rpx; border:none; box-shadow:none; overflow:visible; display:block; }
+.basic-card::before { content:''; display:block; padding-top:140%; width:100%; }
+.basic-card-visual { position:absolute; inset:0; width:100%; display:block; }
 .basic-card.hidden { visibility:hidden; pointer-events:none; }
-.basic-card.selected { border-color:#145751; box-shadow:0 16rpx 32rpx rgba(20,87,81,.22); }
+.basic-card.selected { border:2rpx solid #145751; box-shadow:none; }
 .basic-card.result { background:#fef3c7; }
-.basic-card-value { width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
+.basic-card-value { position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
 .basic-card-value-text { font-size:64rpx; font-weight:700; color:#1f2937; }
-.basic-ops { display:flex; flex-direction:column; gap:16rpx; align-items:stretch; justify-content:center; flex:0 0 150rpx; }
-.basic-ops .btn-operator { height:96rpx; padding:16rpx 0; font-size:56rpx; }
+.basic-ops { display:flex; flex-direction:column; gap:12rpx; align-items:stretch; justify-content:stretch; flex:0 0 150rpx; height:100%; }
+.basic-ops .btn-operator { flex:1; padding:16rpx 0; font-size:56rpx; display:flex; align-items:center; justify-content:center; }
 .basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
