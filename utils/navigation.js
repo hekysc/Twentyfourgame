@@ -82,3 +82,58 @@ export function exitApp(options = {}) {
 
   return false
 }
+
+export function navigateToHome(options = {}) {
+  const url = '/pages/index/index'
+  const afterNavigate = typeof options.afterNavigate === 'function' ? options.afterNavigate : null
+
+  const launch = () => {
+    if (afterNavigate) {
+      try { afterNavigate() } catch (_) {}
+    }
+  }
+
+  const tryReLaunch = () => {
+    try {
+      uni.reLaunch({
+        url,
+        success: launch,
+        fail: (err) => {
+          console.error('reLaunch 失败:', err)
+        },
+      })
+    } catch (err) {
+      console.error('尝试 reLaunch 失败:', err)
+    }
+  }
+
+  const trySwitchTab = () => {
+    try {
+      uni.switchTab({
+        url,
+        success: launch,
+        fail: (err) => {
+          console.log('switchTab 失败，尝试 reLaunch:', err)
+          tryReLaunch()
+        },
+      })
+    } catch (err) {
+      console.log('switchTab 调用异常，尝试 reLaunch:', err)
+      tryReLaunch()
+    }
+  }
+
+  try {
+    uni.navigateTo({
+      url,
+      success: launch,
+      fail: (err) => {
+        console.log('navigateTo 失败，尝试 switchTab:', err)
+        trySwitchTab()
+      },
+    })
+  } catch (err) {
+    console.log('navigateTo 调用异常，尝试 switchTab:', err)
+    trySwitchTab()
+  }
+}

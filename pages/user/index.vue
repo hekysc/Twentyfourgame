@@ -38,13 +38,13 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onBackPress, onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, getUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { saveAvatarForUser, removeAvatarForUser, consumeAvatarRestoreNotice } from '../../utils/avatar.js'
-import { exitApp } from '../../utils/navigation.js'
+import { navigateToHome } from '../../utils/navigation.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
 import { getCachedUsersState, setCachedUsersState, scheduleTabWarmup } from '../../utils/tab-cache.js'
 
@@ -53,6 +53,11 @@ const newName = ref('')
 
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitPage() })
+
+onBackPress(() => {
+  navigateToHome()
+  return true
+})
 const { safeTop, safeBottom } = useSafeArea()
 const basePaddingPx = rpxToPx(24) || 12
 const pageStyle = computed(() => {
@@ -182,22 +187,7 @@ function avatarText(name){
 }
 
 function exitPage(){
-  exitApp({
-    fallback: () => {
-      try {
-        if (typeof uni.switchTab === 'function') {
-          uni.switchTab({ url: '/pages/index/index' })
-          return
-        }
-      } catch (_) {}
-      try {
-        if (typeof uni.reLaunch === 'function') {
-          uni.reLaunch({ url: '/pages/index/index' })
-          return
-        }
-      } catch (_) {}
-    }
-  })
+  navigateToHome()
 }
 </script>
 

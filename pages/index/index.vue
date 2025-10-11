@@ -219,7 +219,7 @@
 // ==================== 依赖引入 ====================
 // 注意：按功能分组，便于查找对应模块
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
-import { onHide, onShow } from '@dcloudio/uni-app'
+import { onBackPress, onHide, onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import CircleActionButton from '../../components/CircleActionButton.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
@@ -351,6 +351,22 @@ function showBasicError(code) {
   showHint(msg, { interactive: true })
 }
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitGamePage() })
+
+let lastBackPressTs = 0
+onBackPress(() => {
+  const now = Date.now()
+  if (now - lastBackPressTs < 2000) {
+    exitGamePage()
+  } else {
+    lastBackPressTs = now
+    try {
+      showHint('再按一次返回退出应用', { duration: 2000, interactive: false })
+    } catch (_) {
+      uni.showToast({ title: '再按一次退出应用', icon: 'none' })
+    }
+  }
+  return true
+})
 
 const fmtMs = formatMs
 const fmtMs1 = formatMsShort

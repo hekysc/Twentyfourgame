@@ -1,3 +1,8 @@
+<!--
+  CircleActionButton
+  圆形/长条操作按钮组件，支持图标、标签、禁用状态等多种配置。
+  Props: icon, label, disabled, danger, primary, iconColor, iconSize, wide。
+-->
 <template>
   <view class="circle-button" :class="{ disabled }">
     <view class="circle-button-shell">

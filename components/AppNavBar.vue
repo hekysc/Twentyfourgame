@@ -1,3 +1,8 @@
+<!--
+  AppNavBar
+  顶部导航栏组件，提供返回按钮、标题与右侧插槽。
+  Props: title, showBack, withSafeTop, background, backToIndex。
+-->
 <template>
   <view class="app-nav-bar" :style="navStyle">
     <view class="nav-inner">
@@ -22,13 +27,14 @@
 <script setup>
 import { computed } from 'vue'
 import { useSafeArea } from '../utils/useSafeArea.js'
+import { navigateToHome } from '../utils/navigation.js'
 
 const props = defineProps({
   title: { type: String, default: '' },
   showBack: { type: Boolean, default: false },
   withSafeTop: { type: Boolean, default: true },
   background: { type: String, default: '#ffffff' },
-  backToIndex: { type: Boolean, default: false },
+  backToIndex: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['back'])
@@ -43,25 +49,27 @@ const navStyle = computed(() => {
 })
 
 function handleBack() {
-  if (emit) emit('back')
-  const fallbackToGame = () => {
-    try {
-      uni.switchTab({ url: '/pages/index/index' })
-    } catch (err) {
-      try { uni.reLaunch({ url: '/pages/index/index' }) } catch (_) {}
-    }
-  }
+  // 先触发自定义事件
+  emit('back')
+  
+  // 如果需要返回首页
   if (props.backToIndex) {
-    fallbackToGame()
-    return
-  }
-  try {
+    navigateToHome()
+  } else {
+    // 普通返回
     uni.navigateBack({
       delta: 1,
-      fail: fallbackToGame,
+      fail: (err) => {
+        console.log('navigateBack 失败，尝试返回首页:', err)
+        // 如果返回失败，尝试回到首页
+        uni.switchTab({
+          url: '/pages/index/index',
+          fail: () => {
+            uni.reLaunch({ url: '/pages/index/index' })
+          }
+        })
+      }
     })
-  } catch (err) {
-    fallbackToGame()
   }
 }
 </script>

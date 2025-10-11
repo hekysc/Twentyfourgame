@@ -69,10 +69,11 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onBackPress, onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { useSafeArea } from '../../utils/useSafeArea.js'
 import { getGameplayPrefs, setGameplayPrefs, consumeRankMigrationNotice, getLastMode, setLastMode } from '../../utils/prefs.js'
+import { navigateToHome } from '../../utils/navigation.js'
 
 const { safeBottom } = useSafeArea()
 const MODE_CHANGE_EVENT = 'tf24:mode-changed'
@@ -125,6 +126,11 @@ const toggles = computed(() => ([
     checked: reducedMotion.value,
   },
 ]))
+
+onBackPress(() => {
+  navigateToHome()
+  return true
+})
 
 function syncFromStorage(showMigration = false) {
   const prefs = getGameplayPrefs()

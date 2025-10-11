@@ -264,13 +264,13 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import MiniBar from '../../components/MiniBar.vue'
 import AppNavBar from '../../components/AppNavBar.vue'
-import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onBackPress, onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended, getCurrentUser } from '../../utils/store.js'
 import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mistakes.js'
 import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
-import { exitApp } from '../../utils/navigation.js'
+import { navigateToHome } from '../../utils/navigation.js'
 import {
   computeOverviewRows,
   summarizeNearMisses,
@@ -318,6 +318,11 @@ const userMap = computed(() => {
 })
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitStatsPage() })
+
+onBackPress(() => {
+  navigateToHome()
+  return true
+})
 // 单用户兼容：保留 ext 但内部来源于 userExtMap
 const ext = ref({ totals:{ total:0, success:0, fail:0 }, days:{}, rounds:[], agg:{} })
 // 日期标签旋转：当数据点较多时自动竖排，避免重叠
@@ -956,22 +961,7 @@ const overviewRowsSorted = computed(() => {
 })
 
 function exitStatsPage() {
-  exitApp({
-    fallback: () => {
-      try {
-        if (typeof uni.switchTab === 'function') {
-          uni.switchTab({ url: '/pages/index/index' })
-          return
-        }
-      } catch (_) {}
-      try {
-        if (typeof uni.reLaunch === 'function') {
-          uni.reLaunch({ url: '/pages/index/index' })
-          return
-        }
-      } catch (_) {}
-    },
-  })
+  navigateToHome()
 }
 </script>
 

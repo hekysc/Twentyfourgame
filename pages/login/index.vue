@@ -66,6 +66,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { onBackPress } from '@dcloudio/uni-app'
 import { ensureInit, getUsers, addUser, switchUser, resetAllData, touchLastPlayed } from '../../utils/store.js'
 import { saveAvatarForUser } from '../../utils/avatar.js'
 import { useFloatingHint } from '../../utils/hints.js'
@@ -79,6 +80,22 @@ const errMsg = ref('')
 
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitLoginPage() })
+
+let lastBackPress = 0
+onBackPress(() => {
+  const now = Date.now()
+  if (now - lastBackPress < 2000) {
+    exitLoginPage()
+  } else {
+    lastBackPress = now
+    try {
+      showHint('再按一次返回退出应用', { duration: 2000, interactive: false })
+    } catch (_) {
+      uni.showToast({ title: '再按一次退出应用', icon: 'none' })
+    }
+  }
+  return true
+})
 const { safeTop } = useSafeArea()
 const loginPageStyle = computed(() => ({ paddingTop: `${Math.max(0, safeTop.value || 0)}px` }))
 
