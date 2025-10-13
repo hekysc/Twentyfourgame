@@ -39,9 +39,7 @@
           <view v-else class="avatar" :style="{ backgroundColor: u.color || colorFrom(u) }">{{ avatarText(u.name) }}</view>
           <view class="user-col">
             <view class="user-name">{{ u.name }}</view>
-            <view class="user-sub">最近程序：{{ lastPlayedText(u.lastPlayedAt) }}</view>
-              <!-- </text>
-            </text> -->
+            <view class="user-sub">最近：{{ lastPlayedText(u.lastPlayedAt) }}</view>
           </view>
           <text class="chev">›</text>
         </button>
@@ -279,7 +277,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20rpx;
-  padding: 0 100rpx 20rpx 100rpx;  /* 改为padding，不用margin */
+  padding: 0 60rpx 20rpx 60rpx;  /* 改为padding，不用margin */
   overflow-y: auto;
   min-height: 0;
   height: 0;  /* 强制高度约束 */
@@ -333,6 +331,8 @@ body {
   color:#64748b;
   white-space:nowrap;
   align-self:center;                     /* ✅ 单独确保这一列底对齐 */
+  margin-left: auto;       /* 靠右对齐 */
+  text-align: right;       /* 文字靠右 */
 }
 .chev{
   flex:0 0 auto;          /* 不要挤压中间列 */

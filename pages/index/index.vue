@@ -15,130 +15,131 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <view id="gameTopBox" class="game-header top-fixed">
-      <AppNavBar :showBack="false" :with-safe-top="false">
-        <template #title>
-          <view class="nav-title-stack">
-            <text class="nav-title-main">无敌24点程序</text>
-          </view>
-        </template>
-      </AppNavBar>
-
-      <!-- 顶部工具栏：显示当前用户信息与快速跳转按钮 -->
-      <view class="topbar">
-        <!-- 用户头像和名字 -->
-        <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
-          <template v-if="currentUserAvatar && !avatarLoadFailed">
-            <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
+    <view class="page-scroll-container">
+      <view id="gameTopBox" class="game-header top-fixed">
+        <AppNavBar :showBack="false" :with-safe-top="false">
+          <template #title>
+            <view class="nav-title-stack">
+              <text class="nav-title-main">无敌24点程序</text>
+            </view>
           </template>
-          <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
-          <text class="user-chip-name">{{ currentUserName }}</text>
+        </AppNavBar>
+
+        <!-- 顶部工具栏：显示当前用户信息与快速跳转按钮 -->
+        <view class="topbar">
+          <!-- 用户头像和名字 -->
+          <view class="user-chip" hover-class="user-chip-hover" @tap="goLogin">
+            <template v-if="currentUserAvatar && !avatarLoadFailed">
+              <image class="user-chip-avatar" :src="currentUserAvatar" mode="aspectFill" @error="onAvatarError" />
+            </template>
+            <view v-else class="user-chip-fallback" :style="{ backgroundColor: currentUserColor }">{{ currentUserInitial }}</view>
+            <text class="user-chip-name">{{ currentUserName }}</text>
+          </view>
+
+          <!-- 按钮组 -->
+          <view class="topbar-actions">
+            <CircleActionButton icon="account_circle" label="用户" @tap="goUser" />
+            <CircleActionButton icon="insights" label="统计" @tap="goStats" />
+            <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
+          </view>
         </view>
 
-        <!-- 按钮组 -->
-        <view class="topbar-actions">
-          <CircleActionButton icon="account_circle" label="用户" @tap="goUser" />
-          <CircleActionButton icon="insights" label="统计" @tap="goStats" />
-          <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
-        </view>
-      </view>
 
-
-      <!-- 本局统计：紧凑表格（1行表头 + 1行数据），实时展示当前对局表现 -->
-      <view id="statsRow" class="card section stats-compact-table stats-card">
-        <view class="thead">
-          <text class="th">剩余</text>
-          <text class="th">局数</text>
-          <text class="th ok">成功</text>
-          <text class="th fail">失败</text>
-          <text class="th">胜率</text>
-          <text class="th">上一局</text>
-          <text class="th">本局</text>
-        </view>
-        <view class="tbody">
-          <text class="td">{{ remainingCards }}</text>
-          <text class="td">{{ handsPlayed }}</text>
-          <text class="td ok">{{ successCount }}</text>
-          <text class="td fail">{{ failCount }}</text>
-          <text class="td">{{ winRate }}%</text>
-          <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
-          <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
-            <block v-if="handElapsedMs < 120000">
-              <text>{{ fmtMs1(handElapsedMs) }}</text>
-            </block>
-            <block v-else>
-              <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
-            </block>
+        <!-- 本局统计：紧凑表格（1行表头 + 1行数据），实时展示当前对局表现 -->
+        <view id="statsRow" class="card section stats-compact-table stats-card">
+          <view class="thead">
+            <text class="th">剩余</text>
+            <text class="th">局数</text>
+            <text class="th ok">成功</text>
+            <text class="th fail">失败</text>
+            <text class="th">胜率</text>
+            <text class="th">上一局</text>
+            <text class="th">本局</text>
+          </view>
+          <view class="tbody">
+            <text class="td">{{ remainingCards }}</text>
+            <text class="td">{{ handsPlayed }}</text>
+            <text class="td ok">{{ successCount }}</text>
+            <text class="td fail">{{ failCount }}</text>
+            <text class="td">{{ winRate }}%</text>
+            <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
+            <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
+              <block v-if="handElapsedMs < 120000">
+                <text>{{ fmtMs1(handElapsedMs) }}</text>
+              </block>
+              <block v-else>
+                <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
+              </block>
+            </view>
           </view>
         </view>
       </view>
-    </view>
 
-    <view class="game-middle" :style="{ height: middleHeight + 'px' }">
-      <view class="mode-panels">
-        <!-- Pro 模式：拖拽式编辑区，提供更高自由度 -->
-        <view class="pro-mode mode-panel" v-show="mode === 'pro'">
-            <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-            <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
-              <view v-for="(card, idx) in cards" :key="idx"
-                    class="playing-card"
-                    :class="{ used: (usedByCard[idx]||0) > 0 }"
-                    @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
-                    @touchmove.stop.prevent="onDrag($event)"
-                    @touchend.stop.prevent="endDrag()">
-                <PlayingCard class="playing-card-visual" :card="card" />
-              </view>
-            </view>
-
-            <!-- 运算符候选区：两行布局 -->
-            <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
-              <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
-                      @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+      <view class="game-middle">
+        <view class="mode-panels">
+          <!-- Pro 模式：拖拽式编辑区，提供更高自由度 -->
+          <view class="pro-mode mode-panel" v-show="mode === 'pro'">
+              <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
+              <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
+                <view v-for="(card, idx) in cards" :key="idx"
+                      class="playing-card"
+                      :class="{ used: (usedByCard[idx]||0) > 0 }"
+                      @touchstart.stop.prevent="startDrag({ type: 'num', value: String(card.rank), rank: card.rank, suit: card.suit, cardIndex: idx }, $event)"
                       @touchmove.stop.prevent="onDrag($event)"
-                      @touchend.stop.prevent="endDrag()">{{ op }}</button>
-            </view>
-            <!-- 运算符第二行：括号操作，密度根据屏幕高度动态调整 -->
-            <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
-              <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
-                      @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
-                      @touchmove.stop.prevent="onDrag($event)"
-                      @touchend.stop.prevent="endDrag()">{{ op }}</button>
-              <button v-if="mode === 'pro'"
-                      class="btn btn-submit-pro"
-                      :class="{ disabled: submitDisabled }"
-                      :disabled="submitDisabled"
-                      @tap="handleSubmit">
-                提交
-              </button>
-            </view>
-
-            <!-- 拖拽中的浮层 -->
-            <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
-
-            <!-- 表达式卡片容器（高度由脚本计算） -->
-            <view class="expr-card card section">
-              <view
-                id="exprZone"
-                class="expr-zone"
-                :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
-                :style="{ height: exprZoneHeight + 'px' }"
-              >
-                <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
-                <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
-                  <block v-for="(t, i) in tokens" :key="i">
-                    <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-                    <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                          @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
-                          @touchmove.stop.prevent="onDrag($event)"
-                          @touchend.stop.prevent="endDrag()">
-                      <PlayingCard v-if="t.type==='num'" class="tok-card-visual" :card="{ rank: t.rank != null ? t.rank : Number(t.value), suit: t.suit || 'S', value: t.value }" size="sm" :fill="true" />
-                      <text v-else class="tok-op-text">{{ t.value }}</text>
-                    </view>
-                  </block>
-                  <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                      @touchend.stop.prevent="endDrag()">
+                  <PlayingCard class="playing-card-visual" :card="card" />
                 </view>
               </view>
-            </view>
+
+              <!-- 运算符候选区：两行布局 -->
+              <view id="opsRow1" :class="['ops-row-1', opsDensityClass]">
+                <button v-for="op in ['+','-','×','÷']" :key="op" class="btn btn-operator"
+                        @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+                        @touchmove.stop.prevent="onDrag($event)"
+                        @touchend.stop.prevent="endDrag()">{{ op }}</button>
+              </view>
+              <!-- 运算符第二行：括号操作，密度根据屏幕高度动态调整 -->
+              <view id="opsRow2" :class="['ops-row-2', opsDensityClass]">
+                <button v-for="op in ['(',')']" :key="op" class="btn btn-operator"
+                        @touchstart.stop.prevent="startDrag({ type: 'op', value: op }, $event)"
+                        @touchmove.stop.prevent="onDrag($event)"
+                        @touchend.stop.prevent="endDrag()">{{ op }}</button>
+                <button v-if="mode === 'pro'"
+                        class="btn btn-submit-pro"
+                        :class="{ disabled: submitDisabled }"
+                        :disabled="submitDisabled"
+                        @tap="handleSubmit">
+                  提交
+                </button>
+              </view>
+
+              <!-- 拖拽中的浮层 -->
+              <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
+
+              <!-- 表达式卡片容器（高度由脚本计算） -->
+              <view class="expr-card card section">
+                <view
+                  id="exprZone"
+                  class="expr-zone"
+                  :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
+                  :style="{ height: exprZoneHeight + 'px' }"
+                >
+                  <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
+                  <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
+                    <block v-for="(t, i) in tokens" :key="i">
+                      <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                      <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
+                            @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                            @touchmove.stop.prevent="onDrag($event)"
+                            @touchend.stop.prevent="endDrag()">
+                        <PlayingCard v-if="t.type==='num'" class="tok-card-visual" :card="{ rank: t.rank != null ? t.rank : Number(t.value), suit: t.suit || 'S', value: t.value }" size="sm" :fill="true" />
+                        <text v-else class="tok-op-text">{{ t.value }}</text>
+                      </view>
+                    </block>
+                    <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                  </view>
+                </view>
+              </view>
           </view>
 
           <!-- Basic 模式：简化操作，面向快速输入 -->
@@ -170,19 +171,19 @@
               </view>
             </view>
           </view>
+        </view>
+      </view>
+
+      <!-- 底部操作按钮：集中放置与局相关的快捷操作 -->
+      <view id="gameBottomBox" class="game-footer">
+        <view class="action-grid">
+          <CircleActionButton icon="undo" label="撤销" :disabled="undoDisabled" @tap="handleUndo" />
+          <CircleActionButton icon="refresh" label="重置" :disabled="resetDisabled" @tap="handleReset" />
+          <CircleActionButton icon="lightbulb" label="提示" @tap="handleHint" />
+          <CircleActionButton icon="skip_next" label="下一题" @tap="skipHand" />
+        </view>
       </view>
     </view>
-
-    <!-- 底部操作按钮：集中放置与局相关的快捷操作 -->
-    <view id="gameBottomBox" class="game-footer bottom-fixed">
-      <view class="action-grid">
-        <CircleActionButton icon="undo" label="撤销" :disabled="undoDisabled" @tap="handleUndo" />
-        <CircleActionButton icon="refresh" label="重置" :disabled="resetDisabled" @tap="handleReset" />
-        <CircleActionButton icon="lightbulb" label="提示" @tap="handleHint" />
-        <CircleActionButton icon="skip_next" label="下一题" @tap="skipHand" />
-      </view>
-    </view>
-
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
     <!-- 成功动画覆盖层（0.5s） -->
     <view v-if="successAnimating" class="success-overlay">
@@ -1772,30 +1773,36 @@ function onSessionOver() {
    3. 通过自定义变量配合脚本测量，实现表达式区缩放。
 */
 .page {
-  height: 100dvh;
-  min-height: calc(var(--vh, 1vh) * 100);
+  min-height: 100dvh;
+  /* min-height: calc(var(--vh, 1vh) * 100); */
   background: #f8fafc;
   display:flex;
   flex-direction: column;
   box-sizing:border-box;
   padding: 0 24rpx;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-top: constant(safe-area-inset-top);
   padding-top: env(safe-area-inset-top);
 }
 .page { opacity: 0; }
+.page-scroll-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
 .page.booted { animation: page-fade-in .28s ease-out forwards; }
 .top-fixed { flex:0 0 auto; padding:24rpx 0; }
-.bottom-fixed { flex:0 0 auto; }
+/* .bottom-fixed { flex:0 0 auto; } */
 .game-header { display:flex; flex-direction:column; gap:16rpx; }
 .game-middle {
-  flex:0 0 auto;
-  display:flex;
-  flex-direction:column;
+  flex:1 1 auto;
+  /* display:flex;
+  flex-direction:column; */
   min-height:0;
-  overflow:hidden;
-  padding-bottom:16rpx;
+  overflow:auto;
+  /* padding-bottom:16rpx; */
 }
 .mode-panels { flex:1; display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .mode-panel { display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
@@ -1868,22 +1875,23 @@ function onSessionOver() {
 
 .game-footer {
   flex:0 0 auto;
-  padding:24rpx 0 36rpx;
+  /* padding:24rpx 0 36rpx; */
+  margin-top: 32rpx;
   background: transparent;
-  position: relative;
-  z-index:20;
-  display:flex;
-  justify-content:center;
-  pointer-events:none;
+  /* position: relative; */
+  /* z-index:20; */
+  /* display:flex; */
+  /* justify-content:center; */
+  pointer-events:auto;
 }
 .action-grid {
   display:flex;
   flex-wrap:wrap;
   justify-content:center;
-  padding:8rpx 24rpx 0;
+  /* padding:8rpx 24rpx 0; */
   max-width:640rpx;
   pointer-events:auto;
-  gap:16rpx;
+  gap:50rpx;
 }
 
 .timer-cell { cursor: pointer; }
