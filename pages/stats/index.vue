@@ -943,21 +943,48 @@ const overviewRowsSorted = computed(() => {
     const key = sortKey.value
     const dir = sortDir.value
     const sign = dir === 'asc' ? 1 : -1
-    list.sort((a,b) => {
+
+    list.sort((a, b) => {
       const av = a?.[key]
       const bv = b?.[key]
+
+      // 1) 名称：中文友好比较
       if (key === 'name') {
-        const as = String(av || '')
-        const bs = String(bv || '')
+        const as = String(av ?? '')
+        const bs = String(bv ?? '')
         return as.localeCompare(bs, 'zh') * sign
       }
+
+      // 2) avgTimeMs：空值永远排最后（无论 asc / desc）
+      if (key === 'avgTimeMs' || key === 'bestTimeMs') {
+        const isEmpty = (v) =>
+          v == null || v === '' || v === '-' || !Number.isFinite(Number(v))
+
+        const aEmpty = isEmpty(av)
+        const bEmpty = isEmpty(bv)
+
+        if (aEmpty && bEmpty) return 0
+        if (aEmpty) return 1   // a 放到后面
+        if (bEmpty) return -1  // b 放到后面
+
+        // 都非空，按数值比较并尊重升/降序
+        const na = Number(av)
+        const nb = Number(bv)
+        if (na === nb) return 0
+        return (na > nb ? 1 : -1) * sign
+      }
+
+      // 3) 其他数值字段：原有逻辑（非数值当 -Infinity）
       const na = Number.isFinite(av) ? av : -Infinity
       const nb = Number.isFinite(bv) ? bv : -Infinity
       if (na === nb) return 0
       return (na > nb ? 1 : -1) * sign
     })
+
     return list
-  } catch(_) { return [] }
+  } catch (_) {
+    return []
+  }
 })
 
 function exitStatsPage() {
