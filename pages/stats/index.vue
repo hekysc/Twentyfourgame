@@ -995,7 +995,7 @@ function exitStatsPage() {
 <style scoped>
 .page{ min-height:100vh; box-sizing:border-box; position:relative; }
 .section{ background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
-.section.title{ background:none; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
+.section.title{ background:#313030; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
 .title{ font-size:32rpx; font-weight:800 }
 .table { 
   margin-top: 12rpx; 
@@ -1141,7 +1141,7 @@ function exitStatsPage() {
 }
 .r-result.ok{ color:#16a34a; font-weight:700 }
 .r-result.fail{ color:#dc2626; font-weight:700 }
-.picker-trigger{ padding:8rpx 14rpx; background:#f1f5f9; border-radius:12rpx }
+.picker-trigger{ padding:8rpx 14rpx; background:none; border-radius:12rpx;color:#fff }
 .difficulty-heatmaps{
   display:grid;
   grid-template-rows:auto auto;

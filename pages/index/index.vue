@@ -68,7 +68,7 @@
                 <text>{{ fmtMs1(handElapsedMs) }}</text>
               </block>
               <block v-else>
-                <button class="btn btn-secondary btn-reshuffle" @click.stop="reshuffle">洗牌</button>
+                <text class="timer-fail-text">失败</text>
               </block>
             </view>
           </view>
@@ -286,6 +286,7 @@ const hapticsEnabled = ref(!!appliedGameplay.value.haptics)
 const sfxEnabled = ref(!!appliedGameplay.value.sfx)
 const reducedMotion = ref(!!appliedGameplay.value.reducedMotion)
 const handRecorded = ref(false)
+const timeoutRecorded = ref(false)
 const BASIC_EXPR_HEIGHT_PX = 70
 const PRO_EXPR_HEIGHT_PX = 80
 const exprZoneHeight = ref(initialMode === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX)
@@ -511,6 +512,7 @@ function saveSession() {
       faceUseHigh: !!faceUseHigh.value,
       rankMode: appliedGameplay.value.rankMode,
       handRecorded: !!handRecorded.value,
+      timeoutRecorded: !!timeoutRecorded.value,
       handStartTs: handStartTs.value || 0,
       hintWasUsed: !!hintWasUsed.value,
       attemptCount: attemptCount.value || 0,
@@ -572,6 +574,7 @@ function loadSession() {
       sfxEnabled.value = restoredGameplay.sfx
       reducedMotion.value = restoredGameplay.reducedMotion
       handRecorded.value = !!data.handRecorded
+      timeoutRecorded.value = !!data.timeoutRecorded
       handStartTs.value = data.handStartTs || Date.now()
       hintWasUsed.value = !!data.hintWasUsed
       attemptCount.value = data.attemptCount || 0
@@ -631,9 +634,49 @@ const handElapsedMs = computed(() => {
 let handTimer = null
 function startHandTimer() {
   if (handTimer) return
-  try { handTimer = setInterval(() => { nowTs.value = Date.now() }, 100) } catch (_) { handTimer = null }
+  try {
+    handTimer = setInterval(() => {
+      const now = Date.now()
+      nowTs.value = now
+      const start = handStartTs.value || now
+      if (!timeoutRecorded.value && (now - start) >= 120000) {
+        handleTimeout()
+      }
+    }, 100)
+  } catch (_) { handTimer = null }
 }
 function stopHandTimer() { if (handTimer) { try { clearInterval(handTimer) } catch(_){} handTimer = null } }
+
+function handleTimeout() {
+  if (timeoutRecorded.value || handRecorded.value) return
+  timeoutRecorded.value = true
+  handRecorded.value = true
+  handFailedOnce.value = true
+  const elapsed = Date.now() - (handStartTs.value || Date.now())
+  const normalizedElapsed = elapsed > 0 ? elapsed : 120000
+  const statsData = computeExprStats(tokens.value)
+  handsPlayed.value += 1
+  failCount.value += 1
+  try {
+    pushRound({
+      success: false,
+      timeMs: normalizedElapsed,
+      hintUsed: !!hintWasUsed.value,
+      retries: attemptCount.value || 0,
+      ops: statsData.ops,
+      exprLen: statsData.exprLen,
+      maxDepth: statsData.maxDepth,
+      faceUseHigh: !!faceUseHigh.value,
+      hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+      expr: expr.value,
+    })
+    updateLastSuccess()
+  } catch (_) {}
+  if (selectedUserId.value) {
+    try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
+  }
+  try { showHint('超过120秒，已记失败，可继续作答', 2000) } catch (_) {}
+}
 
 const drag = ref({ active: false, token: null, x: 0, y: 0, startX: 0, startY: 0, moved: false })
 const exprBox = ref({ left: 0, top: 0, right: 0, bottom: 0 })
@@ -1248,6 +1291,7 @@ function resetHandStateForNext() {
   handFailedOnce.value = false;
   // 你已有的重置：handRecorded、attemptCount、hintWasUsed、errorValueText 等
   handRecorded.value = false;  // 若你还在别处用到它，这里也清掉
+  timeoutRecorded.value = false;
   attemptCount.value = 0;
   hintWasUsed.value = false;
   errorValueText.value = '';
@@ -1287,7 +1331,22 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
   }
 
   if (ok) {
+    const timedOut = timeoutRecorded.value
     errorValueText.value = ''
+    if (timedOut) {
+      if (handSettled.value && settledResult.value === 'success') {
+        try { saveSession() } catch (_) {}
+        return
+      }
+      handSettled.value = true
+      settledResult.value = 'success'
+      try {
+        successAnimating.value = true
+        setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+      } catch (_) { nextHand() }
+      try { saveSession() } catch (_) {}
+      return
+    }
     if (origin === 'basic' && handFailedOnce.value) {
       try {
         successAnimating.value = true
@@ -2012,7 +2071,7 @@ function onSessionOver() {
 .stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
 .stat-value { font-weight:700; color:#111827; font-size:28rpx; }
 
-.btn-reshuffle { padding: 12rpx 0; font-size: 26rpx; line-height: 1; }
+.timer-fail-text { color:#dc2626; font-weight:700; font-size:28rpx; }
 
 .basic-mode { display:flex; flex-direction:column; gap:18rpx; flex:1; min-height:0; overflow:hidden; }
 .basic-board { display:flex; gap:18rpx; align-items:stretch; justify-content:center; }
