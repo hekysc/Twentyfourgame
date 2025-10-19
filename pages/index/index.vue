@@ -156,7 +156,7 @@
                 </view>
               </view>
               <!-- Basic 操作区：点击一次选牌、二次选操作 -->
-              <view class="basic-ops">
+              <view class="basic-ops" :style="basicOpsStyle">
                 <button v-for="op in ['+','-','×','÷']" :key="'basic-op-' + op" class="btn btn-operator" :class="{ active: basicSelection.operator === op }" @tap="handleBasicOperator(op)">{{ op }}</button>
               </view>
               <view class="basic-column">
@@ -263,6 +263,16 @@ const basicSelection = ref({ first: null, operator: null })
 const basicHistory = ref([])
 const basicExpression = ref('')
 const basicDisplayExpression = ref('')
+const basicOpsMetrics = ref({ totalHeight: 0, buttonHeight: 0 })
+const basicOpsStyle = computed(() => {
+  const metrics = basicOpsMetrics.value || {}
+  const btn = Number(metrics.buttonHeight)
+  const total = Number(metrics.totalHeight)
+  if (!Number.isFinite(btn) || btn <= 0) return {}
+  const style = { '--basic-ops-button-height': `${btn}px` }
+  if (Number.isFinite(total) && total > 0) style.height = `${total}px`
+  return style
+})
 // 读取本地偏好：包含 JQK 映射、牌源、震动等用户个性化设置
 const gameplayDefaults = (() => {
   try {
@@ -454,6 +464,7 @@ function measureFixedSections() {
       })
       query?.exec(() => {
         computeMiddleHeight()
+        syncBasicOpsHeight()
       })
     })
   } catch (_) {
@@ -732,6 +743,31 @@ function updateExprHeight() {
 
 updateExprHeight()
 
+function syncBasicOpsHeight() {
+  if (mode.value !== 'basic') {
+    basicOpsMetrics.value = { totalHeight: 0, buttonHeight: 0 }
+    return
+  }
+  nextTick(() => {
+    try {
+      const query = uni.createSelectorQuery()
+      if (query && proxy) query.in(proxy)
+      query?.select('.basic-card')?.boundingClientRect()
+      query?.exec((res) => {
+        const rect = Array.isArray(res) ? res[0] : null
+        const cardHeight = rect && Number.isFinite(rect?.height) ? rect.height : 0
+        if (!cardHeight) return
+        const cardGap = Math.max(0, Number(rpxToPx ? rpxToPx(18) : 0))
+        const opsGap = Math.max(0, Number(rpxToPx ? rpxToPx(12) : 0))
+        const totalHeight = cardHeight * 2 + cardGap
+        const buttonHeight = (totalHeight - opsGap * 3) / 4
+        if (!Number.isFinite(buttonHeight) || buttonHeight <= 0) return
+        basicOpsMetrics.value = { totalHeight, buttonHeight }
+      })
+    } catch (_) {}
+  })
+}
+
 const ghostText = computed(() => {
   const t = drag.value.token
   if (!t) return ''
@@ -754,6 +790,7 @@ function applyModeFromPreference(prefMode) {
     mode.value = normalized
   }
   updateExprHeight()
+  syncBasicOpsHeight()
 }
 
 function handleExternalModeChange(newMode) {
@@ -994,7 +1031,7 @@ async function nextHand() {
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
-  nextTick(() => updateExprHeight())
+  nextTick(() => { updateExprHeight(); syncBasicOpsHeight() })
   try { saveSession() } catch (_) {}
 }
 
@@ -1233,8 +1270,8 @@ onMounted(() => {
   applyLatestModePreference()
   if (!restored) { initDeck(); nextHand() }
   setTimeout(() => { booted.value = true }, 0)
-  nextTick(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
-  if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
+  nextTick(() => { updateVHVar(); updateExprHeight(); updateExprScale(); syncBasicOpsHeight() })
+  if (uni.onWindowResize) uni.onWindowResize(() => { updateVHVar(); updateExprHeight(); updateExprScale(); syncBasicOpsHeight() })
   updateLastSuccess()
   startHandTimer()
   requestLayoutMeasure()
@@ -1251,6 +1288,7 @@ onShow(() => {
   startHandTimer()
   try { refreshSafeArea() } catch (_) {}
   requestLayoutMeasure()
+  syncBasicOpsHeight()
   try { scheduleTabWarmup({ delay: 180 }) } catch (_) {}
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
@@ -1737,12 +1775,14 @@ watch(mode, (m) => {
   if (normalized === 'basic') {
     resetBasicStateFromCards()
     basicSelection.value = { first: null, operator: null }
+    nextTick(() => syncBasicOpsHeight())
   } else {
     tokens.value = []
     usedByCard.value = [0, 0, 0, 0]
     exprOverrideText.value = ''
     errorValueText.value = ''
     nextTick(() => { updateExprHeight(); updateExprScale() })
+    basicOpsMetrics.value = { totalHeight: 0, buttonHeight: 0 }
   }
   closeTimerPopover()
   requestLayoutMeasure()
@@ -1750,10 +1790,12 @@ watch(mode, (m) => {
 
 watch(cards, () => {
   resetBasicStateFromCards()
+  if (mode.value === 'basic') nextTick(() => syncBasicOpsHeight())
 })
 
 watch(faceUseHigh, () => {
   resetBasicStateFromCards()
+  if (mode.value === 'basic') nextTick(() => syncBasicOpsHeight())
 })
 
 watch(tokens, () => updateExprScale())
@@ -2085,8 +2127,8 @@ function onSessionOver() {
 .basic-card.result { background:#fef3c7; }
 .basic-card-value { position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
 .basic-card-value-text { font-size:64rpx; font-weight:700; color:#1f2937; }
-.basic-ops { display:flex; flex-direction:column; gap:12rpx; align-items:stretch; justify-content:stretch; flex:0 0 150rpx; height:100%; }
-.basic-ops .btn-operator { flex:1; padding:16rpx 0; font-size:56rpx; display:flex; align-items:center; justify-content:center; }
+.basic-ops { display:flex; flex-direction:column; gap:12rpx; align-items:stretch; justify-content:flex-start; flex:0 0 150rpx; height:100%; min-height:0; }
+.basic-ops .btn-operator { flex:0 0 var(--basic-ops-button-height, auto); height: var(--basic-ops-button-height, auto); padding:16rpx 0; font-size:56rpx; display:flex; align-items:center; justify-content:center; }
 .basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
