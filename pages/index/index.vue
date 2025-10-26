@@ -2116,7 +2116,7 @@ function onSessionOver() {
 .timer-fail-text { color:#dc2626; font-weight:700; font-size:28rpx; }
 
 .basic-mode { display:flex; flex-direction:column; gap:18rpx; flex:1; min-height:0; overflow:hidden; }
-.basic-board { display:flex; gap:18rpx; align-items:stretch; justify-content:center; }
+.basic-board { display:flex; gap:18rpx; align-items:stretch; justify-content:center;padding-bottom: 24rpx;}
 .basic-column { display:flex; flex-direction:column; gap:18rpx; flex:1; }
 .basic-card-wrapper { flex:1; position:relative; }
 .basic-card { position:relative; width:100%; background:none; border-radius:8rpx; border:none; box-shadow:none; overflow:visible; display:block; }
