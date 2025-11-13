@@ -80,7 +80,7 @@
           <!-- Pro 模式：拖拽式编辑区，提供更高自由度 -->
           <view class="pro-mode mode-panel" v-if="mode === 'pro'">
               <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
-              <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
+              <view id="cardGrid" class="card-grid" style="padding-top: 0rpx; margin-top: -20rpx;">
                 <view v-for="(card, idx) in cards" :key="idx"
                       class="playing-card"
                       :class="{ used: (usedByCard[idx]||0) > 0 }"
@@ -297,8 +297,8 @@ const sfxEnabled = ref(!!appliedGameplay.value.sfx)
 const reducedMotion = ref(!!appliedGameplay.value.reducedMotion)
 const handRecorded = ref(false)
 const timeoutRecorded = ref(false)
-const BASIC_EXPR_HEIGHT_PX = 70
-const PRO_EXPR_HEIGHT_PX = 80
+const BASIC_EXPR_HEIGHT_PX = 90
+const PRO_EXPR_HEIGHT_PX = 200
 const exprZoneHeight = ref(initialMode === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX)
 const currentUser = ref(null)
 const avatarLoadFailed = ref(false)
@@ -1955,7 +1955,7 @@ function onSessionOver() {
 /* 牌区 */ 
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
 .playing-card { position:relative; width:100%; background:none; border-radius:16rpx; overflow:visible; }
-.playing-card::before { content:""; display:block; padding-top:140%; }
+.playing-card::before { content:""; display:block; }
 .playing-card.used { filter: grayscale(1) saturate(.2); opacity:.5; }
 .playing-card .card-visual { position:absolute; inset:0; width:100%; height:100%; }
 .tok-card-visual { width:100%; height:100%; display:block; }

@@ -99,6 +99,10 @@ const sizeClass = computed(() => SIZE_CLASS_MAP[props.size] || 'card-visual--lg'
   aspect-ratio: 5 / 7;
 }
 
+.pro-mode .playing-card::before {
+  padding-top: 120%;
+}
+
 .card-visual--fill::before {
   display: none;
 }
