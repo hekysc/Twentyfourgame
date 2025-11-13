@@ -1,0 +1,2 @@
+"use strict";Object.defineProperty(exports,Symbol.toStringTag,{value:"Module"});const s=require("./common/vendor.js"),t=require("./utils/avatar.js"),n=require("./utils/tab-cache.js"),r={onLaunch(){try{t.ensureUserAvatars&&t.ensureUserAvatars().catch(()=>{})}catch{}try{n.scheduleTabWarmup({immediate:!0})}catch{}},onShow(){},onHide(){}};function a(){return{app:s.createSSRApp(r)}}a().app.mount("#app");exports.createApp=a;
+//# sourceMappingURL=../.sourcemap/mp-weixin/app.js.map

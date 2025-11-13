@@ -78,7 +78,7 @@
       <view class="game-middle">
         <view class="mode-panels">
           <!-- Pro 模式：拖拽式编辑区，提供更高自由度 -->
-          <view class="pro-mode mode-panel" v-show="mode === 'pro'">
+          <view class="pro-mode mode-panel" v-if="mode === 'pro'">
               <!-- 牌区：四张卡片等宽占满一行（每张卡片单独计数） -->
               <view id="cardGrid" class="card-grid" style="padding-top: 0rpx;">
                 <view v-for="(card, idx) in cards" :key="idx"
@@ -143,7 +143,7 @@
           </view>
 
           <!-- Basic 模式：简化操作，面向快速输入 -->
-          <view class="basic-mode mode-panel" v-show="mode !== 'pro'">
+          <view class="basic-mode mode-panel" v-if="mode === 'basic'">
             <view class="basic-board">
               <view class="basic-column">
                 <view v-for="i in [0, 2]" :key="'basic-left-' + i" class="basic-card-wrapper">
