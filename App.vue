@@ -1,4 +1,5 @@
 <script>
+<<<<<<< HEAD
 import {
   ensureUserAvatars
 } from './utils/avatar.js'
@@ -58,6 +59,17 @@ export default {
         immediate: true
       })
     } catch (_) {}
+=======
+import { ensureUserAvatars } from './utils/avatar.js'
+import { scheduleTabWarmup } from './utils/tab-cache.js'
+import { ensureAutoLogin } from './utils/auth.js'
+
+export default {
+  onLaunch() {
+    try { ensureUserAvatars && ensureUserAvatars().catch(() => {}) } catch (_) {}
+    try { scheduleTabWarmup({ immediate: true }) } catch (_) {}
+    ensureAutoLogin()
+>>>>>>> fa14bfa889a325bfe154c355179004e5920c333b
     try {
       // 仅 App 端支持预加载，H5 忽略
       // #ifdef APP-PLUS

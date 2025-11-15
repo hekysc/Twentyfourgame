@@ -7,7 +7,6 @@
     "vueVersion" : "3",
     "transformPx" : true,
     "app-plus" : {
-        "modules" : {},
         "orientation" : [ "portrait-primary" ],
         "splashscreen" : {
             "alwaysShowBeforeRender" : true,
@@ -23,6 +22,9 @@
             },
             "ios" : {
                 "dSYMs" : false
+            },
+            "harmony" : {
+                "package" : "com.semi2025.super24.hm"
             },
             "icons" : {
                 "android" : {
@@ -56,7 +58,16 @@
                     }
                 }
             },
-            "sdkConfigs" : {}
+            "sdkConfigs" : {
+                "ad" : {
+                    "appid" : "uniad-app-demo-id",
+                    "ks" : {},
+                    "sigmob" : {},
+                    "zy" : {},
+                    "fl" : {},
+                    "jl" : {}
+                }
+            }
         }
     },
     "mp-weixin" : {
@@ -79,6 +90,10 @@
         ],
         "lazyCodeLoading" : "requiredComponents",
         "plugins" : {},
+        "ad" : {
+            "banner" : [ "adunit-wx-banner-demo" ],
+            "rewardedVideo" : [ "adunit-wx-reward-demo" ]
+        },
         "resizable" : true,
         "navigateToMiniProgramAppIdList" : [],
         "shareAppMessage" : true,

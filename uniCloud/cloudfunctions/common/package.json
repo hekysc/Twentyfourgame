@@ -1,7 +1,0 @@
-{
-  "name": "common",
-  "dependencies": {
-    "uni-jwt": "^2.1.1"
-  },
-  "extensions": {}
-}
