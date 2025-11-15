@@ -148,7 +148,7 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .ad-demo {
   padding: 32rpx;
   color: #333;

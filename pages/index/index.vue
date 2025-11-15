@@ -225,7 +225,7 @@ import AppNavBar from '../../components/AppNavBar.vue'
 import CircleActionButton from '../../components/CircleActionButton.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
-import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
+import { ensureInit, getCurrentUser, pushRound, readStatsExtended } from '../../utils/cloud-store.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
 import { scheduleTabWarmup, mergeCachedStatsExt } from '../../utils/tab-cache.js'
 import {

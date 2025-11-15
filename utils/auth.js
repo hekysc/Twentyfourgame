@@ -58,8 +58,17 @@ export async function wxLogin() {
   // #ifndef MP-WEIXIN
   throw new Error('仅支持在微信小程序中调用 wxLogin')
   // #endif
-  const loginRes = await uni.login({ provider: 'weixin' })
-  if (!loginRes.code) {
+  const loginResult = await uni.login({ provider: 'weixin' })
+  let loginErr = null
+  let loginRes = loginResult
+  if (Array.isArray(loginResult)) {
+    loginErr = loginResult[0]
+    loginRes = loginResult[1]
+  }
+  if (loginErr) {
+    throw loginErr
+  }
+  if (!loginRes?.code) {
     throw new Error('微信登录失败')
   }
   const { result } = await uniCloud.callFunction({

@@ -4,7 +4,8 @@
     "pages/index/index",
     "pages/user/index",
     "pages/stats/index",
-    "pages/settings/index"
+    "pages/settings/index",
+    "pages/ad-demo/index"
   ],
   "window": {
     "navigationStyle": "custom",
@@ -24,6 +25,14 @@
   ],
   "lazyCodeLoading": "requiredComponents",
   "plugins": {},
+  "ad": {
+    "banner": [
+      "adunit-wx-banner-demo"
+    ],
+    "rewardedVideo": [
+      "adunit-wx-reward-demo"
+    ]
+  },
   "resizable": true,
   "navigateToMiniProgramAppIdList": [],
   "shareAppMessage": true,

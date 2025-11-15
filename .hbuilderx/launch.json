@@ -10,6 +10,16 @@
         {
             "openVueDevtools" : true,
             "type" : "uni-app:app-ios"
+        },
+        {
+            "default" : {
+                "launchtype" : "local"
+            },
+            "mp-weixin" : {
+                "launchtype" : "remote"
+            },
+            "provider" : "aliyun",
+            "type" : "uniCloud"
         }
     ]
 }
