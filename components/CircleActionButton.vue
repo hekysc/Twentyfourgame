@@ -55,9 +55,9 @@ const ICON_GLYPHS = {
 const tooltipVisible = ref(false)
 let tooltipTimer = null
 
-function handleTap() {
+function handleTap(evt) {
   if (props.disabled) return
-  emit('tap')
+  emit('tap', evt)
 }
 
 function showTooltip() {

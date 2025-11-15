@@ -936,6 +936,15 @@ const undoDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.lengt
 const resetDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : false)
 const submitDisabled = computed(() => mode.value !== 'pro' || tokens.value.length === 0)
 
+let lastUndoEventStamp = 0
+let lastUndoStateSignature = ''
+
+function calcUndoStateSignature() {
+  return (mode.value === 'pro')
+    ? `pro:${tokens.value.length}`
+    : `basic:${basicHistory.value.length}`
+}
+
 function clearExprOverride() {
   if (exprOverrideText.value) exprOverrideText.value = ''
 }
@@ -1061,7 +1070,12 @@ function resetBasicBoard() {
   try { saveSession() } catch (_) {}
 }
 
-function handleUndo() {
+function handleUndo(evt) {
+  const evtStamp = (evt && typeof evt.timeStamp === 'number') ? evt.timeStamp : 0
+  const stateSignature = calcUndoStateSignature()
+  if (evtStamp && evtStamp === lastUndoEventStamp && stateSignature === lastUndoStateSignature) {
+    return
+  }
   if (mode.value === 'pro') {
     if (!tokens.value.length) return
     removeTokenAt(tokens.value.length - 1)
@@ -1069,6 +1083,8 @@ function handleUndo() {
   } else {
     undoBasicStep()
   }
+  lastUndoStateSignature = calcUndoStateSignature()
+  lastUndoEventStamp = evtStamp
 }
 
 function handleReset() {
