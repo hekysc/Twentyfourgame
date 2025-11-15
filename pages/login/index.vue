@@ -71,6 +71,7 @@ import { useFloatingHint } from '../../utils/hints.js'
 import { useEdgeExit } from '../../utils/edge-exit.js'
 import { exitApp } from '../../utils/navigation.js'
 import { useSafeArea } from '../../utils/useSafeArea.js'
+import { getSystemInfo } from '../../utils/system-compat.js'
 import AppNavBar from '../../components/AppNavBar.vue'
 
 const users = ref({ list: [], currentId: '' })
@@ -106,7 +107,7 @@ onMounted(() => {
 
 function updateVHVar(){
   try {
-    const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+    const sys = getSystemInfo()
     const h = sys.windowHeight || (typeof window !== 'undefined' ? window.innerHeight : 0) || 0
     // #ifndef MP-WEIXIN
     if (h && typeof document !== 'undefined' && document.documentElement && document.documentElement.style) {

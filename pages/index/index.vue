@@ -246,6 +246,7 @@ import { useEdgeExit } from '../../utils/edge-exit.js'
 import { getGameplayPrefs, getLastMode, setLastMode, setGameplayPrefs, consumeRankMigrationNotice } from '../../utils/prefs.js'
 import { consumeAvatarRestoreNotice } from '../../utils/avatar.js'
 import { exitApp } from '../../utils/navigation.js'
+import { getSystemInfo } from '../../utils/system-compat.js'
 
 // --------------------
 // 状态：牌面、模式与表达式
@@ -783,7 +784,7 @@ const opsDensityClass = computed(() => opsDensity.value === 'tight' ? 'ops-tight
 function updateExprHeight() {
   exprZoneHeight.value = mode.value === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX
   try {
-    const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+    const sys = getSystemInfo()
     const winH = sys.windowHeight || sys.screenHeight || 0
     if (mode.value !== 'pro') {
       opsDensity.value = 'normal'
@@ -1111,7 +1112,7 @@ function openTimerPopover() {
         timerPopover.value = { visible: true, left: 0, top: 0 }
         return
       }
-      const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+      const sys = getSystemInfo()
       let top = (rect.bottom || (rect.top || 0) + (rect.height || 0)) + 8
       const limit = (sys && Number.isFinite(sys.windowHeight)) ? sys.windowHeight - 96 : 0
       if (limit && top > limit) top = limit
@@ -2042,7 +2043,7 @@ function moveToken(from, to) {
 
 function updateVHVar() {
   try {
-    const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) || {}
+    const sys = getSystemInfo()
     const h = sys.windowHeight || (typeof window !== 'undefined' ? window.innerHeight : 0) || 0
     // #ifndef MP-WEIXIN
     if (h && typeof document !== 'undefined' && document.documentElement && document.documentElement.style) {

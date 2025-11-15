@@ -39,6 +39,7 @@
 2. 运行：运行 -> 选择“运行到浏览器（H5）”或“运行到手机模拟器”
 3. 打包 App：完善 `manifest.json` 后使用 HBuilderX 进行打包
 4. 微信小程序：如需导出 mp-weixin 版本，可参考《[微信小程序打包适配提示词](docs/mp-weixin-prompts.md)》完成自查与适配。
+5. 多端兼容：针对 mp-weixin 在 Android/iOS/鸿蒙 设备上的差异与自测清单详见《[小程序端兼容指引](docs/miniapp-compat.md)》。
 
 ## 操作说明（程序页） 
 

@@ -89,7 +89,15 @@
         "resizable" : true,
         "navigateToMiniProgramAppIdList" : [],
         "shareAppMessage" : true,
-        "shareTimeline" : true
+        "shareTimeline" : true,
+        "compatible" : {
+            "ignoreDevOptionalModules" : [],
+            "usingLegacyMethod" : false,
+            "runtimeCheckingMode" : "bypass"
+        },
+        "optimization" : {
+            "subPackages" : true
+        }
     },
     "mp-alipay" : {},
     "h5" : {

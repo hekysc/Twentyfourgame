@@ -1,4 +1,5 @@
 import { onUnmounted } from 'vue'
+import { getSystemInfo, isIOS, isAndroid, isHarmonyOS } from './system-compat.js'
 
 function getTouchPoint(e) {
   const t = (e && e.touches && e.touches[0]) || (e && e.changedTouches && e.changedTouches[0]) || {}
@@ -9,10 +10,20 @@ function getTouchPoint(e) {
 
 export function useEdgeExit(options = {}) {
   const { showHint, onExit, confirmWindow = 2000, edgeDp = 16 } = options || {}
-  const sys = (uni.getSystemInfoSync && uni.getSystemInfoSync()) ? uni.getSystemInfoSync() : {}
+  const sys = getSystemInfo()
   const width = sys.windowWidth || 0
   const pixelRatio = sys.pixelRatio || 1
   const edgePx = Math.max(12, Math.round(edgeDp * (Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1)))
+
+  // 根据不同系统调整边缘手势灵敏度
+  let sensitivityAdjustment = 1.0
+  if (isIOS()) {
+    sensitivityAdjustment = 1.2 // iOS上稍微降低灵敏度
+  } else if (isAndroid()) {
+    sensitivityAdjustment = 0.8 // Android上稍微提高灵敏度
+  } else if (isHarmonyOS()) {
+    sensitivityAdjustment = 1.0 // 鸿蒙保持默认灵敏度
+  }
 
   const state = {
     tracking: false,
@@ -46,8 +57,11 @@ export function useEdgeExit(options = {}) {
   function handleTouchMove(e) {
     if (!state.tracking) return
     const { x, y } = getTouchPoint(e)
-    state.lastDX = x - state.startX
-    state.lastDY = y - state.startY
+    const adjustedDX = (x - state.startX) * sensitivityAdjustment
+    const adjustedDY = (y - state.startY) * sensitivityAdjustment
+    
+    state.lastDX = adjustedDX
+    state.lastDY = adjustedDY
   }
 
   function attemptExit() {

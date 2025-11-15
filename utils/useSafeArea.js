@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
+import { getSystemInfo, isIOS, isAndroid, isHarmonyOS } from './system-compat.js'
 
 function extractSafeInsets(sys) {
   const statusHeight = Number.isFinite(sys?.statusBarHeight) ? sys.statusBarHeight : 0
@@ -29,16 +30,34 @@ export function useSafeArea() {
 
   function fetchSystemInfo() {
     try {
-      if (typeof uni !== 'undefined' && typeof uni.getSystemInfo === 'function') {
-        uni.getSystemInfo({ success: applyInfo })
-        return
+      const sys = getSystemInfo()
+      applyInfo(sys)
+      
+      // 针对不同系统的特殊处理
+      if (isIOS()) {
+        // iOS特定处理
+        if (sys.safeAreaInsets && sys.safeAreaInsets.top > 0) {
+          safeTop.value = sys.safeAreaInsets.top
+        }
+      } else if (isAndroid()) {
+        // Android特定处理
+        if (sys.statusBarHeight > 0) {
+          safeTop.value = sys.statusBarHeight
+        }
+      } else if (isHarmonyOS()) {
+        // 鸿蒙特定处理
+        if (sys.statusBarHeight > 0) {
+          safeTop.value = sys.statusBarHeight
+        }
       }
-      if (typeof uni !== 'undefined' && typeof uni.getSystemInfoSync === 'function') {
-        const sys = uni.getSystemInfoSync()
-        applyInfo(sys)
-      }
-    } catch (_) {
-      /* noop */
+    } catch (e) {
+      console.warn('获取系统信息失败:', e)
+      // 设置默认值
+      applyInfo({
+        safeTop: 20,
+        safeBottom: 0,
+        windowHeight: 667
+      })
     }
   }
 
