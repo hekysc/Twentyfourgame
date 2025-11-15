@@ -38,7 +38,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { onBackPress, onShow } from '@dcloudio/uni-app'
+import { onBackPress, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, getUsers, addUser, renameUser, removeUser as rmUser, switchUser } from '../../utils/store.js'
 import { useFloatingHint } from '../../utils/hints.js'
@@ -189,6 +189,24 @@ function avatarText(name){
 function exitPage(){
   navigateToHome()
 }
+
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    path: '/pages/index/index',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
+
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    query: '',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
 </script>
 
 <style scoped>

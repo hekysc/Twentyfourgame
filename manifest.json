@@ -69,8 +69,27 @@
     "mp-weixin" : {
         "appid" : "wx58faf81d08ca037c",
         "setting" : {
-            "urlCheck" : true
-        }
+            "urlCheck" : true,
+            "es6" : true,
+            "minified" : true,
+            "postcss" : true
+        },
+        "usingComponents" : true,
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "你的位置信息将用于小程序位置接口的效果展示"
+            }
+        },
+        "requiredPrivateInfos" : [
+            "getLocation",
+            "startLocationUpdate"
+        ],
+        "lazyCodeLoading" : "requiredComponents",
+        "plugins" : {},
+        "resizable" : true,
+        "navigateToMiniProgramAppIdList" : [],
+        "shareAppMessage" : true,
+        "shareTimeline" : true
     },
     "mp-alipay" : {},
     "h5" : {

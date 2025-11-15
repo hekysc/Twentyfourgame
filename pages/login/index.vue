@@ -64,7 +64,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { onBackPress } from '@dcloudio/uni-app'
+import { onBackPress, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { ensureInit, getUsers, addUser, switchUser, resetAllData, touchLastPlayed } from '../../utils/store.js'
 import { saveAvatarForUser } from '../../utils/avatar.js'
 import { useFloatingHint } from '../../utils/hints.js'
@@ -227,6 +227,24 @@ function colorFrom(u){
 function resetData(){
   uni.showModal({ title:'重置数据', content:'将清空本地所有数据，是否继续？', success(res){ if(res.confirm){ resetAllData(); errMsg.value=''; refresh() } } })
 }
+
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    path: '/pages/index/index',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
+
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    query: '',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
 </script>
 
 <style scoped>

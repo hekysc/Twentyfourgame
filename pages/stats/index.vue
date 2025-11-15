@@ -264,7 +264,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import MiniBar from '../../components/MiniBar.vue'
 import AppNavBar from '../../components/AppNavBar.vue'
-import { onBackPress, onShow, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onBackPress, onShow, onPullDownRefresh, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { ensureInit, allUsersWithStats, readStatsExtended, getCurrentUser } from '../../utils/store.js'
 import { loadMistakeBook, getSummary as getMistakeSummary } from '../../utils/mistakes.js'
 import { useFloatingHint } from '../../utils/hints.js'
@@ -990,6 +990,24 @@ const overviewRowsSorted = computed(() => {
 function exitStatsPage() {
   navigateToHome()
 }
+
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    path: '/pages/index/index',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
+
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    query: '',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
 </script>
 
 <style scoped>

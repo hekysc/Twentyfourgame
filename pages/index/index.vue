@@ -220,7 +220,7 @@
 // ==================== 依赖引入 ====================
 // 注意：按功能分组，便于查找对应模块
 import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextTick } from 'vue'
-import { onBackPress, onHide, onShow } from '@dcloudio/uni-app'
+import { onBackPress, onHide, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import CircleActionButton from '../../components/CircleActionButton.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
@@ -2076,6 +2076,24 @@ function onSessionOver() {
     })
   } catch (_) { /* noop */ }
 }
+
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    path: '/pages/index/index',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
+
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    query: '',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
 </script>
 
 <style scoped> 

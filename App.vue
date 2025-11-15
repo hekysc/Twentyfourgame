@@ -16,7 +16,23 @@ export default {
     } catch (e) {}
   },
   onShow() {},
-  onHide() {}
+  onHide() {},
+  // 全局分享给好友
+  onShareAppMessage() {
+    return {
+      title: '24点游戏小程序 - 挑战你的计算能力！',
+      path: '/pages/index/index',
+      imageUrl: '' // 使用系统默认截图或小程序logo
+    }
+  },
+  // 全局分享到朋友圈
+  onShareTimeline() {
+    return {
+      title: '24点游戏小程序 - 挑战你的计算能力！',
+      query: '',
+      imageUrl: '' // 使用系统默认截图或小程序logo
+    }
+  }
 }
 </script>
 

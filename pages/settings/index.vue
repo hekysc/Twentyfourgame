@@ -70,7 +70,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { onBackPress, onShow } from '@dcloudio/uni-app'
+import { onBackPress, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { useSafeArea } from '../../utils/useSafeArea.js'
 import { getGameplayPrefs, setGameplayPrefs, consumeRankMigrationNotice, getLastMode, setLastMode } from '../../utils/prefs.js'
@@ -291,6 +291,24 @@ function clearCache() {
     try { uni.removeStorageSync('__tf24_tab_cache__') } catch (err) {}
   }
 }
+
+// 分享给好友
+onShareAppMessage(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    path: '/pages/index/index',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
+
+// 分享到朋友圈
+onShareTimeline(() => {
+  return {
+    title: '24点游戏小程序 - 挑战你的计算能力！',
+    query: '',
+    imageUrl: '' // 使用系统默认截图或小程序logo
+  }
+})
 
 </script>
 
