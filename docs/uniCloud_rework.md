@@ -1,10 +1,9 @@
-# uniCloud + 多端登录与广告改造方案
+# uniCloud + 多端登录改造方案
 
 ## 1. 总体架构概览
-- **前端**：基于 `uni-app` + Vue3，目标平台 `mp-weixin`、`app-android`、`app-ios`、`app-harmony`。公共逻辑（登录、广告、云函数调用）集中在 `utils/`，页面组件保持跨端 API。
+- **前端**：基于 `uni-app` + Vue3，目标平台 `mp-weixin`、`app-android`、`app-ios`、`app-harmony`。公共逻辑（登录、云函数调用）集中在 `utils/`，页面组件保持跨端 API。
 - **后端**：uniCloud（阿里云/腾讯云任一环境），通过云函数/云对象暴露登录、用户、游戏业务接口，使用云数据库存储用户信息、战绩、配置。
 - **鉴权**：统一 `user` 表 + token 机制（JWT 或自定义加密），多端通过不同 `scene` 进入 `login` 云函数，创建/更新用户并生成 token。
-- **广告**：统一封装 `utils/ad.js`，内部根据条件编译加载 uni-ad Banner/激励视频组件，按平台切换广告位 ID。
 
 ```
 uni-app（mp-weixin / app）
@@ -367,116 +366,19 @@ exports.main = async (event) => {
 }
 ```
 
-## 7. uni-ad 集成
-
-### 7.1 manifest.json 配置
-- **mp-weixin**：`mp-weixin` 配置中启用广告组件，在 `mp-weixin` 后台申请 banner / 激励视频广告位 ID，并填入 `ad.unitId.banner`、`ad.unitId.rewardedVideo`。
-- **app-android / app-ios / app-harmony**：在 `app-plus` → `Ad` → 勾选 `uni-ad`，配置 `dcloud_appid`、`uni-ad` appid/secret，分别填写 Android/iOS/Harmony 广告位。
-
-### 7.2 `utils/ad.js`
-```js
-const bannerIds = {
-  'mp-weixin': 'adunit-wx-banner',
-  'app': 'adunit-app-banner'
-}
-const rewardedIds = {
-  'mp-weixin': 'adunit-wx-rewarded',
-  'app': 'adunit-app-rewarded'
-}
-
-export function showBannerAd() {
-  // #ifdef MP-WEIXIN
-  const ad = uni.createRewardedVideoAd({ adUnitId: bannerIds['mp-weixin'] })
-  ad.show()
-  // #endif
-
-  // #ifdef APP-PLUS
-  const ad = plus.ad.createBannerAd({ adUnitId: bannerIds['app'] })
-  ad.show()
-  // #endif
-}
-
-export function showRewardedAd({ onClose }) {
-  // #ifdef MP-WEIXIN
-  const ad = uni.createRewardedVideoAd({ adUnitId: rewardedIds['mp-weixin'] })
-  ad.onClose(res => {
-    onClose && onClose(res && res.isEnded)
-  })
-  ad.show()
-  // #endif
-
-  // #ifdef APP-PLUS
-  const ad = uni.createRewardedVideoAd({ adUnitId: rewardedIds['app'] })
-  ad.onClose(res => onClose && onClose(res.isEnded !== false))
-  ad.show()
-  // #endif
-}
-```
-
-### 7.3 页面示例 `pages/index/index.vue`
-```vue
-<template>
-  <view class="profile">
-    <image :src="user.avatar_url" class="avatar" />
-    <text>{{ user.nickname }}</text>
-  </view>
-  <view class="records">
-    <view v-for="item in records" :key="item._id">{{ item.result }}</view>
-  </view>
-  <view class="actions">
-    <button @click="onShowAd">看广告获得提示</button>
-  </view>
-  <!-- #ifdef MP-WEIXIN -->
-  <ad unit-id="adunit-wx-banner" ad-type="banner" />
-  <!-- #endif -->
-  <!-- #ifdef APP-PLUS -->
-  <ad unit-id="adunit-app-banner" ad-type="banner" />
-  <!-- #endif -->
-</template>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { getLocalUser } from '@/utils/auth'
-import { showRewardedAd } from '@/utils/ad'
-
-const user = ref(getLocalUser())
-const records = ref([])
-
-onMounted(async () => {
-  const { result } = await uniCloud.callFunction({
-    name: 'game',
-    data: { action: 'list', token: uni.getStorageSync('tf24_token') }
-  })
-  records.value = result.list
-})
-
-function onShowAd() {
-  showRewardedAd({
-    onClose: (finished) => {
-      if (finished) {
-        uni.showToast({ title: '获得提示！' })
-      } else {
-        uni.showToast({ title: '观看未完成', icon: 'none' })
-      }
-    }
-  })
-}
-</script>
-```
-
-## 8. 多端兼容实践建议
+## 7. 多端兼容实践建议
 1. **条件编译**：
    ```js
    // #ifdef MP-WEIXIN
-   // 微信特有能力：getUserProfile、微信广告
+   // 微信特有能力：getUserProfile 等
    // #endif
 
    // #ifdef APP-PLUS
-   // plus.* API、App 设备信息、uni-ad App 广告
+   // plus.* API、App 设备信息、推送等
    // #endif
 
    // #ifdef APP-HARMONY
-   // 鸿蒙差异：设备信息、推送
+   // 鸿蒙差异：设备能力、窗口管理
    // #endif
    ```
 2. **跨端 API**：优先使用 `uni.xxx` 接口；如需 `wx` 对象，必须包裹 `#ifdef MP-WEIXIN`。避免直接操作 DOM。
@@ -486,17 +388,16 @@ function onShowAd() {
    - `运行到手机或模拟器` → Android；`发行` → `原生App-Android/iOS`。
    - 鸿蒙：HBuilderX 4.x+ 勾选 `app-harmony`，配置 Harmony App 信息，再 `发行` → `HarmonyOS App`。
 5. **登录缓存**：多端统一 `storage key`，`APP-PLUS` + 鸿蒙都走 `appLogin()`（游客/设备），避免依赖 Android/iOS 特有 API。
-6. **广告降级**：若平台不支持激励视频（如某些 H5 或鸿蒙版本），隐藏按钮或改为“冷却倒计时”逻辑。
 
-## 9. 完整页面示例（含广告 + 多端条件编译）
+## 8. 完整页面示例（含多端条件编译）
 ```vue
 <template>
   <view class="page">
     <view class="profile">
-      <image :src="user.avatar_url" class="avatar" />
-      <view>
+      <image v-if="user.avatar_url" :src="user.avatar_url" class="avatar" mode="aspectFill" />
+      <view class="info">
         <text class="name">{{ user.nickname || '游客' }}</text>
-        <text class="id">ID: {{ user._id }}</text>
+        <text class="id">ID: {{ user._id || '未登录' }}</text>
       </view>
     </view>
 
@@ -510,49 +411,48 @@ function onShowAd() {
         <text>{{ item.result }}</text>
         <text class="time">{{ formatTime(item.created_at) }}</text>
       </view>
+      <view v-if="!records.length" class="empty">暂无云端战绩</view>
     </view>
 
-    <button class="ad-btn" @click="watchAd">看广告获得提示</button>
+    <view class="actions">
+      <button class="refresh-btn" :loading="loading" @click="loadRecords">同步战绩</button>
+    </view>
 
-    <!-- Banner 广告 -->
     <!-- #ifdef MP-WEIXIN -->
-    <ad unit-id="adunit-wx-banner" ad-type="banner" ad-theme="white" />
+    <view class="platform-hint">当前运行于微信小程序</view>
     <!-- #endif -->
     <!-- #ifdef APP-PLUS -->
-    <ad unit-id="adunit-app-banner" ad-type="banner" />
+    <view class="platform-hint">当前运行于 App (Android/iOS/鸿蒙)</view>
     <!-- #endif -->
   </view>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { showRewardedAd } from '@/utils/ad'
 import dayjs from 'dayjs'
 
 const token = uni.getStorageSync('tf24_token')
-const user = ref(uni.getStorageSync('tf24_user'))
+const user = ref(uni.getStorageSync('tf24_user') || {})
 const records = ref([])
+const loading = ref(false)
 
 onMounted(loadRecords)
 
 async function loadRecords() {
-  const { result } = await uniCloud.callFunction({
-    name: 'game',
-    data: { action: 'list', token }
-  })
-  records.value = result.list
-}
-
-function watchAd() {
-  showRewardedAd({
-    onClose: (finished) => {
-      if (finished) {
-        uni.showToast({ title: '获得提示奖励！' })
-      } else {
-        uni.showToast({ title: '未完成观看', icon: 'none' })
-      }
-    }
-  })
+  if (!token) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    return
+  }
+  loading.value = true
+  try {
+    const { result } = await uniCloud.callFunction({
+      name: 'game',
+      data: { action: 'list', token }
+    })
+    records.value = result.list || []
+  } finally {
+    loading.value = false
+  }
 }
 
 function formatTime(ts) {
@@ -563,16 +463,22 @@ function formatTime(ts) {
 <style scoped>
 .page { padding: 24rpx; }
 .profile { display: flex; align-items: center; margin-bottom: 32rpx; }
-.avatar { width: 120rpx; height: 120rpx; border-radius: 50%; margin-right: 24rpx; }
+.avatar { width: 120rpx; height: 120rpx; border-radius: 50%; margin-right: 24rpx; background: #f1f5f9; }
+.info { display: flex; flex-direction: column; }
+.name { font-size: 34rpx; font-weight: 600; }
+.id { font-size: 24rpx; color: #94a3b8; }
+.stats { display: flex; justify-content: space-between; margin-bottom: 24rpx; }
 .records { max-height: 400rpx; overflow-y: auto; margin-bottom: 24rpx; }
 .record { padding: 16rpx 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-.ad-btn { background: #ff8a00; color: #fff; margin: 32rpx 0; }
+.empty { text-align: center; color: #94a3b8; padding: 40rpx 0; }
+.actions { margin-bottom: 24rpx; }
+.refresh-btn { background: #2563eb; color: #fff; border: none; border-radius: 16rpx; }
+.platform-hint { font-size: 24rpx; color: #94a3b8; text-align: center; margin-top: 16rpx; }
 </style>
 ```
 
-## 10. 结论
+## 9. 结论
 - 通过 uniCloud + 云数据库统一用户、登录、业务逻辑，保证多端一致性。
 - 微信端采用 `wxLogin + getUserProfile` 自动同步昵称/头像，App 端游客/手机号登录同表存储。
 - `auth.js` 统一 token，所有业务云函数通过 `verifyToken` 保护接口。
-- `utils/ad.js` + 条件编译封装 uni-ad，实现 mp-weixin + Android/iOS/鸿蒙 广告展示，并提供激励视频奖励示例。
 - 文档列出多端兼容建议与完整页面示例，可直接迁移到现有 uni-app 工程。

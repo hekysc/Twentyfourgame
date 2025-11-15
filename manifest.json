@@ -58,16 +58,7 @@
                     }
                 }
             },
-            "sdkConfigs" : {
-                "ad" : {
-                    "appid" : "uniad-app-demo-id",
-                    "ks" : {},
-                    "sigmob" : {},
-                    "zy" : {},
-                    "fl" : {},
-                    "jl" : {}
-                }
-            }
+            "sdkConfigs" : {}
         }
     },
     "mp-weixin" : {
@@ -90,10 +81,6 @@
         ],
         "lazyCodeLoading" : "requiredComponents",
         "plugins" : {},
-        "ad" : {
-            "banner" : [ "adunit-wx-banner-demo" ],
-            "rewardedVideo" : [ "adunit-wx-reward-demo" ]
-        },
         "resizable" : true,
         "navigateToMiniProgramAppIdList" : [],
         "shareAppMessage" : true,
