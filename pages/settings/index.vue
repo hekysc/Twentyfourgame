@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { onBackPress, onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { useSafeArea } from '../../utils/useSafeArea.js'
@@ -132,33 +132,63 @@ onBackPress(() => {
   return true
 })
 
+// 添加防重复标志和缓存
+let hasLoaded = false
+let isSyncing = false
+let lastSyncTime = 0
+
 function syncFromStorage(showMigration = false) {
-  const prefs = getGameplayPrefs()
-  playMode.value = getLastMode ? getLastMode() : playMode.value
-  rankMode.value = prefs.rankMode
-  deckSource.value = prefs.deckSource
-  mixWeight.value = prefs.mixWeight
-  haptics.value = !!prefs.haptics
-  sfx.value = !!prefs.sfx
-  reducedMotion.value = !!prefs.reducedMotion
-  if (showMigration && prefs.rankMigrationNotice) {
-    try {
-      uni.showToast({
-        title: '已迁移到新规则：JQK 仅支持 1 或 11/12/13',
-        icon: 'none',
-        duration: 2500,
-      })
-    } catch (_) {}
-    consumeRankMigrationNotice()
+  // 防止短时间内重复调用
+  const now = Date.now()
+  if (isSyncing || (now - lastSyncTime) < 100) {
+    return
+  }
+  
+  isSyncing = true
+  lastSyncTime = now
+  
+  try {
+    const prefs = getGameplayPrefs()
+    playMode.value = getLastMode ? getLastMode() : playMode.value
+    rankMode.value = prefs.rankMode
+    deckSource.value = prefs.deckSource
+    mixWeight.value = prefs.mixWeight
+    haptics.value = !!prefs.haptics
+    sfx.value = !!prefs.sfx
+    reducedMotion.value = !!prefs.reducedMotion
+    if (showMigration && prefs.rankMigrationNotice) {
+      try {
+        uni.showToast({
+          title: '已迁移到新规则：JQK 仅支持 1 或 11/12/13',
+          icon: 'none',
+          duration: 2500,
+        })
+      } catch (_) {}
+      consumeRankMigrationNotice()
+    }
+  } finally {
+    isSyncing = false
   }
 }
 
+// 修改页面生命周期钩子，避免重复加载
 onMounted(() => {
-  syncFromStorage(true)
+  // 只在首次挂载时同步数据
+  if (!hasLoaded) {
+    hasLoaded = true
+    syncFromStorage(true)
+  }
 })
 
 onShow(() => {
-  syncFromStorage(false)
+  // onShow中不再调用syncFromStorage，避免重复加载
+  // 如果需要数据同步，可以考虑只在特定情况下执行
+})
+
+onUnmounted(() => {
+  // 页面卸载时重置标志，确保下次进入页面时能正常加载
+  hasLoaded = false
+  isSyncing = false
 })
 
 function onModeChange(e) {

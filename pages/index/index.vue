@@ -1789,7 +1789,28 @@ function goLogin(){
 function goStats(){ try { uni.reLaunch({ url:'/pages/stats/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} } }
 function goGame(){ try { uni.reLaunch({ url:'/pages/index/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/index/index' }) } catch(_){} } }
 function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/user/index' }) } catch(_){} } }
-function goSettings(){ try { uni.navigateTo({ url: '/pages/settings/index' }) } catch(e1){ try { uni.reLaunch({ url: '/pages/settings/index' }) } catch(_){} } }
+function goSettings() {
+  try {
+    // 统一使用redirectTo，避免页面重复创建
+    uni.redirectTo({ 
+      url: '/pages/settings/index',
+      success: () => {
+        // 导航成功，不需要其他操作
+      },
+      fail: (err) => {
+        console.warn('redirectTo to settings failed:', err)
+        // 如果redirectTo失败，使用navigateTo作为备用方案
+        try {
+          uni.navigateTo({ url: '/pages/settings/index' })
+        } catch (e2) {
+          console.error('navigateTo to settings also failed:', e2)
+        }
+      }
+    })
+  } catch(e) {
+    console.error('goSettings error:', e)
+  }
+}
 
 function startDrag(token, e) {
   drag.value.active = true
