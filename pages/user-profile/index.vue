@@ -21,8 +21,8 @@
       </button>
       <!-- #endif -->
 
-      <button class="action-button success" @click="handleShowRewardedAd">
-        <text class="button-text">看广告获取奖励</text>
+      <button class="action-button info" @click="refreshProfile">
+        <text class="button-text">刷新资料</text>
       </button>
 
        <button class="action-button danger" @click="handleLogout">
@@ -30,31 +30,20 @@
       </button>
     </view>
 
-    <!-- Banner 广告位 -->
-    <!-- #ifdef MP-WEIXIN || APP-PLUS -->
-    <view class="ad-banner-container">
-       <ad :adpid="adConfig.banner" ad-type="banner" ad-theme="white" @error="onAdError"></ad>
-    </view>
-    <!-- #endif -->
-
   </view>
 </template>
 
 <script>
 import {
   getWxProfileAndUpdate,
-  logout
+  logout,
+  getToken
 } from '@/utils/auth.js';
-import {
-  showRewardedAd,
-  AD_CONFIG // 导入广告配置
-} from '@/utils/ad.js';
 
 export default {
   data() {
     return {
-      userInfo: {},
-      adConfig: AD_CONFIG // 将配置绑定到 data
+      userInfo: {}
     };
   },
   onShow() {
@@ -88,22 +77,31 @@ export default {
       }
       // #endif
     },
-    async handleShowRewardedAd() {
-      try {
-        const res = await showRewardedAd();
-        if (res.isEnded) {
-          uni.showToast({ title: '恭喜！获得奖励！', icon: 'none' });
-        } else {
-          uni.showToast({ title: '中途退出，无法获得奖励', icon: 'none' });
+    async refreshProfile() {
+        uni.showLoading({ title: '正在刷新...' });
+        try {
+            const res = await uniCloud.callFunction({
+                name: 'user',
+                data: {
+                    action: 'getProfile',
+                    token: getToken()
+                }
+            });
+            const result = res.result;
+            if (result.errCode === 0) {
+                const newUserInfo = result.data.userInfo;
+                this.userInfo = newUserInfo;
+                getApp().globalData.userInfo = newUserInfo;
+                uni.setStorageSync('uni_user_info', newUserInfo);
+                uni.showToast({ title: '刷新成功', icon: 'success' });
+            } else {
+                uni.showToast({ title: result.errMsg, icon: 'none' });
+            }
+        } catch (e) {
+            uni.showToast({ title: '刷新失败，请重试', icon: 'none' });
+        } finally {
+            uni.hideLoading();
         }
-      } catch (err) {
-        uni.showModal({
-            title: '提示',
-            content: '广告加载失败，请稍后重试',
-            showCancel: false
-        });
-        console.error('广告播放失败:', err);
-      }
     },
     handleLogout() {
         logout();
@@ -114,9 +112,6 @@ export default {
     },
     showToast(message) {
         uni.showToast({ title: message, icon: 'none' });
-    },
-    onAdError(err) {
-        console.error('Banner广告加载失败:', err);
     }
   }
 };
@@ -124,65 +119,31 @@ export default {
 
 <style scoped>
 .profile-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40rpx;
-  background-color: #f7f7f7;
-  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center; padding: 40rpx; background-color: #f7f7f7; min-height: 100vh;
 }
 .user-info-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: #ffffff;
-  border-radius: 20rpx;
-  padding: 40rpx;
-  width: 100%;
-  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
-  margin-bottom: 40rpx;
+  display: flex; flex-direction: column; align-items: center; background-color: #ffffff; border-radius: 20rpx; padding: 40rpx; width: 100%; box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05); margin-bottom: 40rpx;
 }
 .avatar {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  border: 4rpx solid #eee;
-  margin-bottom: 20rpx;
+  width: 160rpx; height: 160rpx; border-radius: 50%; border: 4rpx solid #eee; margin-bottom: 20rpx;
 }
 .nickname {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 10rpx;
+  font-size: 36rpx; font-weight: bold; color: #333; margin-bottom: 10rpx;
 }
 .user-id {
-    font-size: 24rpx;
-    color: #999;
+    font-size: 24rpx; color: #999;
 }
 .action-list {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 30rpx;
+  width: 100%; display: flex; flex-direction: column; gap: 30rpx;
 }
 .action-button {
-  background-color: #fff;
-  border-radius: 10rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.05);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 90rpx;
-  padding: 0;
-  margin: 0;
-  line-height: normal;
+  background-color: #fff; border-radius: 10rpx; box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.05); display: flex; justify-content: center; align-items: center; height: 90rpx; padding: 0; margin: 0; line-height: normal;
 }
 .action-button::after {
     border: none;
 }
 .button-text {
-  font-size: 30rpx;
-  color: #333;
+  font-size: 30rpx; color: #333;
 }
 .action-button.primary {
   background-color: #007aff;
@@ -190,10 +151,10 @@ export default {
 .action-button.primary .button-text {
   color: #fff;
 }
-.action-button.success {
-  background-color: #4cd964;
+.action-button.info {
+  background-color: #5ac8fa;
 }
-.action-button.success .button-text {
+.action-button.info .button-text {
   color: #fff;
 }
 .action-button.danger {
@@ -201,14 +162,5 @@ export default {
 }
 .action-button.danger .button-text {
     color: #fff;
-}
-.ad-banner-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  padding-bottom: constant(safe-area-inset-bottom);
-  padding-bottom: env(safe-area-inset-bottom);
-  background-color: #fff;
 }
 </style>

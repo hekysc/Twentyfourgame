@@ -7,9 +7,7 @@
     "vueVersion" : "3",
     "transformPx" : true,
     "app-plus" : {
-        "modules" : {
-            "Ad" : {}
-        },
+        "modules" : {},
         "orientation" : [ "portrait-primary" ],
         "splashscreen" : {
             "alwaysShowBeforeRender" : true,
@@ -58,9 +56,7 @@
                     }
                 }
             },
-            "sdkConfigs" : {
-                "ad" : {}
-            }
+            "sdkConfigs" : {}
         }
     },
     "mp-weixin" : {
@@ -82,12 +78,7 @@
             "startLocationUpdate"
         ],
         "lazyCodeLoading" : "requiredComponents",
-        "plugins" : {
-            "ad" : {
-                "version" : "1.2.2",
-                "provider" : "wx99ac57241a543615"
-            }
-        },
+        "plugins" : {},
         "resizable" : true,
         "navigateToMiniProgramAppIdList" : [],
         "shareAppMessage" : true,

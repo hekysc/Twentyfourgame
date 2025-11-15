@@ -22,7 +22,6 @@ export async function login() {
       token,
       userInfo
     } = res.data;
-    // 保存 token 和用户信息到本地存储
     uni.setStorageSync(TOKEN_KEY, token);
     uni.setStorageSync(USER_INFO_KEY, userInfo);
     console.log('登录成功:', res.data);
@@ -46,7 +45,6 @@ async function wxLogin() {
       provider: 'weixin',
       success: async (loginRes) => {
         try {
-          console.log('wxLogin: uni.login success, calling cloud function...');
           const result = await uniCloud.callFunction({
             name: 'login',
             data: {
@@ -56,12 +54,10 @@ async function wxLogin() {
           });
           resolve(result.result);
         } catch (e) {
-          console.error('wxLogin: callFunction error', e);
           reject(e);
         }
       },
       fail: (err) => {
-        console.error('wxLogin: uni.login failed:', err);
         reject(err);
       }
     });
@@ -73,10 +69,7 @@ async function wxLogin() {
  */
 async function appLogin() {
   return new Promise((resolve, reject) => {
-    // App 端使用设备 ID 作为唯一标识
-    // plus.device.uuid 在某些情况下可能不唯一或变化，可结合其他信息增强唯一性
     const deviceId = plus.device.uuid;
-    console.log('appLogin: deviceId =', deviceId);
     uniCloud.callFunction({
       name: 'login',
       data: {
@@ -86,7 +79,6 @@ async function appLogin() {
     }).then(res => {
       resolve(res.result);
     }).catch(err => {
-      console.error('appLogin: callFunction error', err);
       reject(err);
     });
   });
@@ -108,13 +100,21 @@ export async function getWxProfileAndUpdate() {
         } = infoRes.userInfo;
 
         try {
-          console.log('getWxProfileAndUpdate: getUserProfile success, calling cloud object...');
-          // 调用云对象更新用户信息
-          const user = uniCloud.importObject('user');
-          const updateResult = await user.updateProfile({
-            nickname: nickName,
-            avatar_url: avatarUrl
+          console.log('getWxProfileAndUpdate: calling "user" cloud function with action "updateProfile"');
+          // 调用 user 云函数更新用户信息
+          const result = await uniCloud.callFunction({
+            name: 'user',
+            data: {
+              action: 'updateProfile',
+              token: getToken(), // 传入 token
+              profile: {
+                nickname: nickName,
+                avatar_url: avatarUrl
+              }
+            }
           });
+
+          const updateResult = result.result;
 
           if (updateResult.errCode === 0) {
             // 更新本地存储的用户信息
@@ -122,19 +122,18 @@ export async function getWxProfileAndUpdate() {
             console.log('用户信息更新成功:', updateResult.data.userInfo);
             resolve(updateResult.data.userInfo);
           } else {
+            uni.showToast({ title: updateResult.errMsg, icon: 'none' });
             console.error('用户信息更新失败:', updateResult.errMsg);
             reject(new Error(updateResult.errMsg));
           }
         } catch (e) {
-          console.error('调用 user.updateProfile 云对象失败', e);
+          uni.showToast({ title: '请求失败，请重试', icon: 'none' });
+          console.error('调用 user.updateProfile 云函数失败', e);
           reject(e);
         }
       },
       fail: (err) => {
-        uni.showToast({
-          title: '您已取消授权',
-          icon: 'none'
-        });
+        uni.showToast({ title: '您已取消授权', icon: 'none' });
         reject(err);
       }
     });
@@ -171,7 +170,6 @@ export function isLogged() {
 export function logout() {
   uni.removeStorageSync(TOKEN_KEY);
   uni.removeStorageSync(USER_INFO_KEY);
-  // 可以在这里通过 event bus 通知所有页面更新状态
   uni.$emit('user-logout');
   console.log('用户已退出登录');
 }
