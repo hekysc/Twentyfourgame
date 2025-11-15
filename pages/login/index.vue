@@ -233,7 +233,7 @@ function resetData(){
  .login-page {
   /* 视口高度填满，兼容移动端动态地址栏 */
   min-height: 100dvh;
-  min-height: calc(var(--vh, 1vh) * 100);
+  min-height: -webkit-fill-available;
   background: #f1f5f9;
   display: flex;
   flex-direction: column;
@@ -260,7 +260,7 @@ body {
   flex-direction: column;
   overflow: hidden;  /* 防止溢出 */
   min-height: 0;  /* 允许收缩 */
-  height: 0;  /* 强制高度约束 */
+  /* 移除 height: 0; 这在iOS上可能导致内容不显示 */
 }
 .login-heading { 
   flex-shrink: 0;  /* 不收缩 */
@@ -280,7 +280,9 @@ body {
   padding: 0 60rpx 20rpx 60rpx;  /* 改为padding，不用margin */
   overflow-y: auto;
   min-height: 0;
-  height: 0;  /* 强制高度约束 */
+  /* 移除 height: 0; 这在iOS上可能导致内容不显示 */
+  /* iOS兼容性：添加-webkit-前缀 */
+  -webkit-overflow-scrolling: touch;
 }
 /* 滚动条样式优化 */
 .user-list::-webkit-scrollbar {
@@ -305,14 +307,10 @@ body {
 .avatar-img{ width:72rpx; height:72rpx; border-radius:50%; margin-right:20rpx; background:#e2e8f0 }
 .user-col{
   flex:1;
-  display:grid;
-  /* 方案A：定宽（最稳妥，确保“最近程序”纵向齐） */
-  grid-template-columns: minmax(0, 200rpx) 1fr;  /* ← 原来是 auto 1fr */
-  /* 也可用半定宽：grid-template-columns: minmax(240rpx, 36vw) 1fr; 
-     （注意小程序端对 clamp/minmax 的兼容性，H5/App 正常） */
-  align-items:left;
-  justify-items:start;                /* ✅ 内容在各列内靠左 */
-  column-gap:10rpx; 
+  display:flex;  /* 改为flex布局，在iOS上更稳定 */
+  flex-direction: column;
+  align-items:flex-start;
+  justify-content:center;
   min-width:0;
 }
 .user-name {
@@ -325,14 +323,15 @@ body {
   text-align:left;                    /* ✅ 明确指定左对齐 */
   width: 100%;      /* 关键修复 */
   max-width: 100%;  /* 双重保险 */
+  flex-shrink: 1;   /* iOS兼容：允许收缩 */
 }
 .user-sub {
   font-size:20rpx;
   color:#64748b;
   white-space:nowrap;
-  align-self:center;                     /* ✅ 单独确保这一列底对齐 */
-  margin-left: auto;       /* 靠右对齐 */
   text-align: right;       /* 文字靠右 */
+  flex-shrink: 0;   /* iOS兼容：不收缩 */
+  align-self: flex-end;     /* iOS兼容：右对齐 */
 }
 .chev{
   flex:0 0 auto;          /* 不要挤压中间列 */

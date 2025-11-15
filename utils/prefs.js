@@ -10,8 +10,8 @@ const DEFAULT_PREFS = {
   lastMode: 'basic',
   lastHintTs: 0,
   avatarMeta: {},
-  rankMode: 'jqk-11-12-13',
-  ranks: { ...RANK_MODES['jqk-11-12-13'].ranks },
+  rankMode: 'jqk-1',
+  ranks: { ...RANK_MODES['jqk-1'].ranks },
   deckSource: 'regular',
   mixWeight: 50,
   haptics: true,
@@ -42,7 +42,7 @@ function writePrefs(data) {
 function deriveRanks(mode) {
   const info = RANK_MODES[mode]
   if (info) return { ...info.ranks }
-  return { ...RANK_MODES['jqk-11-12-13'].ranks }
+  return { ...RANK_MODES['jqk-1'].ranks }
 }
 
 function normalizeDeckSource(value) {
@@ -55,7 +55,7 @@ function normalizePrefs(raw) {
   merged.lastMode = merged.lastMode === 'pro' ? 'pro' : 'basic'
   merged.lastHintTs = Number.isFinite(merged.lastHintTs) ? merged.lastHintTs : 0
   merged.avatarMeta = merged.avatarMeta && typeof merged.avatarMeta === 'object' ? merged.avatarMeta : {}
-  merged.rankMode = RANK_MODES[merged.rankMode] ? merged.rankMode : 'jqk-11-12-13'
+  merged.rankMode = RANK_MODES[merged.rankMode] ? merged.rankMode : 'jqk-1'
   merged.ranks = deriveRanks(merged.rankMode)
   merged.deckSource = normalizeDeckSource(merged.deckSource)
   merged.mixWeight = Number.isFinite(merged.mixWeight) ? Math.min(100, Math.max(0, Math.round(merged.mixWeight))) : 50
@@ -92,7 +92,7 @@ function detectLegacyRankMode() {
       return session.faceUseHigh ? 'jqk-11-12-13' : 'jqk-1'
     }
   } catch (_) {}
-  return 'jqk-11-12-13'
+  return 'jqk-1'
 }
 
 function migrateLegacyPrefs() {
@@ -133,7 +133,10 @@ function readPrefs() {
 }
 
 function setPrefs(data) {
+  // 清除缓存，确保下次读取时获取最新数据
+  cachedPrefs = null
   cachedPrefs = normalizePrefs(data)
+  console.log('setPrefs normalized data:', cachedPrefs)
   writePrefs(cachedPrefs)
   return cachedPrefs
 }
@@ -204,6 +207,16 @@ export function clearAvatarMeta(userId) {
 
 export function getGameplayPrefs() {
   const prefs = readPrefs()
+  console.log('getGameplayPrefs returning:', {
+    rankMode: prefs.rankMode,
+    ranks: deriveRanks(prefs.rankMode),
+    deckSource: prefs.deckSource,
+    mixWeight: prefs.mixWeight,
+    haptics: prefs.haptics,
+    sfx: prefs.sfx,
+    reducedMotion: prefs.reducedMotion,
+    rankMigrationNotice: prefs.rankMigrationNotice,
+  })
   return {
     rankMode: prefs.rankMode,
     ranks: deriveRanks(prefs.rankMode),
@@ -217,8 +230,12 @@ export function getGameplayPrefs() {
 }
 
 export function setGameplayPrefs(partial) {
+  console.log('setGameplayPrefs called with:', partial)
   updatePrefs(p => {
     const nextRankMode = RANK_MODES[partial?.rankMode] ? partial.rankMode : p.rankMode
+    console.log('RANK_MODES keys:', Object.keys(RANK_MODES))
+    console.log('partial?.rankMode:', partial?.rankMode, 'is in RANK_MODES:', !!RANK_MODES[partial?.rankMode])
+    console.log('Current rankMode:', p.rankMode, 'Next rankMode:', nextRankMode)
     return {
       ...p,
       rankMode: nextRankMode,

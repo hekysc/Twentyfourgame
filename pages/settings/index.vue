@@ -79,7 +79,7 @@ const { safeBottom } = useSafeArea()
 const MODE_CHANGE_EVENT = 'tf24:mode-changed'
 
 const playMode = ref(getLastMode ? getLastMode() : 'basic')
-const rankMode = ref('jqk-11-12-13')
+const rankMode = ref('jqk-1')
 const deckSource = ref('regular')
 const mixWeight = ref(50)
 const haptics = ref(true)
@@ -183,9 +183,35 @@ function onModeChange(e) {
 }
 
 function onRankModeChange(e) {
-  const value = e?.detail?.value || 'jqk-11-12-13'
+  const value = e?.detail?.value || 'jqk-1'
+  console.log('onRankModeChange called with:', value)
   rankMode.value = value
   setGameplayPrefs({ rankMode: value })
+  
+  // 立即通知其他页面设置已更改
+  try {
+    if (typeof uni.$emit === 'function') {
+      console.log('Emitting tf24:rank-mode-changed event with value:', value)
+      uni.$emit('tf24:rank-mode-changed', value)
+      // 使用全局事件确保通知能够跨页面传播
+      try {
+        uni.$emit('tf24:gameplay-prefs-changed', { rankMode: value })
+        console.log('Emitting tf24:gameplay-prefs-changed event')
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.error('Error emitting rank mode change event:', err)
+  }
+  
+  // 显示提示
+  try {
+    const modeText = value === 'jqk-1' ? 'JQK 记作 1' : 'JQK 记作 11/12/13'
+    uni.showToast({
+      title: `已切换：${modeText}`,
+      icon: 'none',
+      duration: 1600,
+    })
+  } catch (_) {}
 }
 
 function onDeckSourceChange(e) {

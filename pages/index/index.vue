@@ -273,24 +273,37 @@ const basicOpsStyle = computed(() => {
   if (Number.isFinite(total) && total > 0) style.height = `${total}px`
   return style
 })
+// 静态默认值：仅在无法从存储读取时使用
+const staticGameplayDefaults = {
+  rankMode: 'jqk-1',
+  deckSource: 'regular',
+  mixWeight: 50,
+  haptics: true,
+  sfx: true,
+  reducedMotion: false,
+}
+
 // 读取本地偏好：包含 JQK 映射、牌源、震动等用户个性化设置
-const gameplayDefaults = (() => {
+function getGameplayDefaults() {
   try {
     const prefs = getGameplayPrefs()
     return {
-      rankMode: prefs.rankMode || 'jqk-11-12-13',
-      deckSource: prefs.deckSource || 'regular',
-      mixWeight: Number.isFinite(prefs.mixWeight) ? prefs.mixWeight : 50,
+      rankMode: prefs.rankMode || staticGameplayDefaults.rankMode,
+      deckSource: prefs.deckSource || staticGameplayDefaults.deckSource,
+      mixWeight: Number.isFinite(prefs.mixWeight) ? prefs.mixWeight : staticGameplayDefaults.mixWeight,
       haptics: !!prefs.haptics,
       sfx: !!prefs.sfx,
       reducedMotion: !!prefs.reducedMotion,
     }
   } catch (_) {
-    return { rankMode: 'jqk-11-12-13', deckSource: 'regular', mixWeight: 50, haptics: true, sfx: true, reducedMotion: false }
+    return { ...staticGameplayDefaults }
   }
-})()
-const appliedGameplay = ref({ ...gameplayDefaults })
-const pendingGameplay = ref({ ...gameplayDefaults })
+}
+
+const gameplayDefaults = getGameplayDefaults()
+// 使用深拷贝来初始化响应式变量，避免引用问题
+const appliedGameplay = ref(JSON.parse(JSON.stringify(gameplayDefaults)))
+const pendingGameplay = ref(JSON.parse(JSON.stringify(gameplayDefaults)))
 const faceUseHigh = ref(appliedGameplay.value.rankMode === 'jqk-11-12-13')
 const hapticsEnabled = ref(!!appliedGameplay.value.haptics)
 const sfxEnabled = ref(!!appliedGameplay.value.sfx)
@@ -412,13 +425,22 @@ function normalizeGameplaySnapshot(prefs) {
 function syncPendingGameplayPrefs() {
   try {
     const prefs = getGameplayPrefs()
+    console.log('syncPendingGameplayPrefs got prefs:', prefs)
+    console.log('syncPendingGameplayPrefs current pendingGameplay:', pendingGameplay.value)
+    console.log('syncPendingGameplayPrefs current appliedGameplay:', appliedGameplay.value)
     if (prefs && prefs.rankMigrationNotice) {
       try { uni.showToast({ title: '已迁移到新规则：JQK 仅支持 1 或 11/12/13', icon: 'none', duration: 2400 }) } catch (_) {}
       try { consumeRankMigrationNotice() } catch (_) {}
       prefs.rankMigrationNotice = false
     }
     const latest = normalizeGameplaySnapshot(prefs)
-    pendingGameplay.value = { ...latest }
+    console.log('syncPendingGameplayPrefs normalized:', latest)
+    console.log('syncPendingGameplayPrefs latest.rankMode:', latest.rankMode)
+    // 使用深拷贝确保触发响应式更新
+    pendingGameplay.value = JSON.parse(JSON.stringify(latest))
+    console.log('syncPendingGameplayPrefs pendingGameplay after update:', pendingGameplay.value)
+    // 立即应用新的设置
+    applyPendingGameplayPrefs()
     try {
       const latestMode = getLastMode && getLastMode()
       if (latestMode) applyModeFromPreference(latestMode)
@@ -427,15 +449,42 @@ function syncPendingGameplayPrefs() {
 }
 
 function applyPendingGameplayPrefs() {
-  const latest = pendingGameplay.value || gameplayDefaults
+  // 直接从pendingGameplay获取最新设置，不使用gameplayDefaults
+  const latest = pendingGameplay.value || getGameplayDefaults()
+  const previousRankMode = appliedGameplay.value.rankMode
+  console.log('applyPendingGameplayPrefs applying:', latest, 'previous:', previousRankMode)
   appliedGameplay.value = { ...latest }
   faceUseHigh.value = appliedGameplay.value.rankMode === 'jqk-11-12-13'
+  console.log('faceUseHigh set to:', faceUseHigh.value, 'rankMode:', appliedGameplay.value.rankMode)
   deckSource.value = appliedGameplay.value.deckSource
   mixWeight.value = appliedGameplay.value.mixWeight
   hapticsEnabled.value = appliedGameplay.value.haptics
   sfxEnabled.value = appliedGameplay.value.sfx
   reducedMotion.value = appliedGameplay.value.reducedMotion
   updateExprHeight()
+  
+  // 如果JQK模式发生变化，需要重新计算当前牌面的解法
+  if (previousRankMode !== appliedGameplay.value.rankMode) {
+    console.log('Rank mode changed from', previousRankMode, 'to', appliedGameplay.value.rankMode, ', recalculating')
+    if (cards.value && cards.value.length === 4) {
+      resetBasicStateFromCards()
+      if (mode.value === 'basic') {
+        nextTick(() => syncBasicOpsHeight())
+      }
+    }
+    
+    // 重新计算当前题目解法
+    try {
+      const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
+      solution.value = mapped.length === 4 ? solve24(mapped) : null
+      console.log('New solution:', solution.value)
+    } catch (_) { 
+      solution.value = null 
+      console.log('Error calculating solution')
+    }
+  } else {
+    console.log('Rank mode unchanged')
+  }
 }
 
 function requestLayoutMeasure() {
@@ -567,23 +616,29 @@ function loadSession() {
       resetBasicStateFromCards()
       tokens.value = Array.isArray(data.tokens) ? data.tokens : []
       usedByCard.value = Array.isArray(data.usedByCard) ? data.usedByCard : [0,0,0,0]
-      const restoredRankMode = normalizeRankMode(data.rankMode || (data.faceUseHigh ? 'jqk-11-12-13' : 'jqk-1'))
-      const restoredGameplay = normalizeGameplaySnapshot({
-        rankMode: restoredRankMode,
+      const storedRankMode = normalizeRankMode(data.rankMode || (data.faceUseHigh ? 'jqk-11-12-13' : 'jqk-1'))
+      const storedGameplay = normalizeGameplaySnapshot({
+        rankMode: storedRankMode,
         deckSource: data.deckSource,
         mixWeight: data.mixWeight,
         haptics: data.haptics,
         sfx: data.sfx,
         reducedMotion: data.reducedMotion,
       })
-      appliedGameplay.value = { ...restoredGameplay }
-      pendingGameplay.value = { ...pendingGameplay.value, ...restoredGameplay }
-      faceUseHigh.value = restoredGameplay.rankMode === 'jqk-11-12-13'
-      deckSource.value = restoredGameplay.deckSource
-      mixWeight.value = restoredGameplay.mixWeight
-      hapticsEnabled.value = restoredGameplay.haptics
-      sfxEnabled.value = restoredGameplay.sfx
-      reducedMotion.value = restoredGameplay.reducedMotion
+      const currentGameplay = normalizeGameplaySnapshot(appliedGameplay.value)
+      const finalGameplay = {
+        ...storedGameplay,
+        ...currentGameplay,
+        rankMode: currentGameplay.rankMode || storedGameplay.rankMode,
+      }
+      appliedGameplay.value = { ...appliedGameplay.value, ...finalGameplay }
+      pendingGameplay.value = { ...pendingGameplay.value, ...finalGameplay }
+      faceUseHigh.value = finalGameplay.rankMode === 'jqk-11-12-13'
+      deckSource.value = finalGameplay.deckSource
+      mixWeight.value = finalGameplay.mixWeight
+      hapticsEnabled.value = finalGameplay.haptics
+      sfxEnabled.value = finalGameplay.sfx
+      reducedMotion.value = finalGameplay.reducedMotion
       handRecorded.value = !!data.handRecorded
       timeoutRecorded.value = !!data.timeoutRecorded
       handStartTs.value = data.handStartTs || Date.now()
@@ -795,6 +850,76 @@ function applyModeFromPreference(prefMode) {
 
 function handleExternalModeChange(newMode) {
   applyModeFromPreference(newMode)
+}
+
+function handleRankModeChange(newRankMode) {
+  console.log('handleRankModeChange called with:', newRankMode)
+  // 立即应用新的JQK设置
+  const latest = { ...pendingGameplay.value, rankMode: newRankMode }
+  pendingGameplay.value = latest
+  appliedGameplay.value = { ...appliedGameplay.value, rankMode: newRankMode }
+  faceUseHigh.value = newRankMode === 'jqk-11-12-13'
+  console.log('handleRankModeChange faceUseHigh set to:', faceUseHigh.value)
+  
+  // 重新初始化当前牌面
+  if (cards.value && cards.value.length === 4) {
+    resetBasicStateFromCards()
+    if (mode.value === 'basic') {
+      nextTick(() => syncBasicOpsHeight())
+    }
+  }
+  
+  // 重新计算当前题目解法（无论当前是否有解法）
+  try {
+    const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
+    solution.value = mapped.length === 4 ? solve24(mapped) : null
+    console.log('handleRankModeChange new solution:', solution.value)
+  } catch (_) { 
+    solution.value = null 
+    console.log('handleRankModeChange error calculating solution')
+  }
+}
+
+function handleGameplayPrefsChange(prefs) {
+  console.log('handleGameplayPrefsChange called with:', prefs)
+  if (!prefs || typeof prefs !== 'object') return
+  
+  // 处理JQK设置变化
+  if (prefs.rankMode && prefs.rankMode !== appliedGameplay.value.rankMode) {
+    console.log('Rank mode changed from', appliedGameplay.value.rankMode, 'to', prefs.rankMode)
+    handleRankModeChange(prefs.rankMode)
+  }
+  
+  // 处理其他设置变化
+  if (prefs.deckSource !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, deckSource: prefs.deckSource }
+    pendingGameplay.value = { ...pendingGameplay.value, deckSource: prefs.deckSource }
+    deckSource.value = prefs.deckSource
+  }
+  
+  if (prefs.mixWeight !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, mixWeight: prefs.mixWeight }
+    pendingGameplay.value = { ...pendingGameplay.value, mixWeight: prefs.mixWeight }
+    mixWeight.value = prefs.mixWeight
+  }
+  
+  if (prefs.haptics !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, haptics: prefs.haptics }
+    pendingGameplay.value = { ...pendingGameplay.value, haptics: prefs.haptics }
+    hapticsEnabled.value = prefs.haptics
+  }
+  
+  if (prefs.sfx !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, sfx: prefs.sfx }
+    pendingGameplay.value = { ...pendingGameplay.value, sfx: prefs.sfx }
+    sfxEnabled.value = prefs.sfx
+  }
+  
+  if (prefs.reducedMotion !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, reducedMotion: prefs.reducedMotion }
+    pendingGameplay.value = { ...pendingGameplay.value, reducedMotion: prefs.reducedMotion }
+    reducedMotion.value = prefs.reducedMotion
+  }
 }
 
 function applyLatestModePreference() {
@@ -1238,6 +1363,12 @@ onMounted(() => {
     if (typeof uni.$on === 'function') {
       try { uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange) } catch (_) {}
       uni.$on(MODE_CHANGE_EVENT, handleExternalModeChange)
+      // 监听JQK设置变化
+      try { uni.$off('tf24:rank-mode-changed', handleRankModeChange) } catch (_) {}
+      uni.$on('tf24:rank-mode-changed', handleRankModeChange)
+      // 监听通用游戏偏好设置变化
+      try { uni.$off('tf24:gameplay-prefs-changed', handleGameplayPrefsChange) } catch (_) {}
+      uni.$on('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
     }
   } catch (_) {}
   ensureInit()
@@ -1281,7 +1412,29 @@ onMounted(() => {
 })
 
 onShow(() => {
-  syncPendingGameplayPrefs()
+  // 清除缓存，强制重新读取最新的设置
+  try {
+    if (typeof uni.$off === 'function') {
+      uni.$off('tf24:rank-mode-changed', handleRankModeChange)
+      uni.$off('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
+    }
+    // 重新绑定事件监听，确保能接收到最新的设置变更
+    if (typeof uni.$on === 'function') {
+      uni.$on('tf24:rank-mode-changed', handleRankModeChange)
+      uni.$on('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
+    }
+  } catch (_) {}
+  
+  // 重新同步设置，确保即使事件没有触发也能获取最新设置
+  const previousRankMode = appliedGameplay.value.rankMode
+  syncPendingGameplayPrefs()  // 这个函数现在会立即应用新的设置
+  
+  // 如果rankMode发生变化，触发额外的处理
+  if (previousRankMode !== appliedGameplay.value.rankMode) {
+    console.log('Rank mode changed in onShow from', previousRankMode, 'to', appliedGameplay.value.rankMode)
+    handleRankModeChange(appliedGameplay.value.rankMode)
+  }
+  
   currentUser.value = getCurrentUser() || null
   loadSession()
   applyLatestModePreference()
@@ -1299,6 +1452,8 @@ onUnmounted(() => {
   try {
     if (typeof uni.$off === 'function') {
       uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange)
+      uni.$off('tf24:rank-mode-changed', handleRankModeChange)
+      uni.$off('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
     }
   } catch (_) {}
   stopHandTimer()
@@ -1793,9 +1948,22 @@ watch(cards, () => {
   if (mode.value === 'basic') nextTick(() => syncBasicOpsHeight())
 })
 
-watch(faceUseHigh, () => {
+watch(faceUseHigh, (newVal, oldVal) => {
+  console.log('faceUseHigh changed from', oldVal, 'to', newVal)
   resetBasicStateFromCards()
   if (mode.value === 'basic') nextTick(() => syncBasicOpsHeight())
+  
+  // 重新计算当前题目解法
+  if (cards.value && cards.value.length === 4) {
+    try {
+      const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
+      solution.value = mapped.length === 4 ? solve24(mapped) : null
+      console.log('Solution recalculated due to faceUseHigh change:', solution.value)
+    } catch (_) { 
+      solution.value = null
+      console.log('Error recalculating solution')
+    }
+  }
 })
 
 watch(tokens, () => updateExprScale())
