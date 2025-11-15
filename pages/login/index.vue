@@ -324,12 +324,27 @@ body {
 .user-item:active{ transform:scale(0.98) }
 .avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:20rpx }
 .avatar-img{ width:72rpx; height:72rpx; border-radius:50%; margin-right:20rpx; background:#e2e8f0 }
+.user-list .user-col{
+  flex-direction: row;
+  align-items:center;
+  justify-content:space-between;
+  gap:16rpx;
+}
+.user-list .user-name{
+  flex:1;
+  min-width:0;
+}
+.user-list .user-sub{
+  align-self:center;
+  text-align:right;
+  flex-shrink:0;
+}
 .user-col{
   flex:1;
   display:flex;  /* 改为flex布局，在iOS上更稳定 */
-  flex-direction: column;
-  align-items:flex-start;
-  justify-content:center;
+  flex-direction: row;
+  align-items:center;
+  justify-content:space-between;
   min-width:0;
 }
 .user-name {
