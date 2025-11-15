@@ -56,6 +56,18 @@
           }
         }
       }
+    },
+    {
+      "path": "pages/ad-demo/index",
+      "style": {
+        "navigationBarTitleText": "云登录与 uni-ad 示例",
+        "enablePullDownRefresh": false,
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": true
+          }
+        }
+      }
     }
   ],
   "globalStyle": {

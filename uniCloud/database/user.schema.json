@@ -1,0 +1,40 @@
+{
+  "bsonType": "object",
+  "required": ["nickname", "platforms"],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+    "openid": { "bsonType": "string", "description": "mp-weixin openid" },
+    "unionid": { "bsonType": "string" },
+    "device_id": { "bsonType": "string" },
+    "phone": { "bsonType": "string" },
+    "nickname": { "bsonType": "string" },
+    "avatar_url": { "bsonType": "string" },
+    "gender": { "bsonType": "int" },
+    "platforms": {
+      "bsonType": "array",
+      "items": { "bsonType": "string" }
+    },
+    "stats": {
+      "bsonType": "object",
+      "properties": {
+        "score": { "bsonType": "int" },
+        "coins": { "bsonType": "int" }
+      }
+    },
+    "created_at": { "bsonType": "long" },
+    "last_login_at": { "bsonType": "long" },
+    "updated_at": { "bsonType": "long" }
+  },
+  "indexes": [
+    {
+      "name": "idx_openid",
+      "unique": true,
+      "fields": { "openid": 1 }
+    },
+    {
+      "name": "idx_device",
+      "unique": true,
+      "fields": { "device_id": 1 }
+    }
+  ]
+}

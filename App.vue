@@ -1,11 +1,13 @@
 <script>
 import { ensureUserAvatars } from './utils/avatar.js'
 import { scheduleTabWarmup } from './utils/tab-cache.js'
+import { ensureAutoLogin } from './utils/auth.js'
 
 export default {
   onLaunch() {
     try { ensureUserAvatars && ensureUserAvatars().catch(() => {}) } catch (_) {}
     try { scheduleTabWarmup({ immediate: true }) } catch (_) {}
+    ensureAutoLogin()
     try {
       // 仅 App 端支持预加载，H5 忽略
       // #ifdef APP-PLUS

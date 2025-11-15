@@ -23,6 +23,9 @@
             "ios" : {
                 "dSYMs" : false
             },
+            "harmony" : {
+                "package" : "com.semi2025.super24.hm"
+            },
             "icons" : {
                 "android" : {
                     "hdpi" : "unpackage/res/icons/72x72.png",
@@ -57,6 +60,7 @@
             },
             "sdkConfigs" : {
                 "ad" : {
+                    "appid" : "uniad-app-demo-id",
                     "ks" : {},
                     "sigmob" : {},
                     "zy" : {},
@@ -86,6 +90,10 @@
         ],
         "lazyCodeLoading" : "requiredComponents",
         "plugins" : {},
+        "ad" : {
+            "banner" : [ "adunit-wx-banner-demo" ],
+            "rewardedVideo" : [ "adunit-wx-reward-demo" ]
+        },
         "resizable" : true,
         "navigateToMiniProgramAppIdList" : [],
         "shareAppMessage" : true,
