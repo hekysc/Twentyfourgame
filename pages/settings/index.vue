@@ -45,7 +45,8 @@
         </view>
       </view>
 
-      <view class="section">
+      <!-- 隐藏其他偏好设置板块 -->
+      <view class="section" v-if="false">
         <view class="section-title">其他偏好</view>
         <view class="toggle-item" v-for="toggle in toggles" :key="toggle.key">
           <view class="toggle-texts">
