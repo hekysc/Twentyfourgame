@@ -348,6 +348,7 @@ const SESSION_KEY = 'tf24_game_session_v1'
 const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
 const settledResult = ref(null);         // 'success' | 'fail' | null
 const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
+const skipInProgress = ref(false)
 
 const { safeTop, safeBottom, windowHeight, refreshSafeArea } = useSafeArea()
 // 根据安全区（刘海、状态栏）动态调整页面内边距
@@ -1139,10 +1140,14 @@ function redealHand() {
 
 // 核心流程：生成下一题并初始化计时器/状态
 async function nextHand() {
+  stopHandTimer()
   applyPendingGameplayPrefs()
   closeTimerPopover()
   const res = await getNextDraw()
-  if (!res) return
+  if (!res) {
+    startHandTimer()
+    return
+  }
 
   resetHandStateForNext()
   if (Array.isArray(res.deck)) deck.value = res.deck
@@ -1152,12 +1157,14 @@ async function nextHand() {
   solution.value = res.solution || null
   tokens.value = []
   usedByCard.value = [0, 0, 0, 0]
+  // 只有在这里才真正重置 handRecorded，表示新一局开始
   handRecorded.value = false
   handStartTs.value = Date.now()
   hintWasUsed.value = false
   attemptCount.value = 0
   nextTick(() => { updateExprHeight(); syncBasicOpsHeight() })
   try { saveSession() } catch (_) {}
+  startHandTimer()
 }
 
 async function getNextDraw() {
@@ -1482,8 +1489,8 @@ function resetHandStateForNext() {
   handSettled.value = false;
   settledResult.value = null;
   handFailedOnce.value = false;
-  // 你已有的重置：handRecorded、attemptCount、hintWasUsed、errorValueText 等
-  handRecorded.value = false;  // 若你还在别处用到它，这里也清掉
+  // 不要在这里重置 handRecorded，因为有些逻辑需要知道上一局是否已记录
+  // handRecorded.value = false;
   timeoutRecorded.value = false;
   attemptCount.value = 0;
   hintWasUsed.value = false;
@@ -1694,9 +1701,16 @@ function showSolution() {
   try { saveSession() } catch (_) {}
 }
 
-function skipHand() {
+async function skipHand() {
+  if (skipInProgress.value) return
+  skipInProgress.value = true
+  
+  // 只有在本局未记录的情况下才记录失败
   if (!handRecorded.value) {
     handRecorded.value = true
+    handSettled.value = true
+    settledResult.value = 'fail'
+    handFailedOnce.value = true
     handsPlayed.value += 1
     failCount.value += 1
     try {
@@ -1719,7 +1733,15 @@ function skipHand() {
       try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
     }
   }
-  nextHand()
+  
+  try {
+    await nextHand()
+  } finally {
+    // 使用setTimeout延迟重置，避免快速连击导致的重复调用
+    setTimeout(() => {
+      skipInProgress.value = false
+    }, 300)
+  }
 }
 
 function reshuffle() {
