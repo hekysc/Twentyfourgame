@@ -1,0 +1,17 @@
+{
+    "uni-id": {
+        "tokenExpiresIn": 2592000,
+        "tokenExpiresThreshold": 86400,
+        "passwordErrorLimit": 6,
+        "passwordErrorRetryTime": 3600,
+        "autoSetInviteCode": false,
+        "forceInviteCode": false
+    },
+    "mp-weixin": {
+        "appId": "YOUR_WEIXIN_MP_APPID_PLEASE_REPLACE",
+        "appSecret": "YOUR_WEIXIN_MP_APPSECRET_PLEASE_REPLACE"
+    },
+    "jwt": {
+        "secret": "YOUR_OWN_SECURE_JWT_SECRET_KEY_PLEASE_REPLACE"
+    }
+}

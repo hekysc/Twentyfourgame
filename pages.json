@@ -56,6 +56,13 @@
           }
         }
       }
+    },
+    {
+      "path": "pages/user-profile/index",
+      "style": {
+        "navigationBarTitleText": "我的主-页",
+        "navigationStyle": "default"
+      }
     }
   ],
   "globalStyle": {
