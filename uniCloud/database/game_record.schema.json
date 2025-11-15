@@ -1,0 +1,21 @@
+{
+  "bsonType": "object",
+  "required": ["uid", "success"],
+  "properties": {
+    "_id": { "bsonType": "objectId" },
+    "uid": { "bsonType": "string" },
+    "puzzle": {
+      "bsonType": "array",
+      "items": { "bsonType": ["int", "string"] }
+    },
+    "success": { "bsonType": "bool" },
+    "time_spent": { "bsonType": "int" },
+    "created_at": { "bsonType": "long" }
+  },
+  "indexes": [
+    {
+      "name": "idx_uid_created",
+      "fields": { "uid": 1, "created_at": -1 }
+    }
+  ]
+}
