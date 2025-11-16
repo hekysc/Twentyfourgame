@@ -670,7 +670,11 @@ function loadSession() {
         } catch (_) { solution.value = null }
       }
       nextTick(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
-  return true
+    }
+    return true
+  } catch (_) {
+    return false
+  }
 }
 
 async function ensureUserSession() {
@@ -711,9 +715,6 @@ function needsProfileCompletion(user) {
     return false
   }
   return !(nickname && avatar)
-}
-    return false
-  } catch (_) { return false }
 }
 
 const remainingCards = computed(() => {

@@ -273,7 +273,7 @@ function goToGame() {
     uni.reLaunch({ url: '/pages/index/index' })
   } catch (_) {
     try {
-      uni.switchTab({ url: '/pages/index/index' })
+      uni.navigateTo({ url: '/pages/index/index' })
     } catch (_) {}
   }
 }
