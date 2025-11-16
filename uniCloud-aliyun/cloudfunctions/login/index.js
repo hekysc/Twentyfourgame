@@ -41,7 +41,7 @@ function sanitizeUser(user) {
 }
 
 async function handleMpWeixin(scenePayload = {}) {
-  const { code, platform = 'mp-weixin' } = scenePayload
+  const { code, platform = 'mp-weixin', phoneNumber = '' } = scenePayload
   const session = await fetchWeixinSession(code)
   const openid = session.openid
   let userDoc = await userCollection.where({ openid }).limit(1).get()
@@ -52,23 +52,31 @@ async function handleMpWeixin(scenePayload = {}) {
       unionid: session.unionid || '',
       nickname: '',
       avatar_url: '',
+      avatar_file_id: '',
       gender: 0,
-      phone: '',
+      phone: phoneNumber || '',
       device_id: '',
       platforms: [platform],
       created_at: Date.now(),
       last_login_at: Date.now(),
+      profile_completed: false,
       stats: { score: 0, coins: 0 }
     }
     const res = await userCollection.add(newUser)
     user = { _id: res.id, ...newUser }
   } else {
-    user.last_login_at = Date.now()
+    const now = Date.now()
+    user.last_login_at = now
     user.platforms = Array.from(new Set([...(user.platforms || []), platform]))
-    await userCollection.doc(user._id).update({
+    const updatePayload = {
       last_login_at: user.last_login_at,
       platforms: user.platforms
-    })
+    }
+    if (phoneNumber) {
+      user.phone = phoneNumber
+      updatePayload.phone = phoneNumber
+    }
+    await userCollection.doc(user._id).update(updatePayload)
   }
   const token = auth.createToken(user)
   return { token, user: sanitizeUser(user) }
@@ -90,10 +98,12 @@ async function handleApp(scenePayload = {}) {
       phone,
       nickname: extra.nickname || '游客',
       avatar_url: extra.avatar_url || '',
+      avatar_file_id: extra.avatar_file_id || '',
       gender: extra.gender || 0,
       platforms: [platform],
       created_at: Date.now(),
       last_login_at: Date.now(),
+      profile_completed: !!(extra.nickname && extra.avatar_url),
       stats: { score: 0, coins: 0 }
     }
     const res = await userCollection.add(newUser)
@@ -111,12 +121,12 @@ async function handleApp(scenePayload = {}) {
 }
 
 exports.main = async (event = {}, context) => {
-  const { scene, code, deviceId, phone, platform, extra } = event
+  const { scene, code, deviceId, phone, platform, extra, phoneNumber } = event
   if (scene === 'mp-weixin') {
-    return await handleMpWeixin({ code, platform })
+    return await handleMpWeixin({ code, platform, phoneNumber: phoneNumber || phone || '' })
   }
   if (scene === 'app') {
-    return await handleApp({ deviceId, phone, platform, extra })
+    return await handleApp({ deviceId, phone: phone || phoneNumber || '', platform, extra })
   }
   throw new Error('不支持的登录场景')
 }

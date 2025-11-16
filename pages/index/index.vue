@@ -316,11 +316,15 @@ const PRO_EXPR_HEIGHT_PX = 200
 const exprZoneHeight = ref(initialMode === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX)
 const currentUser = ref(null)
 const avatarLoadFailed = ref(false)
+let authRedirectPending = false
 const currentUserName = computed(() => {
-  const name = currentUser.value && typeof currentUser.value.name === 'string' ? currentUser.value.name.trim() : ''
-  return name || '未登录'
+  const nickname = typeof currentUser.value?.nickname === 'string' ? currentUser.value.nickname.trim() : ''
+  const legacyName = typeof currentUser.value?.name === 'string' ? currentUser.value.name.trim() : ''
+  return nickname || legacyName || '未登录'
 })
-const currentUserAvatar = computed(() => (currentUser.value && currentUser.value.avatar) ? currentUser.value.avatar : '')
+const currentUserAvatar = computed(() => {
+  return currentUser.value?.avatar_url || currentUser.value?.avatar || ''
+})
 const currentUserInitial = computed(() => avatarInitial(currentUserName.value))
 const currentUserColor = computed(() => colorFromUser(currentUser.value))
 const deck = ref([])
@@ -666,8 +670,48 @@ function loadSession() {
         } catch (_) { solution.value = null }
       }
       nextTick(() => { updateVHVar(); updateExprHeight(); updateExprScale() })
-      return true
+  return true
+}
+
+async function ensureUserSession() {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      if (!authRedirectPending) {
+        authRedirectPending = true
+        goLogin()
+      }
+      return false
     }
+    if (needsProfileCompletion(user)) {
+      if (!authRedirectPending) {
+        authRedirectPending = true
+        goCompleteProfile()
+      }
+      return false
+    }
+    currentUser.value = user
+    authRedirectPending = false
+    return true
+  } catch (err) {
+    console.error('加载用户信息失败:', err)
+    if (!authRedirectPending) {
+      authRedirectPending = true
+      goLogin()
+    }
+    return false
+  }
+}
+
+function needsProfileCompletion(user) {
+  if (!user) return true
+  const nickname = String(user.nickname || '').trim()
+  const avatar = String(user.avatar_url || '').trim()
+  if (user.profile_completed && nickname && avatar) {
+    return false
+  }
+  return !(nickname && avatar)
+}
     return false
   } catch (_) { return false }
 }
@@ -754,7 +798,7 @@ const lastInsertedIndex = ref(-1)
 const { proxy } = getCurrentInstance()
 
 const booted = ref(false)
-const selectedUserId = computed(() => (currentUser.value && currentUser.value.id) ? currentUser.value.id : '')
+const selectedUserId = computed(() => currentUser.value?._id || currentUser.value?.id || '')
 const currentHandNums = computed(() => {
   const arr = (cards.value || []).map(c => c.rank)
   return arr.sort((a, b) => a - b)
@@ -1381,7 +1425,7 @@ function promptDeckReshuffle() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   syncPendingGameplayPrefs()
   try {
     if (typeof uni.$on === 'function') {
@@ -1395,7 +1439,11 @@ onMounted(() => {
       uni.$on('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
     }
   } catch (_) {}
-  ensureInit()
+  await ensureInit()
+  const ready = await ensureUserSession()
+  if (!ready) {
+    return
+  }
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   try {
     const u = getUsers && getUsers()
@@ -1420,7 +1468,6 @@ onMounted(() => {
     }
   } catch (_) { /* noop */ }
 
-  currentUser.value = getCurrentUser() || null
   const restored = loadSession()
   applyLatestModePreference()
   if (!restored) { initDeck(); nextHand() }
@@ -1435,7 +1482,7 @@ onMounted(() => {
   }
 })
 
-onShow(() => {
+onShow(async () => {
   // 清除缓存，强制重新读取最新的设置
   try {
     if (typeof uni.$off === 'function') {
@@ -1459,7 +1506,10 @@ onShow(() => {
     handleRankModeChange(appliedGameplay.value.rankMode)
   }
   
-  currentUser.value = getCurrentUser() || null
+  const ready = await ensureUserSession()
+  if (!ready) {
+    return
+  }
   loadSession()
   applyLatestModePreference()
   startHandTimer()
@@ -1491,7 +1541,7 @@ onUnmounted(() => {
 
 function updateLastSuccess() {
   try {
-    const cu = getCurrentUser && getCurrentUser()
+    const cu = currentUser.value
     if (!cu || !cu.id) { lastSuccessMs.value = null; return }
     const ext = readStatsExtended && readStatsExtended(cu.id)
     if (ext && cu?.id) {
@@ -1801,6 +1851,13 @@ function goLogin(){
     uni.navigateTo({ url:'/pages/login/index' })
   } catch (e1) {
     try { uni.reLaunch({ url:'/pages/login/index' }) } catch (_) {}
+  }
+}
+function goCompleteProfile(){
+  try {
+    uni.navigateTo({ url:'/pages/profile/complete/index' })
+  } catch (e1) {
+    try { uni.reLaunch({ url:'/pages/profile/complete/index' }) } catch (_) {}
   }
 }
 function goStats(){ try { uni.reLaunch({ url:'/pages/stats/index' }) } catch(e1){ try { uni.navigateTo({ url:'/pages/stats/index' }) } catch(_){} } }

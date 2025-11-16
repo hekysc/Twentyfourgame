@@ -101,7 +101,6 @@ import {
 import { 
   wxLogin, 
   appLogin, 
-  getWxProfileAndUpdate, 
   ensureAutoLogin,
   clearSession
 } from '../../utils/auth.js'
@@ -187,6 +186,7 @@ async function loadCurrentUser() {
   }
 }
 
+
 function generateUserColor() {
   const palette = ['#e2e8f0', '#fde68a', '#bbf7d0', '#bfdbfe', '#fecaca', '#f5d0fe', '#c7d2fe']
   return palette[Math.floor(Math.random() * palette.length)]
@@ -199,23 +199,7 @@ async function handleWxLogin() {
   try {
     // 微信登录
     await wxLogin()
-    showHint('登录成功', { duration: 1500 })
-    
-    // 重新加载用户信息
-    await loadCurrentUser()
-    
-    // 尝试获取用户详细信息
-    try {
-      await getWxProfileAndUpdate()
-      await loadCurrentUser()
-    } catch (err) {
-      console.warn('获取用户详细信息失败:', err)
-    }
-    
-    // 登录成功后跳转到游戏页面
-    setTimeout(() => {
-      goToGame()
-    }, 1000)
+    await proceedAfterLogin()
   } catch (err) {
     console.error('微信登录失败:', err)
     showHint('登录失败，请重试', { duration: 2000 })
@@ -231,15 +215,7 @@ async function handleAppLogin() {
   try {
     // App登录
     await appLogin()
-    showHint('登录成功', { duration: 1500 })
-    
-    // 重新加载用户信息
-    await loadCurrentUser()
-    
-    // 登录成功后跳转到游戏页面
-    setTimeout(() => {
-      goToGame()
-    }, 1000)
+    await proceedAfterLogin()
   } catch (err) {
     console.error('App登录失败:', err)
     showHint('登录失败，请重试', { duration: 2000 })
@@ -250,6 +226,46 @@ async function handleAppLogin() {
 
 function handleGuestLogin() {
   showHint('游客模式功能有限，请使用完整登录', { duration: 3000 })
+}
+
+async function proceedAfterLogin() {
+  await loadCurrentUser()
+  const user = currentUser.value
+  if (!user) {
+    showHint('登录状态异常，请重试', { duration: 2000 })
+    return
+  }
+  if (needsProfileCompletion(user)) {
+    showHint('首次登录请完善资料', { duration: 2000 })
+    setTimeout(() => {
+      goCompleteProfile()
+    }, 600)
+    return
+  }
+  showHint('登录成功', { duration: 1500 })
+  setTimeout(() => {
+    goToGame()
+  }, 800)
+}
+
+function needsProfileCompletion(user) {
+  if (!user) return true
+  const nickname = String(user.nickname || '').trim()
+  const avatar = String(user.avatar_url || '').trim()
+  if (user.profile_completed && nickname && avatar) {
+    return false
+  }
+  return !(nickname && avatar)
+}
+
+function goCompleteProfile() {
+  try {
+    uni.navigateTo({ url: '/pages/profile/complete/index' })
+  } catch (_) {
+    try {
+      uni.redirectTo({ url: '/pages/profile/complete/index' })
+    } catch (_) {}
+  }
 }
 
 function goToGame() {

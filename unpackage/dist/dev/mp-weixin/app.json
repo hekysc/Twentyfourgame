@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/login/index",
+    "pages/profile/complete/index",
     "pages/index/index",
     "pages/user/index",
     "pages/stats/index",
@@ -24,14 +25,6 @@
   ],
   "lazyCodeLoading": "requiredComponents",
   "plugins": {},
-  "ad": {
-    "banner": [
-      "adunit-wx-banner-demo"
-    ],
-    "rewardedVideo": [
-      "adunit-wx-reward-demo"
-    ]
-  },
   "resizable": true,
   "navigateToMiniProgramAppIdList": [],
   "shareAppMessage": true,

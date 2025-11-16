@@ -54,7 +54,7 @@ function resolvePlatform() {
   return 'unknown'
 }
 
-export async function wxLogin() {
+export async function wxLogin(options = {}) {
   // #ifndef MP-WEIXIN
   throw new Error('仅支持在微信小程序中调用 wxLogin')
   // #endif
@@ -71,9 +71,22 @@ export async function wxLogin() {
   if (!loginRes?.code) {
     throw new Error('微信登录失败')
   }
+  const payload = {
+    scene: 'mp-weixin',
+    code: loginRes.code,
+    platform: resolvePlatform()
+  }
+  if (options && typeof options === 'object') {
+    if (options.phoneNumber) {
+      payload.phoneNumber = options.phoneNumber
+    }
+    if (options.extra && typeof options.extra === 'object') {
+      payload.extra = options.extra
+    }
+  }
   const { result } = await uniCloud.callFunction({
     name: 'login',
-    data: { scene: 'mp-weixin', code: loginRes.code, platform: resolvePlatform() }
+    data: payload
   })
   if (!result) throw new Error('云函数返回为空')
   return saveSession(result)

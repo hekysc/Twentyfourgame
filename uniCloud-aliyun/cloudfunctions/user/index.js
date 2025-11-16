@@ -39,12 +39,24 @@ exports.main = async (event = {}, context) => {
   }
   if (action === 'updateProfile') {
     const payload = event.data || {}
+    const user = await getUser(uid)
+    if (!user) {
+      return { code: 404, message: 'USER_NOT_FOUND' }
+    }
     const updateData = { updated_at: Date.now() }
+    let nextNickname = user.nickname || ''
+    let nextAvatarUrl = user.avatar_url || ''
     if ('nickname' in payload) {
-      updateData.nickname = payload.nickname || ''
+      const nickname = (payload.nickname || '').trim()
+      updateData.nickname = nickname
+      nextNickname = nickname
     }
     if ('avatar_url' in payload) {
       updateData.avatar_url = payload.avatar_url || ''
+      nextAvatarUrl = updateData.avatar_url
+    }
+    if ('avatar_file_id' in payload) {
+      updateData.avatar_file_id = payload.avatar_file_id || ''
     }
     if ('gender' in payload && typeof payload.gender === 'number') {
       updateData.gender = payload.gender
@@ -52,9 +64,12 @@ exports.main = async (event = {}, context) => {
     if (payload.settings && typeof payload.settings === 'object') {
       updateData.settings = payload.settings
     }
+    if (nextNickname && nextAvatarUrl) {
+      updateData.profile_completed = true
+    }
     await userCollection.doc(uid).update(updateData)
-    const user = await getUser(uid)
-    return { code: 0, user: sanitize(user) }
+    const merged = sanitize({ ...user, ...updateData })
+    return { code: 0, user: merged }
   }
   if (action === 'setPhone') {
     const { phone } = event.data || {}

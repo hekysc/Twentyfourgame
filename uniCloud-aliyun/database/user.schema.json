@@ -9,7 +9,9 @@
     "phone": { "bsonType": "string" },
     "nickname": { "bsonType": "string" },
     "avatar_url": { "bsonType": "string" },
+    "avatar_file_id": { "bsonType": "string" },
     "gender": { "bsonType": "int" },
+    "profile_completed": { "bsonType": "bool" },
     "platforms": {
       "bsonType": "array",
       "items": { "bsonType": "string" }
