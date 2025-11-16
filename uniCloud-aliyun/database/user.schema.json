@@ -1,46 +1,83 @@
 {
   "bsonType": "object",
-  "required": ["nickname", "platforms"],
+  "required": ["account_type"],
+  "permission": {
+    "read": "doc.account_type == 'weixin' || doc.device_id == auth.deviceId",
+    "update": "doc._id == auth.uid",
+    "delete": false
+  },
   "properties": {
-    "_id": { "bsonType": "objectId" },
-    "openid": { "bsonType": "string", "description": "mp-weixin openid" },
-    "unionid": { "bsonType": "string" },
-    "device_id": { "bsonType": "string" },
-    "phone": { "bsonType": "string" },
-    "nickname": { "bsonType": "string" },
-    "avatar_url": { "bsonType": "string" },
-    "gender": { "bsonType": "int" },
+    "_id": {
+      "bsonType": "string",
+      "description": "用户唯一ID，所有账号类型通用。前端创建 local 账号时可不传，由云函数生成。"
+    },
+    "account_type": {
+      "bsonType": "string",
+      "enum": ["weixin", "local"],
+      "description": "账号类型：'weixin' 或 'local'"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "微信账号的 openid，local 账号此字段为空"
+    },
+    "unionid": {
+      "bsonType": "string",
+      "description": "微信账号的 unionid，可选"
+    },
+    "device_id": {
+      "bsonType": "string",
+      "description": "普通账号绑定的设备ID，微信账号此字段可为空"
+    },
+    "nickname": {
+      "bsonType": "string",
+      "description": "用户昵称，可重复"
+    },
+    "avatar_url": {
+      "bsonType": "string",
+      "description": "用户头像URL"
+    },
     "platforms": {
       "bsonType": "array",
-      "items": { "bsonType": "string" }
-    },
-    "settings": {
-      "bsonType": "object",
-      "properties": {
-        "color": { "bsonType": "string" }
-      },
-      "additionalProperties": true
+      "description": "用户登录过的平台列表",
+      "items": {
+        "bsonType": "string"
+      }
     },
     "stats": {
       "bsonType": "object",
+      "description": "用户游戏数据统计",
       "properties": {
-        "score": { "bsonType": "int" },
-        "coins": { "bsonType": "int" }
+        "score": {
+          "bsonType": "int",
+          "defaultValue": 0,
+          "description": "分数"
+        },
+        "coins": {
+          "bsonType": "int",
+          "defaultValue": 0,
+          "description": "金币"
+        }
       }
     },
-    "created_at": { "bsonType": "long" },
-    "last_login_at": { "bsonType": "long" },
-    "updated_at": { "bsonType": "long" }
+    "created_at": {
+      "bsonType": "timestamp",
+      "description": "账号创建时间"
+    },
+    "last_login_at": {
+      "bsonType": "timestamp",
+      "description": "最后登录时间"
+    }
   },
   "indexes": [
     {
-      "name": "idx_openid",
+      "name": "idx_openid_unique",
       "unique": true,
+      "sparse": true,
       "fields": { "openid": 1 }
     },
     {
-      "name": "idx_device",
-      "unique": true,
+      "name": "idx_device_id",
+      "unique": false,
       "fields": { "device_id": 1 }
     }
   ]
