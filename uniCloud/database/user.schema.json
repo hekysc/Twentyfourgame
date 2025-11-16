@@ -1,0 +1,45 @@
+{
+  "bsonType": "object",
+  "required": ["account_type", "nickname"],
+  "properties": {
+    "_id": { "bsonType": "string", "description": "user_id，全局唯一" },
+    "account_type": { "enum": ["weixin", "local"], "description": "账号类型" },
+    "openid": { "bsonType": "string", "description": "mp-weixin openid" },
+    "unionid": { "bsonType": "string" },
+    "device_id": { "bsonType": "string", "description": "普通账号绑定的设备ID" },
+    "nickname": { "bsonType": "string" },
+    "avatar_url": { "bsonType": "string" },
+    "gender": { "bsonType": "int" },
+    "platforms": {
+      "bsonType": "array",
+      "items": { "bsonType": "string" }
+    },
+    "stats": {
+      "bsonType": "object",
+      "properties": {
+        "score": { "bsonType": "int" },
+        "coins": { "bsonType": "int" }
+      }
+    },
+    "created_at": { "bsonType": "long" },
+    "last_login_at": { "bsonType": "long" },
+    "updated_at": { "bsonType": "long" },
+    "merged_to": { "bsonType": "string" },
+    "merged_at": { "bsonType": "long" }
+  },
+  "indexes": [
+    {
+      "name": "idx_openid",
+      "unique": true,
+      "fields": { "openid": 1 }
+    },
+    {
+      "name": "idx_device",
+      "fields": { "device_id": 1 }
+    },
+    {
+      "name": "idx_account_type",
+      "fields": { "account_type": 1 }
+    }
+  ]
+}

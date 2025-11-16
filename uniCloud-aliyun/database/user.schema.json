@@ -1,0 +1,32 @@
+{
+  "bsonType": "object",
+  "required": ["_id", "account_type", "created_at", "stats"],
+  "properties": {
+    "_id": { "bsonType": "string", "description": "user_id" },
+    "account_type": { "enum": ["weixin", "local"] },
+    "openid": { "bsonType": "string" },
+    "unionid": { "bsonType": "string" },
+    "device_id": { "bsonType": "string" },
+    "nickname": { "bsonType": "string" },
+    "avatar_url": { "bsonType": "string" },
+    "platforms": {
+      "bsonType": "array",
+      "items": { "bsonType": "string" }
+    },
+    "created_at": { "bsonType": "long" },
+    "last_login_at": { "bsonType": "long" },
+    "stats": {
+      "bsonType": "object",
+      "properties": {
+        "score": { "bsonType": "int" },
+        "coins": { "bsonType": "int" }
+      }
+    },
+    "merged_to": { "bsonType": "string" },
+    "merged_at": { "bsonType": "long" }
+  },
+  "indexes": [
+    { "name": "openid_unique", "unique": true, "fields": { "openid": 1 }, "partialFilterExpression": { "openid": { "$exists": true } } },
+    { "name": "device_id_index", "fields": { "device_id": 1 } }
+  ]
+}

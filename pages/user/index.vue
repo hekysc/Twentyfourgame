@@ -6,6 +6,30 @@
         @touchend="edgeHandlers.handleTouchEnd"
         @touchcancel="edgeHandlers.handleTouchCancel">
     <AppNavBar title="用户管理" :show-back="true" :with-safe-top="false" :back-to-index="true" />
+    <view class="cloud-card card section">
+      <view class="cloud-header">
+        <text class="cloud-title">当前账号</text>
+        <text class="cloud-type" v-if="sessionUser">{{ sessionUser.account_type === 'weixin' ? '微信账号' : '普通账号' }}</text>
+      </view>
+      <view v-if="sessionUser" class="cloud-body">
+        <text class="cloud-name">{{ sessionUser.nickname || '未命名账号' }}</text>
+        <text class="cloud-id">ID: {{ sessionUser._id }}</text>
+        <view class="cloud-ops">
+          <!-- #ifdef MP-WEIXIN -->
+          <button
+            v-if="sessionUser.account_type === 'local'"
+            class="btn highlight"
+            :loading="upgradeLoading"
+            @tap="upgradeAccount"
+          >升级为微信账号</button>
+          <!-- #endif -->
+          <text v-if="sessionUser.account_type === 'weixin'" class="cloud-tip">已绑定微信，可跨设备登录</text>
+        </view>
+        <view v-if="upgradeErr" class="cloud-err">{{ upgradeErr }}</view>
+      </view>
+      <view v-else class="cloud-empty">暂未登录云端账号，请在登录页选择登录方式。</view>
+    </view>
+
     <view class="row" style="gap:12rpx; align-items:center;">
       <input v-model="newName" placeholder="新用户名称" class="input" />
       <button class="btn btn-primary" @tap="create">添加</button>
@@ -47,9 +71,13 @@ import { saveAvatarForUser, removeAvatarForUser, consumeAvatarRestoreNotice } fr
 import { navigateToHome } from '../../utils/navigation.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
 import { getCachedUsersState, setCachedUsersState, scheduleTabWarmup } from '../../utils/tab-cache.js'
+import { getSession, upgradeLocalAccount } from '../../utils/auth.js'
 
 const users = ref({ list: [], currentId: '' })
 const newName = ref('')
+const sessionUser = ref(null)
+const upgradeLoading = ref(false)
+const upgradeErr = ref('')
 
 const { hintState, showHint, hideHint } = useFloatingHint()
 const edgeHandlers = useEdgeExit({ showHint, onExit: () => exitPage() })
@@ -89,6 +117,11 @@ function loadUsers() {
   setCachedUsersState(data)
 }
 
+function refreshSessionState() {
+  const session = getSession()
+  sessionUser.value = session ? session.user : null
+}
+
 // 过滤掉游客账号（名称为 Guest 的历史记录）
 const visibleUsers = computed(() => (users.value.list || []).filter(u => String(u.name||'') !== 'Guest'))
 
@@ -96,14 +129,34 @@ onMounted(() => {
   try { uni.hideTabBar && uni.hideTabBar() } catch (_) {}
   ensureInit()
   loadUsers()
+  refreshSessionState()
 })
 
 onShow(() => {
   loadUsers()
+  refreshSessionState()
   if (consumeAvatarRestoreNotice()) {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
 })
+
+async function upgradeAccount() {
+  if (!sessionUser.value || sessionUser.value.account_type !== 'local') {
+    upgradeErr.value = '当前账号无需升级'
+    return
+  }
+  upgradeLoading.value = true
+  upgradeErr.value = ''
+  try {
+    await upgradeLocalAccount({ userId: sessionUser.value._id, platform: 'mp-weixin' })
+    refreshSessionState()
+    uni.showToast({ title: '升级成功', icon: 'success' })
+  } catch (err) {
+    upgradeErr.value = err?.message || '升级失败'
+  } finally {
+    upgradeLoading.value = false
+  }
+}
 
 function create(){
   addUser(newName.value.trim()||undefined)
@@ -226,5 +279,16 @@ onShareTimeline(() => {
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
 .floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
+.cloud-card{ margin-bottom:24rpx; display:flex; flex-direction:column; gap:12rpx }
+.cloud-header{ display:flex; justify-content:space-between; align-items:center }
+.cloud-title{ font-size:32rpx; font-weight:600 }
+.cloud-type{ font-size:26rpx; color:#64748b }
+.cloud-body{ display:flex; flex-direction:column; gap:8rpx }
+.cloud-name{ font-size:30rpx; font-weight:600 }
+.cloud-id{ font-size:24rpx; color:#94a3b8 }
+.cloud-ops{ margin-top:8rpx; display:flex; flex-wrap:wrap; gap:12rpx; align-items:center }
+.cloud-tip{ font-size:24rpx; color:#10b981 }
+.cloud-err{ color:#dc2626; font-size:24rpx }
+.cloud-empty{ color:#94a3b8; font-size:26rpx }
 </style>
 

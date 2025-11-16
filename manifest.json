@@ -23,6 +23,9 @@
             "ios" : {
                 "dSYMs" : false
             },
+            "harmony" : {
+                "package" : "com.semi2025.super24.hm"
+            },
             "icons" : {
                 "android" : {
                     "hdpi" : "unpackage/res/icons/72x72.png",
@@ -55,15 +58,7 @@
                     }
                 }
             },
-            "sdkConfigs" : {
-                "ad" : {
-                    "ks" : {},
-                    "sigmob" : {},
-                    "zy" : {},
-                    "fl" : {},
-                    "jl" : {}
-                }
-            }
+            "sdkConfigs" : {}
         }
     },
     "mp-weixin" : {

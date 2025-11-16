@@ -13,6 +13,28 @@
       }
     },
     {
+      "path": "pages/local-account/list",
+      "style": {
+        "navigationBarTitleText": "普通账号",
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": true
+          }
+        }
+      }
+    },
+    {
+      "path": "pages/local-account/create",
+      "style": {
+        "navigationBarTitleText": "创建普通账号",
+        "app-plus": {
+          "titleNView": {
+            "autoBackButton": true
+          }
+        }
+      }
+    },
+    {
       "path": "pages/index/index",
       "style": {
         "navigationBarTitleText": "无敌24点程序·观测",
