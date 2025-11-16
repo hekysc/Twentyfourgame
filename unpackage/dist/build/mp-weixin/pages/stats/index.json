@@ -1,8 +1,0 @@
-{
-  "navigationBarTitleText": "历史统计",
-  "enablePullDownRefresh": true,
-  "usingComponents": {
-    "mini-bar": "../../components/MiniBar",
-    "app-nav-bar": "../../components/AppNavBar"
-  }
-}

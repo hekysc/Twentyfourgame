@@ -1,2 +1,0 @@
-"use strict";const t=require("../common/vendor.js"),r={__name:"MiniBar",props:{pct:{type:Number,default:0},color:{type:String,default:"#16a34a"},trackColor:{type:String,default:"#e5e7eb"},size:{type:Number,default:14}},setup(e){return(o,a)=>({a:e.pct+"%",b:e.color,c:e.size+"rpx",d:e.trackColor})}},c=t._export_sfc(r,[["__scopeId","data-v-3db440fe"]]);wx.createComponent(c);
-//# sourceMappingURL=../../.sourcemap/mp-weixin/components/MiniBar.js.map

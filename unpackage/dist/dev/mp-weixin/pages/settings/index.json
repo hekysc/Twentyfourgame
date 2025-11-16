@@ -1,6 +1,0 @@
-{
-  "navigationBarTitleText": "设置",
-  "usingComponents": {
-    "app-nav-bar": "../../components/AppNavBar"
-  }
-}
