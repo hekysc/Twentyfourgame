@@ -1,0 +1,23 @@
+{
+  "name": "twentyfourgame-cloud-codex",
+  "version": "1.0.0",
+  "description": "24点游戏 - 云端版",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "check": "node build-check.js",
+    "import-check": "node import-check.js",
+    "final-check": "node final-check.js"
+  },
+  "keywords": [
+    "uniapp",
+    "vue3",
+    "24game",
+    "unicloud"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "vue": "^3.3.4"
+  }
+}
