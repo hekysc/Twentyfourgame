@@ -1,0 +1,80 @@
+{
+  "bsonType": "object",
+  "required": ["account_type", "created_at"],
+  "properties": {
+    "account_type": {
+      "bsonType": "string",
+      "enum": ["weixin", "local"],
+      "description": "账号类型：微信 / 本机普通"
+    },
+    "openid": {
+      "bsonType": "string",
+      "description": "微信 openid"
+    },
+    "unionid": {
+      "bsonType": "string",
+      "description": "微信 unionid（可空）"
+    },
+    "device_id": {
+      "bsonType": "string",
+      "description": "普通账号绑定的设备 ID"
+    },
+    "nickname": {
+      "bsonType": "string",
+      "description": "昵称，可重复",
+      "default": "玩家"
+    },
+    "avatar_url": {
+      "bsonType": "string",
+      "description": "头像 URL"
+    },
+    "platforms": {
+      "bsonType": "array",
+      "items": { "bsonType": "string" },
+      "description": "登录过的平台列表"
+    },
+    "created_at": {
+      "bsonType": "long",
+      "description": "注册时间（ms）"
+    },
+    "last_login_at": {
+      "bsonType": "long",
+      "description": "最近登录时间（ms）"
+    },
+    "stats": {
+      "bsonType": "object",
+      "properties": {
+        "score": { "bsonType": "double", "default": 0 },
+        "coins": { "bsonType": "double", "default": 0 }
+      },
+      "description": "游戏统计数据"
+    },
+    "merged_to": {
+      "bsonType": "string",
+      "description": "升级/合并后指向的新账号"
+    },
+    "merged_at": {
+      "bsonType": "long",
+      "description": "合并时间"
+    }
+  },
+  "indexes": [
+    {
+      "name": "openid_unique",
+      "unique": true,
+      "fields": {
+        "openid": 1
+      },
+      "partialFilterExpression": {
+        "openid": { "$exists": true }
+      }
+    },
+    {
+      "name": "device_type_index",
+      "fields": {
+        "device_id": 1,
+        "account_type": 1
+      }
+    }
+  ]
+}
