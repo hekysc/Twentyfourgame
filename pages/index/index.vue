@@ -1250,9 +1250,6 @@ async function getNextDraw() {
 
 async function drawFromNormalDeck() {
   if (!Array.isArray(deck.value) || deck.value.length < 4) {
-    initDeck()
-  }
-  if (!Array.isArray(deck.value) || deck.value.length < 4) {
     promptDeckReshuffle()
     return null
   }
