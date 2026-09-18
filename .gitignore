@@ -45,3 +45,8 @@ local.properties
 *.7z
 *.rar
 
+
+# WeChat miniprogram CI secrets / generated preview
+private.*.key
+*.private.key
+wechat-preview.jpg
