@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Build mp-weixin
         run: npm run build:mp-weixin
       - name: Verify build output
