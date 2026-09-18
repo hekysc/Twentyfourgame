@@ -4,8 +4,8 @@
   "private": true,
   "description": "24-point game built with uni-app and Vue 3",
   "scripts": {
-    "dev:mp-weixin": "uni -p mp-weixin",
-    "build:mp-weixin": "uni build -p mp-weixin",
+    "dev:mp-weixin": "UNI_INPUT_DIR=. uni -p mp-weixin",
+    "build:mp-weixin": "UNI_INPUT_DIR=. uni build -p mp-weixin",
     "wechat:upload": "node scripts/wechat-upload.cjs",
     "wechat:preview": "node scripts/wechat-upload.cjs --preview"
   },
