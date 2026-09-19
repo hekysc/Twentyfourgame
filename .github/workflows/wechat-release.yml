@@ -18,20 +18,29 @@ on:
         description: Upload description
         required: false
         type: string
+        default: Automated upload from Twentyfourgame
 
 permissions:
   contents: read
+
+concurrency:
+  group: wechat-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
         with:
-          node-version: 20
-      - run: npm install --no-audit --no-fund
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
       - name: Build mp-weixin
         run: npm run build:mp-weixin
       - name: Verify build output
@@ -39,11 +48,24 @@ jobs:
           test -f dist/build/mp-weixin/app.js
           test -f dist/build/mp-weixin/app.json
           test -f dist/build/mp-weixin/project.config.json
-      - uses: actions/upload-artifact@v4
+          test -f dist/build/mp-weixin/pages/index/index.wxml
+      - uses: actions/upload-artifact@v6
         with:
           name: mp-weixin
           path: dist/build/mp-weixin
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Validate release inputs
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        env:
+          WECHAT_VERSION: ${{ inputs.version }}
+        run: |
+          test -n "$WECHAT_VERSION"
+          if ! printf '%s' "$WECHAT_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
+            echo "::error::Version must look like 1.2.3 or 1.2.3-beta."
+            exit 1
+          fi
 
       - name: Prepare WeChat private key
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
@@ -61,6 +83,9 @@ jobs:
           WECHAT_VERSION: ${{ inputs.version }}
           WECHAT_DESC: ${{ inputs.description }}
           WECHAT_APPID: wx58faf81d08ca037c
-        run: |
-          test -n "$WECHAT_VERSION"
-          npm run wechat:upload
+          WECHAT_PROJECT_PATH: dist/build/mp-weixin
+        run: npm run wechat:upload
+
+      - name: Remove WeChat private key
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload }}
+        run: rm -f "$RUNNER_TEMP/wechat.key"
