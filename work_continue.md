@@ -8,7 +8,7 @@
 - 拖拽编辑的边界用例梳理（插入占位、撤销等）
 
 ## 完成记录
-- 2026-09-19：打通并加固微信小程序 CI/CD：GitHub Actions 在 Linux 上通过 Uni-App CLI 构建 `dist/build/mp-weixin`，校验并保存 Artifact，使用 `miniprogram-ci` 与 Actions Secret 成功上传微信开发版本；发布保持手动触发，审核/正式发布保留人工安全门。
+- 2026-09-19：打通并加固微信小程序 CI/CD：GitHub Actions 在 Linux 上通过 Uni-App CLI 构建 `dist/build/mp-weixin`，校验并保存 Artifact，使用 `miniprogram-ci` 与 Actions Secret 成功上传微信开发版本；开发版现已支持源码合并到 `main` 后自动触发并自动生成版本号与体验二维码；审核/正式发布继续保留人工安全门。
 
 - 2025-09-20：精简提示/反馈系统，Basic 模式自动结算失败可重试，Pro 模式提示改为 Toast 与答案覆盖。
 - 2025-09-21：全局自定义导航，移除系统返回箭头并补充 H5 兜底样式。

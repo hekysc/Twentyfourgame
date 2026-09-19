@@ -3,6 +3,21 @@ name: WeChat Mini Program
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'App.vue'
+      - 'main.js'
+      - 'pages/**'
+      - 'components/**'
+      - 'core/**'
+      - 'utils/**'
+      - 'static/**'
+      - 'pages.json'
+      - 'manifest.json'
+      - 'package.json'
+      - 'vite.config.js'
+      - 'scripts/wechat-upload.cjs'
   workflow_dispatch:
     inputs:
       upload:
@@ -56,19 +71,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Validate release inputs
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+      - name: Resolve release metadata
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
         env:
-          WECHAT_VERSION: ${{ inputs.version }}
+          DISPATCH_VERSION: ${{ inputs.version }}
+          DISPATCH_DESC: ${{ inputs.description }}
         run: |
-          test -n "$WECHAT_VERSION"
-          if ! printf '%s' "$WECHAT_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
-            echo "::error::Version must look like 1.2.3 or 1.2.3-beta."
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            echo "WECHAT_VERSION=1.0.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+            echo "WECHAT_DESC=Auto dev release from main: ${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          else
+            test -n "$DISPATCH_VERSION"
+            if ! printf '%s' "$DISPATCH_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
+              echo "::error::Version must look like 1.2.3 or 1.2.3-beta."
+              exit 1
+            fi
+            echo "WECHAT_VERSION=$DISPATCH_VERSION" >> "$GITHUB_ENV"
+            echo "WECHAT_DESC=${DISPATCH_DESC:-Automated upload from Twentyfourgame}" >> "$GITHUB_ENV"
           fi
 
       - name: Prepare WeChat private key
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
         env:
           WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_PRIVATE_KEY }}
         run: |
@@ -77,35 +100,31 @@ jobs:
           chmod 600 "$RUNNER_TEMP/wechat.key"
 
       - name: Upload WeChat development version
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
         env:
           WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
-          WECHAT_VERSION: ${{ inputs.version }}
-          WECHAT_DESC: ${{ inputs.description }}
           WECHAT_APPID: wx58faf81d08ca037c
           WECHAT_PROJECT_PATH: dist/build/mp-weixin
         run: npm run wechat:upload
 
       - name: Generate WeChat preview QR
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
         env:
           WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
-          WECHAT_VERSION: ${{ inputs.version }}
-          WECHAT_DESC: ${{ inputs.description }}
           WECHAT_APPID: wx58faf81d08ca037c
           WECHAT_PROJECT_PATH: dist/build/mp-weixin
           WECHAT_QR_PATH: ${{ runner.temp }}/wechat-preview.jpg
         run: npm run wechat:preview
 
       - name: Upload preview QR artifact
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
         uses: actions/upload-artifact@v6
         with:
-          name: wechat-preview-qr-${{ inputs.version }}
+          name: wechat-preview-qr-${{ env.WECHAT_VERSION }}
           path: ${{ runner.temp }}/wechat-preview.jpg
           if-no-files-found: error
           retention-days: 7
 
       - name: Remove WeChat private key
-        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload }}
+        if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload)) }}
         run: rm -f "$RUNNER_TEMP/wechat.key" "$RUNNER_TEMP/wechat-preview.jpg"
