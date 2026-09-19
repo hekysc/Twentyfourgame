@@ -253,7 +253,14 @@ onShareTimeline(() => {
   /* 视口高度填满，兼容移动端动态地址栏 */
   min-height: 100dvh;
   min-height: -webkit-fill-available;
-  background: #f1f5f9;
+  background-color: #f1f5f9;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(20, 87, 81, 0.07) 0,
+    rgba(20, 87, 81, 0.07) 16rpx,
+    rgba(255, 255, 255, 0.22) 16rpx,
+    rgba(255, 255, 255, 0.22) 32rpx
+  );
   display: flex;
   flex-direction: column;
   overflow: hidden;  /* 防止整体滚动 */
