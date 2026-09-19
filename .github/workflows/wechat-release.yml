@@ -86,6 +86,26 @@ jobs:
           WECHAT_PROJECT_PATH: dist/build/mp-weixin
         run: npm run wechat:upload
 
+      - name: Generate WeChat preview QR
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        env:
+          WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
+          WECHAT_VERSION: ${{ inputs.version }}
+          WECHAT_DESC: ${{ inputs.description }}
+          WECHAT_APPID: wx58faf81d08ca037c
+          WECHAT_PROJECT_PATH: dist/build/mp-weixin
+          WECHAT_QR_PATH: ${{ runner.temp }}/wechat-preview.jpg
+        run: npm run wechat:preview
+
+      - name: Upload preview QR artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: wechat-preview-qr-${{ inputs.version }}
+          path: ${{ runner.temp }}/wechat-preview.jpg
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Remove WeChat private key
         if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.upload }}
-        run: rm -f "$RUNNER_TEMP/wechat.key"
+        run: rm -f "$RUNNER_TEMP/wechat.key" "$RUNNER_TEMP/wechat-preview.jpg"
