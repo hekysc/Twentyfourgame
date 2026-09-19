@@ -22,6 +22,8 @@ PR 到 `main` 时自动执行：
 
 工作流会从 GitHub Actions Secret `WECHAT_PRIVATE_KEY` 临时生成密钥文件，调用 `miniprogram-ci` 上传，并在任务结束时删除临时密钥。
 
+开发版本上传成功后，工作流还会调用 `miniprogram-ci preview` 生成体验/预览二维码，并以 `wechat-preview-qr-<version>` Artifact 保存 7 天。二维码 Artifact 可直接下载用于手机微信扫码测试；临时二维码文件随后与私钥一起从 runner 删除。
+
 > 2026-09-19 已实测：版本 `1.0.1` 成功通过该链路上传到微信开发版本。
 
 ## 本地构建
