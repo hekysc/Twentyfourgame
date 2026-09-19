@@ -13,7 +13,11 @@ PR 到 `main` 时自动执行：
 3. 校验 `dist/build/mp-weixin` 的关键文件。
 4. 保存 `mp-weixin` Artifact（30 天）。
 
-手动发布开发版本时，在 GitHub Actions 的 **WeChat Mini Program** 工作流选择 **Run workflow**：
+合并到 `main` 后，如果提交涉及小程序源码/构建相关路径（如 `pages/**`、`components/**`、`core/**`、`utils/**`、`App.vue`、`main.js`、`pages.json`、`manifest.json`、`package.json` 等），工作流会自动发布微信开发版本并生成预览二维码。纯文档和 CI 配置变更不会触发自动发布。
+
+自动版本号使用 `1.0.<GitHub Actions run number>`，例如 Run #15 对应 `1.0.15`。该编号由 GitHub 单调递增，避免人工维护开发版本号。
+
+手动发布入口继续保留作为故障备用。在 GitHub Actions 的 **WeChat Mini Program** 工作流选择 **Run workflow**：
 
 - Branch：`main`
 - Upload a WeChat development version：开启
@@ -68,7 +72,7 @@ npm run wechat:upload
 
 - 微信上传私钥不得进入 Git、PR、Issue、日志或聊天正文。
 - GitHub 中只保存为 Actions Secret：`WECHAT_PRIVATE_KEY`。
-- CI 只允许手动触发时读取上传密钥；普通 PR 构建不会读取 Secret，也不会上传微信。
+- 普通 PR 构建不会读取 Secret，也不会上传微信；只有命中发布路径的 `main` push 或明确开启 Upload 的手动 workflow_dispatch 才读取上传密钥。
 - 发布目录必须是当前 CLI 生成的 `dist/build/mp-weixin`，禁止使用历史 `unpackage` 产物。
 - `miniprogram-ci upload` 只产生微信**开发版本**，不会自动提交审核或正式发布。
 - 审核与正式发布继续作为独立人工安全门，避免代码合并后直接影响线上用户。
