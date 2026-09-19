@@ -1,0 +1,28 @@
+{
+  "name": "twentyfourgame",
+  "version": "1.0.0",
+  "private": true,
+  "description": "24-point game built with uni-app and Vue 3",
+  "scripts": {
+    "dev:mp-weixin": "UNI_INPUT_DIR=. uni -p mp-weixin",
+    "build:mp-weixin": "UNI_INPUT_DIR=. uni build -p mp-weixin",
+    "wechat:upload": "node scripts/wechat-upload.cjs",
+    "wechat:preview": "node scripts/wechat-upload.cjs --preview"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-5020420260813003",
+    "@dcloudio/uni-components": "3.0.0-5020420260813003",
+    "@dcloudio/uni-mp-weixin": "3.0.0-5020420260813003",
+    "vue": "^3.4.21",
+    "vue-i18n": "^9.1.9"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "^3.4.8",
+    "@dcloudio/uni-cli-shared": "3.0.0-5020420260813003",
+    "@dcloudio/uni-stacktracey": "3.0.0-5020420260813003",
+    "@dcloudio/vite-plugin-uni": "3.0.0-5020420260813003",
+    "miniprogram-ci": "2.1.31",
+    "rollup": "4.14.3",
+    "vite": "5.2.8"
+  }
+}

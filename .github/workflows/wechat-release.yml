@@ -1,0 +1,66 @@
+name: WeChat Mini Program
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload a WeChat development version
+        required: true
+        type: boolean
+        default: false
+      version:
+        description: WeChat version, for example 1.0.1
+        required: false
+        type: string
+      description:
+        description: Upload description
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - name: Build mp-weixin
+        run: npm run build:mp-weixin
+      - name: Verify build output
+        run: |
+          test -f unpackage/dist/build/mp-weixin/app.js
+          test -f unpackage/dist/build/mp-weixin/app.json
+          test -f unpackage/dist/build/mp-weixin/project.config.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mp-weixin
+          path: unpackage/dist/build/mp-weixin
+          if-no-files-found: error
+
+      - name: Prepare WeChat private key
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        env:
+          WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_PRIVATE_KEY }}
+        run: |
+          test -n "$WECHAT_PRIVATE_KEY"
+          printf '%s' "$WECHAT_PRIVATE_KEY" > "$RUNNER_TEMP/wechat.key"
+          chmod 600 "$RUNNER_TEMP/wechat.key"
+
+      - name: Upload WeChat development version
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        env:
+          WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
+          WECHAT_VERSION: ${{ inputs.version }}
+          WECHAT_DESC: ${{ inputs.description }}
+          WECHAT_APPID: wx58faf81d08ca037c
+        run: |
+          test -n "$WECHAT_VERSION"
+          npm run wechat:upload
