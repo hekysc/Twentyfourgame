@@ -1,0 +1,108 @@
+name: Formal Release Preparation
+
+on:
+  push:
+    branches:
+      - 'release-trigger/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-release-prep-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve release candidate
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#release-trigger/}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Release trigger branch must be release-trigger/X.Y.Z"
+            exit 1
+          fi
+          echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_REF=release/$VERSION" >> "$GITHUB_ENV"
+
+      - name: Checkout frozen release candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_REF }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Verify frozen candidate identity
+        run: |
+          echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
+          grep -q '"versionName" *: *"'\"$RELEASE_VERSION\"'"' manifest.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build frozen candidate
+        run: npm run build:mp-weixin
+
+      - name: Verify build output
+        run: |
+          test -f dist/build/mp-weixin/app.js
+          test -f dist/build/mp-weixin/app.json
+          test -f dist/build/mp-weixin/project.config.json
+          test -f dist/build/mp-weixin/pages/login/index.wxml
+          test -f dist/build/mp-weixin/pages/index/index.wxml
+          test -f dist/build/mp-weixin/pages/settings/index.wxml
+
+      - name: Save formal release candidate artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: formal-release-candidate-${{ env.RELEASE_VERSION }}
+          path: dist/build/mp-weixin
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Prepare WeChat private key
+        env:
+          WECHAT_PRIVATE_KEY: ${{ secrets.WECHAT_PRIVATE_KEY }}
+        run: |
+          test -n "$WECHAT_PRIVATE_KEY"
+          printf '%s' "$WECHAT_PRIVATE_KEY" > "$RUNNER_TEMP/wechat.key"
+          chmod 600 "$RUNNER_TEMP/wechat.key"
+
+      - name: Upload candidate as WeChat development version
+        env:
+          WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
+          WECHAT_VERSION: ${{ env.RELEASE_VERSION }}
+          WECHAT_DESC: Formal release candidate ${{ env.RELEASE_VERSION }} from ${{ env.RELEASE_SHA }}
+          WECHAT_APPID: wx58faf81d08ca037c
+          WECHAT_PROJECT_PATH: dist/build/mp-weixin
+        run: npm run wechat:upload
+
+      - name: Generate candidate preview QR
+        env:
+          WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
+          WECHAT_VERSION: ${{ env.RELEASE_VERSION }}
+          WECHAT_DESC: Formal release candidate ${{ env.RELEASE_VERSION }}
+          WECHAT_APPID: wx58faf81d08ca037c
+          WECHAT_PROJECT_PATH: dist/build/mp-weixin
+          WECHAT_QR_PATH: ${{ runner.temp }}/formal-release-preview.jpg
+        run: npm run wechat:preview
+
+      - name: Save candidate preview QR
+        uses: actions/upload-artifact@v6
+        with:
+          name: formal-release-preview-${{ env.RELEASE_VERSION }}
+          path: ${{ runner.temp }}/formal-release-preview.jpg
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove temporary release credentials
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/wechat.key" "$RUNNER_TEMP/formal-release-preview.jpg"
