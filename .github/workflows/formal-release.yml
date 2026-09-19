@@ -85,6 +85,19 @@ jobs:
           WECHAT_PROJECT_PATH: dist/build/mp-weixin
         run: npm run wechat:upload
 
+      - name: Submit candidate to WeChat review
+        env:
+          WECHAT_APPID: wx58faf81d08ca037c
+          WECHAT_APPSECRET: ${{ secrets.WECHAT_APPSECRET }}
+          WECHAT_VERSION: ${{ env.RELEASE_VERSION }}
+          WECHAT_DESC: Formal release candidate ${{ env.RELEASE_VERSION }} from ${{ env.RELEASE_SHA }}
+          WECHAT_AUDIT_FIRST_CLASS: ${{ vars.WECHAT_AUDIT_FIRST_CLASS }}
+          WECHAT_AUDIT_SECOND_CLASS: ${{ vars.WECHAT_AUDIT_SECOND_CLASS }}
+          WECHAT_AUDIT_FIRST_ID: ${{ vars.WECHAT_AUDIT_FIRST_ID }}
+          WECHAT_AUDIT_SECOND_ID: ${{ vars.WECHAT_AUDIT_SECOND_ID }}
+          WECHAT_AUDIT_TAG: ${{ vars.WECHAT_AUDIT_TAG }}
+        run: npm run wechat:audit
+
       - name: Generate candidate preview QR
         env:
           WECHAT_PRIVATE_KEY_PATH: ${{ runner.temp }}/wechat.key
