@@ -1,94 +1,77 @@
 # 微信小程序构建与上传流程
 
-本仓库是 Uni-App + Vue 3 的 HBuilderX 工程。发布链路分成两个明确阶段：
+本仓库已经完成 Uni-App Vue 3 CLI 化，并通过 GitHub Actions + 微信官方 `miniprogram-ci` 实际验证了从源码到微信开发版本的自动上传链路。
 
-1. **Uni-App 编译**：源码编译为微信小程序工程。
-2. **微信 CI 上传**：使用微信官方 `miniprogram-ci` 将编译结果上传为微信开发版本。
+## 自动发布（推荐）
 
-## 当前推荐流程
+工作流：`.github/workflows/wechat-release.yml`
 
-### 1. 编译 mp-weixin
+PR 到 `main` 时自动执行：
 
-当前仓库属于 HBuilderX 可视化工程，编译器不在仓库内。使用 HBuilderX 发行到微信小程序，输出目录应为：
+1. 安装依赖。
+2. 执行 `npm run build:mp-weixin`。
+3. 校验 `dist/build/mp-weixin` 的关键文件。
+4. 保存 `mp-weixin` Artifact（30 天）。
 
-```
-unpackage/dist/build/mp-weixin
-```
+手动发布开发版本时，在 GitHub Actions 的 **WeChat Mini Program** 工作流选择 **Run workflow**：
 
-不要直接编辑该目录。后续如完成 CLI 工程迁移，可将这一步改为 `npm run build:mp-weixin`。
+- Branch：`main`
+- Upload a WeChat development version：开启
+- Version：使用类似 `1.0.1` 的版本号
+- Description：填写本次上传说明
 
-### 2. 安装上传工具
+工作流会从 GitHub Actions Secret `WECHAT_PRIVATE_KEY` 临时生成密钥文件，调用 `miniprogram-ci` 上传，并在任务结束时删除临时密钥。
+
+> 2026-09-19 已实测：版本 `1.0.1` 成功通过该链路上传到微信开发版本。
+
+## 本地构建
 
 ```bash
 npm install
+npm run build:mp-weixin
 ```
 
-### 3. 配置微信代码上传密钥
-
-在微信公众平台为 AppID `wx58faf81d08ca037c` 下载代码上传密钥，并配置 IP 白名单。
-
-密钥只保存在发布机器，不得提交 Git。推荐文件名：
+CLI 构建输出目录：
 
 ```
-private.wx58faf81d08ca037c.key
+dist/build/mp-weixin
 ```
 
-### 4. 预览
+`unpackage/` 是 HBuilderX 历史/生成目录，不作为 CI 发布输入，也不要手工修改。
 
-macOS/Linux:
+## 本地预览与上传
+
+先在微信公众平台下载对应 AppID 的代码上传密钥，并只保存在安全的本地路径。
+
+macOS/Linux 示例：
 
 ```bash
 WECHAT_PRIVATE_KEY_PATH=/secure/private.wx58faf81d08ca037c.key \
-WECHAT_VERSION=1.0.0 \
+WECHAT_VERSION=1.0.1 \
+WECHAT_PROJECT_PATH=dist/build/mp-weixin \
 npm run wechat:preview
 ```
 
-PowerShell:
-
-```powershell
-$env:WECHAT_PRIVATE_KEY_PATH="C:\secure\private.wx58faf81d08ca037c.key"
-$env:WECHAT_VERSION="1.0.0"
-npm run wechat:preview
-```
-
-默认生成 `wechat-preview.jpg`。
-
-### 5. 上传开发版本
-
-macOS/Linux:
+上传开发版本：
 
 ```bash
 WECHAT_PRIVATE_KEY_PATH=/secure/private.wx58faf81d08ca037c.key \
-WECHAT_VERSION=1.0.0 \
-WECHAT_DESC="release 1.0.0" \
+WECHAT_VERSION=1.0.1 \
+WECHAT_DESC="release 1.0.1" \
+WECHAT_PROJECT_PATH=dist/build/mp-weixin \
 npm run wechat:upload
 ```
 
-PowerShell:
-
-```powershell
-$env:WECHAT_PRIVATE_KEY_PATH="C:\secure\private.wx58faf81d08ca037c.key"
-$env:WECHAT_VERSION="1.0.0"
-$env:WECHAT_DESC="release 1.0.0"
-npm run wechat:upload
-```
-
-可选变量：
-
-- `WECHAT_APPID`：默认读取当前项目 AppID。
-- `WECHAT_PROJECT_PATH`：默认 `unpackage/dist/build/mp-weixin`。
-- `WECHAT_CI_ROBOT`：默认机器人编号 1。
-- `WECHAT_QR_PATH`：预览二维码输出位置。
-
-## 安全要求
+## 安全与发布边界
 
 - 微信上传私钥不得进入 Git、PR、Issue、日志或聊天正文。
-- 发布机器的出口 IP 必须符合微信公众平台的 IP 白名单配置。
-- 正式上传前必须确认编译目录来自当前待发布源码，而不是历史构建残留。
-- `miniprogram-ci upload` 只上传开发版本；审核与正式发布按微信公众平台发布流程执行。
+- GitHub 中只保存为 Actions Secret：`WECHAT_PRIVATE_KEY`。
+- CI 只允许手动触发时读取上传密钥；普通 PR 构建不会读取 Secret，也不会上传微信。
+- 发布目录必须是当前 CLI 生成的 `dist/build/mp-weixin`，禁止使用历史 `unpackage` 产物。
+- `miniprogram-ci upload` 只产生微信**开发版本**，不会自动提交审核或正式发布。
+- 审核与正式发布继续作为独立人工安全门，避免代码合并后直接影响线上用户。
+- 如以后需要自动提交审核/发布，应另建受保护的 production Environment，并配置人工审批，不应复用普通构建 Job。
 
-## 后续自动化
+## 依赖可重复性
 
-当前最大限制是本仓库仍是 HBuilderX 工程：HBuilderX CLI 支持小程序持续集成，但 HBuilderX 不支持 Linux，因此不能直接把现有工程无改造地放到常规 Linux GitHub-hosted runner 完成编译。
-
-下一阶段建议先在独立分支验证“CLI 工程化迁移”：引入官方 Uni-App Vue 3 CLI 编译器并确保生成的 mp-weixin 与现有 HBuilderX 构建行为一致。验证通过后，再把“源码构建 + miniprogram-ci 上传”合并成一条 GitHub Actions/自托管 CI 流水线。
+当前 Uni-App/DCloud 编译器与 `miniprogram-ci` 已固定版本，但仓库暂未提交 `package-lock.json`，因此 CI 仍使用 `npm install`。后续生成并验证 lockfile 后，应切换到 `npm ci`；在此之前不要直接改成 `npm ci`，否则 CI 会因缺少 lockfile 失败。
