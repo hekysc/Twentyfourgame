@@ -81,3 +81,12 @@ npm run wechat:upload
 ## 依赖可重复性
 
 当前 Uni-App/DCloud 编译器与 `miniprogram-ci` 已固定版本，但仓库暂未提交 `package-lock.json`，因此 CI 仍使用 `npm install`。后续生成并验证 lockfile 后，应切换到 `npm ci`；在此之前不要直接改成 `npm ci`，否则 CI 会因缺少 lockfile 失败。
+
+
+## 正式发布流程
+
+正式发布与自动开发流程分离。正式候选固定在 `release/<version>` 分支；只有收到明确的“准备正式发布 X.Y.Z”指令后，才创建对应的 `release-trigger/<version>` 触发分支。
+
+触发后，Formal Release Preparation 工作流会检出冻结的 `release/<version>`，校验 package.json 与 manifest.json 版本一致，重新构建并保存 90 天候选 Artifact，再将同一候选上传为微信开发版本并生成保存 30 天的候选预览二维码。
+
+该流程只准备正式候选，不提交微信审核，也不正式上线。最终线上发布必须收到独立的“正式上线 X.Y.Z”明确指令；在正式上线能力完成官方接口验证前，不允许用开发上传流程代替正式发布。
