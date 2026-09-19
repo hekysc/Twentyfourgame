@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
-          grep -q '"versionName" *: *"'\"$RELEASE_VERSION\"'"' manifest.json
+          test "$(node -p "JSON.parse(require('fs').readFileSync('manifest.json','utf8')).versionName")" = "$RELEASE_VERSION"
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
