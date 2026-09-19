@@ -4,7 +4,7 @@ const ci = require('miniprogram-ci')
 
 const APPID = process.env.WECHAT_APPID || 'wx58faf81d08ca037c'
 const PRIVATE_KEY_PATH = process.env.WECHAT_PRIVATE_KEY_PATH
-const PROJECT_PATH = path.resolve(process.env.WECHAT_PROJECT_PATH || 'unpackage/dist/build/mp-weixin')
+const PROJECT_PATH = path.resolve(process.env.WECHAT_PROJECT_PATH || 'dist/build/mp-weixin')
 const VERSION = process.env.WECHAT_VERSION
 const DESC = process.env.WECHAT_DESC || 'Automated upload from Twentyfourgame'
 const ROBOT = Number(process.env.WECHAT_CI_ROBOT || 1)

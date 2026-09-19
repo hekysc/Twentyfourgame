@@ -36,13 +36,13 @@ jobs:
         run: npm run build:mp-weixin
       - name: Verify build output
         run: |
-          test -f unpackage/dist/build/mp-weixin/app.js
-          test -f unpackage/dist/build/mp-weixin/app.json
-          test -f unpackage/dist/build/mp-weixin/project.config.json
+          test -f dist/build/mp-weixin/app.js
+          test -f dist/build/mp-weixin/app.json
+          test -f dist/build/mp-weixin/project.config.json
       - uses: actions/upload-artifact@v4
         with:
           name: mp-weixin
-          path: unpackage/dist/build/mp-weixin
+          path: dist/build/mp-weixin
           if-no-files-found: error
 
       - name: Prepare WeChat private key
