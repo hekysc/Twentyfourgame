@@ -32,9 +32,13 @@ function request(method, path, body) {
 }
 
 async function token() {
-  const q='/cgi-bin/token?grant_type=client_credential&appid='+encodeURIComponent(APPID)+'&secret='+encodeURIComponent(APPSECRET)
-  const r=await request('GET',q)
-  if (!r.access_token) throw new Error('Token failed: errcode='+r.errcode+' errmsg='+r.errmsg)
+  const r=await request('POST','/cgi-bin/stable_token',{
+    grant_type:'client_credential',
+    appid:APPID,
+    secret:APPSECRET,
+    force_refresh:false,
+  })
+  if (!r.access_token) throw new Error('Stable token failed: errcode='+r.errcode+' errmsg='+r.errmsg)
   return r.access_token
 }
 
