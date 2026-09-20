@@ -16,7 +16,13 @@ if (!VERSION) fail('WECHAT_VERSION is required.')
 
 function request(method, path, body) {
   return new Promise((resolve, reject) => {
-    const req = https.request({ hostname: 'api.weixin.qq.com', method, path, headers: body ? {'Content-Type':'application/json'} : {} }, res => {
+    const payload = body ? JSON.stringify(body) : null
+    const headers = {
+      'Accept': 'application/json',
+      'User-Agent': 'Twentyfourgame-release/1.0',
+      ...(payload ? {'Content-Type':'application/json; charset=utf-8','Content-Length':Buffer.byteLength(payload)} : {}),
+    }
+    const req = https.request({ hostname: 'api.weixin.qq.com', method, path, headers }, res => {
       let data=''; res.on('data', d => data += d); res.on('end', () => {
         let parsed
         try { parsed=JSON.parse(data) } catch {
@@ -27,7 +33,7 @@ function request(method, path, body) {
         resolve(parsed)
       })
     })
-    req.on('error', reject); if (body) req.write(JSON.stringify(body)); req.end()
+    req.on('error', reject); if (payload) req.write(payload); req.end()
   })
 }
 
