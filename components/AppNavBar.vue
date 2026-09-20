@@ -79,8 +79,8 @@ function handleBack() {
   width: 100%;
   box-sizing: border-box;
   position: relative;
-  background: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.08);
+  background: #f7f3e8;
+  box-shadow: none;
 }
 
 .app-nav-bar::after {
@@ -90,7 +90,7 @@ function handleBack() {
   right: 0;
   bottom: 0;
   height: 1px;
-  background: rgba(15, 23, 42, 0.06);
+  background: rgba(37, 60, 52, 0.10);
 }
 
 .nav-inner {
@@ -115,7 +115,7 @@ function handleBack() {
   max-width: 70%;
   font-size: 34rpx;
   font-weight: 600;
-  color: #111827;
+  color: #253c34;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -136,7 +136,8 @@ function handleBack() {
   width: 80rpx;
   height: 80rpx;
   border-radius: 80rpx;
-  background: rgba(17, 24, 39, 0.08);
+  background: #fffdf6;
+  border: 2rpx solid #e6dece;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -144,12 +145,12 @@ function handleBack() {
 }
 
 .back-btn-hover {
-  background: rgba(17, 24, 39, 0.16);
+  background: #f2ecdc;
 }
 
 .back-icon {
   font-size: 34rpx;
-  color: #111827;
+  color: #24715c;
   font-weight: 700;
   transform: translateX(-4rpx);
 }

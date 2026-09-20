@@ -45,32 +45,38 @@
         </view>
 
 
-        <!-- 本局统计：紧凑表格（1行表头 + 1行数据），实时展示当前对局表现 -->
-        <view id="statsRow" class="card section stats-compact-table stats-card">
-          <view class="thead">
-            <text class="th">剩余</text>
-            <text class="th">局数</text>
-            <text class="th ok">成功</text>
-            <text class="th fail">失败</text>
-            <text class="th">胜率</text>
-            <text class="th">上一局</text>
-            <text class="th">本局</text>
+        <view class="play-selector" aria-label="游戏模式">
+          <view class="mode-switch">
+            <button class="mode-option" :class="{ active: mode === 'basic' }" @tap="selectMode('basic')">Basic</button>
+            <button class="mode-option" :class="{ active: mode === 'pro' }" @tap="selectMode('pro')">Pro</button>
           </view>
-          <view class="tbody">
-            <text class="td">{{ remainingCards }}</text>
-            <text class="td">{{ handsPlayed }}</text>
-            <text class="td ok">{{ successCount }}</text>
-            <text class="td fail">{{ failCount }}</text>
-            <text class="td">{{ winRate }}%</text>
-            <text class="td">{{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
-            <view class="td timer-cell" id="timerCell" @tap="handleTimerTap">
-              <block v-if="handElapsedMs < 120000">
-                <text>{{ fmtMs1(handElapsedMs) }}</text>
-              </block>
-              <block v-else>
-                <text class="timer-fail-text">失败</text>
-              </block>
+          <view class="deck-badge">{{ deckSourceLabel }}题库</view>
+        </view>
+
+        <!-- 本局统计：突出当前进度，保留完整的会话数据 -->
+        <view id="statsRow" class="card section stats-summary stats-card">
+          <view class="stats-primary">
+            <view class="stats-feature stats-feature-timer">
+              <text class="stats-label">本局</text>
+              <view class="timer-cell" id="timerCell" @tap="handleTimerTap">
+                <text v-if="handElapsedMs < 120000" class="stats-value">{{ fmtMs1(handElapsedMs) }}</text>
+                <text v-else class="timer-fail-text">失败</text>
+              </view>
             </view>
+            <view class="stats-feature">
+              <text class="stats-label">胜率</text>
+              <text class="stats-value">{{ winRate }}%</text>
+            </view>
+            <view class="stats-feature">
+              <text class="stats-label">剩余</text>
+              <text class="stats-value">{{ remainingCards }}</text>
+            </view>
+          </view>
+          <view class="stats-secondary">
+            <text>局数 {{ handsPlayed }}</text>
+            <text class="ok">成功 {{ successCount }}</text>
+            <text class="fail">失败 {{ failCount }}</text>
+            <text>上一局 {{ lastSuccessMs != null ? fmtMs(lastSuccessMs) : '-' }}</text>
           </view>
         </view>
       </view>
@@ -89,6 +95,37 @@
                       @touchend.stop.prevent="endDrag()">
                   <PlayingCard class="playing-card-visual" :card="card" />
                 </view>
+              </view>
+
+              <!-- 先展示算式，再提供运算键，减少视线往返 -->
+              <view class="expr-card card section">
+                <view
+                  id="exprZone"
+                  class="expr-zone"
+                  :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
+                  :style="{ height: exprZoneHeight + 'px' }"
+                >
+                  <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
+                  <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
+                    <block v-for="(t, i) in tokens" :key="i">
+                      <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                      <view v-if="t.type === 'num'" class="tok num" :class="{ 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i }"
+                            @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                            @touchmove.stop.prevent="onDrag($event)"
+                            @touchend.stop.prevent="endDrag()">
+                        <PlayingCard class="tok-card-visual" :card="{ rank: t.rank != null ? t.rank : Number(t.value), suit: t.suit || 'S', value: t.value }" size="sm" :fill="true" />
+                      </view>
+                      <view v-else class="tok op" :class="{ 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i }"
+                            @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
+                            @touchmove.stop.prevent="onDrag($event)"
+                            @touchend.stop.prevent="endDrag()">
+                        <text class="tok-op-text">{{ t.value }}</text>
+                      </view>
+                    </block>
+                    <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
+                  </view>
+                </view>
+                <text v-if="hintWasUsed && exprOverrideText" class="hint-settled-note">已查看答案，本局记为失败</text>
               </view>
 
               <!-- 运算符候选区：两行布局 -->
@@ -116,30 +153,6 @@
               <!-- 拖拽中的浮层 -->
               <view v-if="drag.active" class="drag-ghost" :style="ghostStyle">{{ ghostText }}</view>
 
-              <!-- 表达式卡片容器（高度由脚本计算） -->
-              <view class="expr-card card section">
-                <view
-                  id="exprZone"
-                  class="expr-zone"
-                  :class="{ 'expr-zone-active': drag.active, empty: tokens.length === 0 && !exprOverrideText }"
-                  :style="{ height: exprZoneHeight + 'px' }"
-                >
-                  <view v-if="exprOverrideText" class="expr-override">{{ exprOverrideText }}</view>
-                  <view id="exprRow" class="row expr-row" :style="{ transform: 'scale(' + exprScale + ')', transformOrigin: 'left center'}">
-                    <block v-for="(t, i) in tokens" :key="i">
-                      <view v-if="dragInsertIndex === i" class="insert-placeholder" :class="placeholderSizeClass"></view>
-                      <view class="tok" :class="[ (t.type === 'num' ? 'num' : 'op'), { 'just-inserted': i === lastInsertedIndex, 'dragging': drag.token && drag.token.type==='tok' && drag.token.index===i } ]"
-                            @touchstart.stop.prevent="startDrag({ type: 'tok', index: i, value: t.value }, $event)"
-                            @touchmove.stop.prevent="onDrag($event)"
-                            @touchend.stop.prevent="endDrag()">
-                        <PlayingCard v-if="t.type==='num'" class="tok-card-visual" :card="{ rank: t.rank != null ? t.rank : Number(t.value), suit: t.suit || 'S', value: t.value }" size="sm" :fill="true" />
-                        <text v-else class="tok-op-text">{{ t.value }}</text>
-                      </view>
-                    </block>
-                    <view v-if="dragInsertIndex === tokens.length" class="insert-placeholder" :class="placeholderSizeClass"></view>
-                  </view>
-                </view>
-              </view>
           </view>
 
           <!-- Basic 模式：简化操作，面向快速输入 -->
@@ -170,6 +183,7 @@
                 </view>
               </view>
             </view>
+            <view class="basic-helper">{{ basicHelperText }}</view>
           </view>
         </view>
       </view>
@@ -325,6 +339,10 @@ const currentUserInitial = computed(() => avatarInitial(currentUserName.value))
 const currentUserColor = computed(() => colorFromUser(currentUser.value))
 const deck = ref([])
 const deckSource = ref(appliedGameplay.value.deckSource || 'regular')
+const deckSourceLabel = computed(() => {
+  const labels = { regular: '整副', mistakes: '错题', mix: '混合' }
+  return labels[deckSource.value] || labels.regular
+})
 const mixWeight = ref(appliedGameplay.value.mixWeight ?? 50)
 const mistakeRunUsed = ref(new Set())
 const mistakeRunStamp = ref(0)
@@ -371,6 +389,22 @@ const basicErrorMessages = {
   INACTIVE_SLOT: '请选择有效的数字',
   DIVIDE_BY_ZERO: '除数不能为 0',
   INVALID_OPERATION: '无法进行该运算，请重试',
+}
+
+const basicHelperText = computed(() => {
+  if (handSettled.value && settledResult.value === 'success') return '答对了，即将进入下一题'
+  if (handFailedOnce.value) return '本局已记为失败，可撤销后继续练习'
+  if (basicSelection.value.first === null) return '选一张牌 → 运算符 → 另一张牌'
+  if (basicSelection.value.operator) return '请选择另一张牌'
+  return '请选择一个运算符'
+})
+
+function selectMode(nextMode) {
+  const normalized = nextMode === 'pro' ? 'pro' : 'basic'
+  if (mode.value === normalized) return
+  try { setLastMode(normalized) } catch (_) {}
+  try { uni.$emit?.(MODE_CHANGE_EVENT, normalized) } catch (_) {}
+  applyModeFromPreference(normalized)
 }
 
 function showBasicError(code) {
@@ -1108,7 +1142,24 @@ function handleSubmit() {
 }
 
 function handleHint() {
-  showSolution()
+  if (hintWasUsed.value) {
+    showSolution()
+    return
+  }
+  try {
+    uni.showModal({
+      title: '查看答案',
+      content: '查看答案将结束本局并记为失败，是否继续？',
+      confirmText: '查看答案',
+      confirmColor: '#A44C43',
+      cancelText: '继续作答',
+      success: (res) => {
+        if (res.confirm) showSolution()
+      },
+    })
+  } catch (_) {
+    showSolution()
+  }
 }
 
 function refresh() { nextHand() }
@@ -2122,7 +2173,7 @@ onShareTimeline(() => {
 .page {
   min-height: 100dvh;
   /* min-height: calc(var(--vh, 1vh) * 100); */
-  background: #f8fafc;
+  background: var(--tf24-paper);
   display:flex;
   flex-direction: column;
   box-sizing:border-box;
@@ -2140,7 +2191,7 @@ onShareTimeline(() => {
   min-height: 100%;
 }
 .page.booted { animation: page-fade-in .28s ease-out forwards; }
-.top-fixed { flex:0 0 auto; padding:24rpx 0; }
+.top-fixed { flex:0 0 auto; padding:16rpx 0 8rpx; }
 /* .bottom-fixed { flex:0 0 auto; } */
 .game-header { display:flex; flex-direction:column; gap:16rpx; }
 .game-middle {
@@ -2154,7 +2205,7 @@ onShareTimeline(() => {
 .mode-panels { flex:1; display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .mode-panel { display:flex; flex-direction:column; gap:14rpx; min-height:0; overflow:hidden; }
 .pro-mode { flex:1; min-height:0; }
-.topbar { display:flex; align-items:center; justify-content:space-between; gap:16rpx; padding:0 24rpx; }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:16rpx; padding:0 8rpx; }
 .topbar-actions { display:flex; align-items:center; gap:12rpx; margin-left:auto; }
 .topbar-actions .circle-button { margin:0; }
 
@@ -2163,10 +2214,10 @@ onShareTimeline(() => {
   align-items:center;
   gap:16rpx;
   padding:12rpx 20rpx;
-  background:#fff;
-  border:2rpx solid #e2e8f0;
+  background:var(--tf24-surface);
+  border:2rpx solid var(--tf24-line);
   border-radius:9999rpx;
-  box-shadow:0 6rpx 16rpx rgba(15,23,42,0.08);
+  box-shadow:0 6rpx 16rpx rgba(57,65,49,.07);
   width:100%;
   box-sizing:border-box;
 }
@@ -2184,19 +2235,26 @@ onShareTimeline(() => {
   justify-content:center;
   font-size:34rpx;
   font-weight:700;
-  color:#0f172a;
-  background:#e2e8f0;
+  color:var(--tf24-ink);
+  background:#e4c777;
 }
 .user-chip-name {
   flex:1;
   font-size:32rpx;
   font-weight:700;
-  color:#0f172a;
+  color:var(--tf24-ink);
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 .user-chip-hover { opacity:0.86; }
+
+.play-selector { display:flex; align-items:center; justify-content:space-between; gap:16rpx; padding:0 8rpx; }
+.mode-switch { display:inline-flex; align-items:center; gap:4rpx; padding:4rpx; border:2rpx solid var(--tf24-line); border-radius:999rpx; background:#ece5d5; }
+.mode-option { min-width:112rpx; height:56rpx; margin:0; padding:0 24rpx; border:none; border-radius:999rpx; background:transparent; color:var(--tf24-muted); font-size:24rpx; font-weight:800; line-height:56rpx; }
+.mode-option::after { border:none; }
+.mode-option.active { background:var(--tf24-primary); color:#fff; box-shadow:0 4rpx 10rpx rgba(36,113,92,.2); }
+.deck-badge { color:#796d59; font-size:24rpx; font-weight:700; }
  
 /* 牌区 */ 
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
@@ -2218,7 +2276,7 @@ onShareTimeline(() => {
 .ops-row-1.ops-tight,
 .ops-row-2.ops-tight { gap:10rpx; }
 .nav-title-stack { display:flex; flex-direction:column; align-items:center; justify-content:center; }
-.nav-title-main { font-size:32rpx; font-weight:700; color:#0f172a; }
+.nav-title-main { font-size:32rpx; font-weight:800; color:var(--tf24-ink); letter-spacing:1rpx; }
 
 .game-footer {
   flex:0 0 auto;
@@ -2243,22 +2301,22 @@ onShareTimeline(() => {
 
 .timer-cell { cursor: pointer; }
 .timer-popover-layer { position:fixed; inset:0; z-index:998; }
-.timer-popover { position:absolute; background:#fff; padding:18rpx 28rpx; border-radius:20rpx; box-shadow:0 16rpx 40rpx rgba(15,23,42,0.2); transform:translate(-50%, 0); display:flex; flex-direction:column; gap:12rpx; }
-.timer-popover-item { border:none; border-radius:12rpx; padding:16rpx 32rpx; background:#fee2e2; color:#b91c1c; font-size:28rpx; font-weight:700; }
+.timer-popover { position:absolute; background:var(--tf24-surface); padding:18rpx 28rpx; border:2rpx solid var(--tf24-line); border-radius:20rpx; box-shadow:0 16rpx 40rpx rgba(57,65,49,.18); transform:translate(-50%, 0); display:flex; flex-direction:column; gap:12rpx; }
+.timer-popover-item { border:none; border-radius:12rpx; padding:16rpx 32rpx; background:#f4dfdb; color:var(--tf24-danger); font-size:28rpx; font-weight:700; }
 
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
+.floating-hint{ max-width:70%; background:rgba(37,60,52,.94); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(37,60,52,.25); backdrop-filter:blur(12px) }
 
-.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(15,23,42,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-.btn-operator { background:#fff; color:#2563eb; border:2rpx solid #e5e7eb; font-size:60rpx;font-weight: bold;}
+.btn { border:none; border-radius:16rpx; padding:28rpx 0; font-size:32rpx; line-height:1; box-shadow:0 8rpx 20rpx rgba(57,65,49,.06); width:100%; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+.btn-operator { background:var(--tf24-surface); color:var(--tf24-primary); border:2rpx solid var(--tf24-line); font-size:60rpx;font-weight: bold;}
 .pro-mode .btn-operator { padding:20rpx 0; }
 .ops-row-1.ops-compact .btn-operator,
 .ops-row-2.ops-compact .btn-operator { padding:18rpx 0; font-size:54rpx; }
 .ops-row-1.ops-tight .btn-operator,
 .ops-row-2.ops-tight .btn-operator { padding:16rpx 0; font-size:50rpx; }
 .btn-submit-pro {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: var(--tf24-primary);
   color: #fff;
   border: none;
   padding: 0 36rpx;
@@ -2270,7 +2328,7 @@ onShareTimeline(() => {
   justify-content: center;
   min-width: 160rpx;
   height: 100%;
-  box-shadow: 0 12rpx 28rpx rgba(37, 99, 235, 0.25);
+  box-shadow: 0 12rpx 28rpx rgba(36,113,92,.25);
   transition: opacity .2s ease, transform .2s ease;
 }
 .btn-submit-pro:active {
@@ -2281,22 +2339,22 @@ onShareTimeline(() => {
   opacity: .45;
   box-shadow: none;
 }
-.btn-primary { background:#145751; color:#fff; }
+.btn-primary { background:var(--tf24-primary); color:#fff; }
 /* 使用全局 .btn-secondary 样式（uni.scss）以保持一致性 */
 
 /* 成功动画覆盖层 */
 .success-overlay { position:absolute; left:0; right:0; top:0; bottom:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-.success-burst { background: rgba(34,197,94,0.92); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(34,197,94,.35); animation: success-pop .5s ease-out both; }
-.error-burst { background: rgba(239,68,68,0.92); color:#fff; font-weight:800; font-size:48rpx; padding:28rpx 40rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(239,68,68,.35); animation: success-pop .5s ease-out both; display:flex; flex-direction:column; align-items:center; gap:6rpx }
+.success-burst { background: var(--tf24-primary); color:#fff; font-weight:800; font-size:64rpx; padding:40rpx 60rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(36,113,92,.32); animation: success-pop .5s ease-out both; }
+.error-burst { background: var(--tf24-danger); color:#fff; font-weight:800; font-size:48rpx; padding:28rpx 40rpx; border-radius:9999rpx; box-shadow:0 16rpx 40rpx rgba(164,76,67,.32); animation: success-pop .5s ease-out both; display:flex; flex-direction:column; align-items:center; gap:6rpx }
 .error-burst .err-title{ font-size:48rpx; font-weight:800 }
 .error-burst .err-val{ font-size:28rpx; font-weight:700; opacity:.95 }
 @keyframes success-pop { 0% { transform: scale(.6); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 
 /* 表达式区 */
-.expr-card { background:#fff; padding:16rpx; border-radius:16rpx; border:2rpx solid #e5e7eb; box-shadow:0 6rpx 20rpx rgba(0,0,0,.06); }
+.expr-card { background:var(--tf24-surface); padding:16rpx; border-radius:20rpx; border:2rpx solid var(--tf24-line); box-shadow:0 6rpx 20rpx rgba(57,65,49,.06); }
 .expr-title { margin-top: 0; color:#111827; font-size:30rpx; font-weight:600; }
 .status-text { color:#1f2937; font-weight:700; }
-.expr-zone { --tok-card-h: 104rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f5f7fb; border:2rpx dashed #d1d5db; border-radius:24rpx; padding:20rpx; overflow:hidden; position:relative;}
+.expr-zone { --tok-card-h: 104rpx; --card-w-ratio: 0.714; margin-top: 8rpx; background:#f4efdf; border:2rpx dashed #d3c8b4; border-radius:16rpx; padding:20rpx; overflow:hidden; position:relative;}
 .expr-override {
   position:absolute;
   inset:0;
@@ -2305,14 +2363,14 @@ onShareTimeline(() => {
   justify-content:center;
   text-align:center;
   padding:0 32rpx;
-  color:#1f2937;
+  color:var(--tf24-ink);
   font-size:30rpx;
   font-weight:700;
-  background:rgba(245,247,251,0.92);
+  background:rgba(244,239,223,.96);
   pointer-events:none;
   z-index:2;
 }
-.expr-zone-active { border-color:#3a7afe; }
+.expr-zone-active { border-color:var(--tf24-primary); }
 .expr-placeholder { color:#9ca3af; text-align:center; margin-top: 8rpx; }
 .expr-row { display:inline-flex; flex-wrap:nowrap; white-space:nowrap; gap:8rpx; align-items:center; }
 /* 只有在 empty 状态下显示提示 */
@@ -2324,7 +2382,7 @@ onShareTimeline(() => {
   align-items: center;
   justify-content: center;
   pointer-events: none;      /* 不拦截拖拽/点击 */
-  color: #9aa3af;            /* 轻提示色 */
+  color: #9b917e;            /* 轻提示色 */
   font-size: 26rpx;
   letter-spacing: 1rpx;
   user-select: none;
@@ -2333,49 +2391,55 @@ onShareTimeline(() => {
   transition: opacity .18s ease;
   */
 }
-.tok { color:#1f3a93; border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
+.tok { color:var(--tf24-primary); border-radius:14rpx; transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
 .tok.num { padding:0; border:none; background:transparent; width: calc(var(--tok-card-h) * var(--card-w-ratio)); height: var(--tok-card-h); display:inline-block; }
-.tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:#fff; border:2rpx solid #e5e7eb; display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(15,23,42,.06); box-sizing: border-box; }
+.tok.op { height: var(--tok-card-h); width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); padding: 0; font-size: calc(var(--tok-card-h) * 0.42); background:var(--tf24-surface); border:2rpx solid var(--tf24-line); display:flex; align-items:center; justify-content:center; box-shadow:0 6rpx 20rpx rgba(57,65,49,.06); box-sizing: border-box; }
 .tok.dragging { opacity:.6; box-shadow:0 6rpx 24rpx rgba(0,0,0,.18); }
 .tok.just-inserted { animation: pop-in 200ms ease-out; }
-.insert-placeholder { border-radius:14rpx; border:2rpx dashed #3a7afe; background:#eaf1ff; opacity:.9; position:relative; overflow:hidden; }
+.insert-placeholder { border-radius:14rpx; border:2rpx dashed var(--tf24-primary); background:#e1eee8; opacity:.9; position:relative; overflow:hidden; }
 .insert-placeholder.num { min-width: calc(var(--tok-card-h) * var(--card-w-ratio)); min-height: var(--tok-card-h); margin:2rpx; }
 .insert-placeholder.op { min-width: calc(var(--tok-card-h) * var(--card-w-ratio) / 2); min-height: var(--tok-card-h); margin:2rpx; }
 .insert-placeholder::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(60deg, rgba(58,122,254,0.05) 0, rgba(58,122,254,0.05) 8rpx, rgba(58,122,254,0.18) 8rpx, rgba(58,122,254,0.18) 16rpx); background-size:200% 100%; animation:shimmer 1.2s linear infinite; }
-.drag-ghost { position:fixed; z-index:9999; background:#3a7afe; color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
+.drag-ghost { position:fixed; z-index:9999; background:var(--tf24-primary); color:#fff; padding:16rpx 22rpx; border-radius:10rpx; font-size:32rpx; pointer-events:none; }
 
-/* 统计：单行紧凑 */
-.stats-card { background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; } 
-.stats-compact-table { display:grid; grid-template-rows:auto auto; row-gap:8rpx; }
-.stats-compact-table .thead, .stats-compact-table .tbody { display:grid; grid-template-columns: repeat(7, 1fr); align-items:center; column-gap:12rpx; }
-.stats-compact-table .thead { color:#6b7280; font-weight:700; font-size:26rpx; text-align: center;}
-.stats-compact-table .tbody { font-size:28rpx; text-align: center;}
-.stats-compact-table .ok { color:#16a34a; font-weight:700 }
-.stats-compact-table .fail { color:#dc2626; font-weight:700 }
-.stats-one-line .stats-item { display:flex; align-items:center; gap:6rpx; padding:4rpx 8rpx; border-right:2rpx solid #e5e7eb; }
-.stats-one-line .stats-item:last-child { border-right:none; }
-.stat-label { color:#6b7280; font-size:26rpx; }
-.stat-label.ok, .stat-value.ok { color:#16a34a; font-weight:700 }
-.stat-label.fail, .stat-value.fail { color:#dc2626; font-weight:700 }
-.stat-value { font-weight:700; color:#111827; font-size:28rpx; }
-
-.timer-fail-text { color:#dc2626; font-weight:700; font-size:28rpx; }
+/* 统计：先呈现当前决策所需的三项，再展示会话摘要 */
+.stats-card { background:var(--tf24-surface); border:2rpx solid var(--tf24-line); border-radius:20rpx; padding:20rpx; }
+.stats-summary { display:flex; flex-direction:column; gap:16rpx; }
+.stats-primary { display:grid; grid-template-columns:1.25fr 1fr 1fr; gap:12rpx; }
+.stats-feature { min-height:104rpx; padding:16rpx 12rpx; border-radius:14rpx; background:#f5f0e3; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:6rpx; }
+.stats-feature-timer { background:#e3efe9; align-items:flex-start; padding-left:22rpx; }
+.stats-label { color:var(--tf24-muted); font-size:22rpx; font-weight:700; }
+.stats-value { color:var(--tf24-ink); font-size:34rpx; font-weight:800; line-height:1.1; }
+.stats-feature-timer .stats-value { color:var(--tf24-primary-deep); font-size:40rpx; }
+.stats-secondary { display:flex; flex-wrap:wrap; gap:8rpx 16rpx; padding:0 4rpx; color:var(--tf24-muted); font-size:22rpx; font-weight:700; }
+.stats-secondary .ok { color:var(--tf24-primary); }
+.stats-secondary .fail { color:var(--tf24-danger); }
+.timer-fail-text { color:var(--tf24-danger); font-weight:800; font-size:30rpx; }
+.hint-settled-note { display:block; padding:14rpx 4rpx 0; color:var(--tf24-danger); font-size:24rpx; font-weight:700; text-align:center; }
 
 .basic-mode { display:flex; flex-direction:column; gap:18rpx; flex:1; min-height:0; overflow:hidden; }
-.basic-board { display:flex; gap:18rpx; align-items:stretch; justify-content:center;padding-bottom: 24rpx;}
+.basic-board { display:flex; gap:18rpx; align-items:stretch; justify-content:center; padding-bottom: 8rpx;}
 .basic-column { display:flex; flex-direction:column; gap:18rpx; flex:1; }
 .basic-card-wrapper { flex:1; position:relative; }
 .basic-card { position:relative; width:100%; background:none; border-radius:8rpx; border:none; box-shadow:none; overflow:visible; display:block; }
 .basic-card::before { content:''; display:block; padding-top:140%; width:100%; }
 .basic-card-visual { position:absolute; inset:0; width:100%; display:block; }
 .basic-card.hidden { visibility:hidden; pointer-events:none; }
-.basic-card.selected { border:2rpx solid #145751; box-shadow:none; }
-.basic-card.result { background:#fef3c7; }
-.basic-card-value { position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fefce8 0%, #fde68a 100%); }
-.basic-card-value-text { font-size:64rpx; font-weight:700; color:#1f2937; }
+.basic-card.selected { border:3rpx solid var(--tf24-primary); border-radius:16rpx; box-shadow:0 0 0 6rpx rgba(36,113,92,.12); }
+.basic-card.result { background:#f2e3b9; }
+.basic-card-value { position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg, #fffdf6 0%, #f0dfad 100%); border:2rpx solid var(--tf24-line); border-radius:16rpx; box-sizing:border-box; }
+.basic-card-value-text { font-size:64rpx; font-weight:800; color:var(--tf24-ink); }
 .basic-ops { display:flex; flex-direction:column; gap:12rpx; align-items:stretch; justify-content:flex-start; flex:0 0 150rpx; height:100%; min-height:0; }
 .basic-ops .btn-operator { flex:0 0 var(--basic-ops-button-height, auto); height: var(--basic-ops-button-height, auto); padding:16rpx 0; font-size:56rpx; display:flex; align-items:center; justify-content:center; }
-.basic-ops .btn-operator.active { background:#145751; color:#fff; border-color:#145751; }
+.basic-ops .btn-operator.active { background:var(--tf24-primary); color:#fff; border-color:var(--tf24-primary); }
+.basic-helper { padding:16rpx 20rpx; border-radius:14rpx; background:#f0eadc; color:#6e695d; font-size:24rpx; font-weight:700; text-align:center; }
+
+@media (max-width: 360px) {
+  .topbar-actions { gap:6rpx; }
+  .action-grid { gap:34rpx; }
+  .stats-primary { gap:8rpx; }
+  .stats-feature-timer .stats-value { font-size:34rpx; }
+}
 
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }

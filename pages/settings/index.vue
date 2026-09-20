@@ -39,7 +39,7 @@
             max="100"
             step="1"
             @change="onMixWeightChange"
-            active-color="#2563eb"
+            active-color="#24715C"
             background-color="#e2e8f0"
           />
         </view>
@@ -56,7 +56,7 @@
           <switch
             :checked="toggle.checked"
             @change="(e) => onToggleChange(toggle.key, e.detail.value)"
-            color="#2563eb"
+            color="#24715C"
           />
         </view>
       </view>
@@ -315,7 +315,7 @@ onShareTimeline(() => {
 <style scoped>
 .settings-page {
   min-height: 100vh;
-  background: #f3f4f6;
+  background: var(--tf24-paper);
 }
 
 .settings-body {
@@ -325,7 +325,7 @@ onShareTimeline(() => {
 }
 
 .section {
-  background: #ffffff;
+  background: var(--tf24-surface);
   border-radius: 24rpx;
   padding: 32rpx 28rpx;
   margin-bottom: 24rpx;
@@ -335,7 +335,7 @@ onShareTimeline(() => {
 .section-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--tf24-ink);
   margin-bottom: 24rpx;
 }
 
@@ -365,7 +365,7 @@ onShareTimeline(() => {
 
 .mix-label {
   font-size: 26rpx;
-  color: #0f172a;
+  color: var(--tf24-ink);
   margin-bottom: 12rpx;
 }
 
@@ -387,7 +387,7 @@ onShareTimeline(() => {
 
 .toggle-title {
   font-size: 28rpx;
-  color: #111827;
+  color: var(--tf24-ink);
   font-weight: 500;
 }
 
@@ -400,7 +400,7 @@ onShareTimeline(() => {
 .clear-cache {
   width: 100%;
   padding: 20rpx 0;
-  background: linear-gradient(135deg, #ef4444, #f87171);
+  background: var(--tf24-danger);
   color: #ffffff;
   font-size: 28rpx;
   border-radius: 9999rpx;

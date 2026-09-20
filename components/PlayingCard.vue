@@ -75,14 +75,14 @@ const sizeClass = computed(() => SIZE_CLASS_MAP[props.size] || 'card-visual--lg'
   --center-rank-size: 60rpx;
   --center-suit-size: 32rpx;
   --center-gap: 8rpx;
-  --card-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.12);
+  --card-shadow: 0 10rpx 24rpx rgba(57, 65, 49, 0.12);
   position: relative;
   aspect-ratio: 5 / 7;
   width: 100%;
   box-sizing: border-box;
   border-radius: var(--card-border-radius);
-  background: #fff;
-  border: 2rpx solid #e5e7eb;
+  background: #fffdf6;
+  border: 2rpx solid #e6dece;
   box-shadow: var(--card-shadow);
   overflow: hidden;
   transition: transform 120ms ease-out;
@@ -114,11 +114,11 @@ const sizeClass = computed(() => SIZE_CLASS_MAP[props.size] || 'card-visual--lg'
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  color: #1f2937;
+  color: #253c34;
 }
 
 .card-visual--red .card-visual__body {
-  color: #b91c1c;
+  color: #a44c43;
 }
 
 .card-visual__corner {
@@ -162,13 +162,13 @@ const sizeClass = computed(() => SIZE_CLASS_MAP[props.size] || 'card-visual--lg'
 .card-visual--black .card-visual__center-suit,
 .card-visual--black .card-visual__rank,
 .card-visual--black .card-visual__center-rank {
-  color: #111827;
+  color: #253c34;
 }
 
 .card-visual--red .card-visual__center-suit,
 .card-visual--red .card-visual__rank,
 .card-visual--red .card-visual__center-rank {
-  color: #b91c1c;
+  color: #a44c43;
 }
 
 .card-visual--lg {
@@ -179,7 +179,7 @@ const sizeClass = computed(() => SIZE_CLASS_MAP[props.size] || 'card-visual--lg'
   --center-rank-size: 62rpx;
   --center-suit-size: 30rpx;
   --center-gap: 6rpx;
-  --card-shadow: 0 12rpx 32rpx rgba(15, 23, 42, 0.12);
+  --card-shadow: 0 12rpx 32rpx rgba(57, 65, 49, 0.12);
 }
 
 .card-visual--md {
@@ -200,6 +200,6 @@ const sizeClass = computed(() => SIZE_CLASS_MAP[props.size] || 'card-visual--lg'
   --center-rank-size: 40rpx;
   --center-suit-size: 22rpx;
   --center-gap: 3rpx;
-  --card-shadow: 0 6rpx 18rpx rgba(15, 23, 42, 0.16);
+  --card-shadow: 0 6rpx 18rpx rgba(57, 65, 49, 0.14);
 }
 </style>

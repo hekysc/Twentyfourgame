@@ -35,7 +35,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   danger: { type: Boolean, default: false },
   primary: { type: Boolean, default: false },
-  iconColor: { type: String, default: '#111827' },
+  iconColor: { type: String, default: '#24715c' },
   iconSize: { type: Number, default: 28 },
 })
 
@@ -116,12 +116,12 @@ onBeforeUnmount(() => clearTimer())
   width: 88rpx;
   height: 88rpx;
   border-radius: 9999rpx;
-  background: #ffffff;
-  border: 2rpx solid rgba(15, 23, 42, 0.08);
+  background: #fffdf6;
+  border: 2rpx solid #e6dece;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6rpx 16rpx rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6rpx 16rpx rgba(57, 65, 49, 0.07);
 }
 
 .circle-icon {
@@ -134,17 +134,17 @@ onBeforeUnmount(() => clearTimer())
 }
 
 .circle-button-core.primary {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: #24715c;
   border-color: transparent;
 }
 
 .circle-button-core.primary {
-  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  background: #24715c;
   border-color: transparent;
 }
 
 .circle-button-core.danger {
-  background: linear-gradient(135deg, #ef4444, #f87171);
+  background: #a44c43;
   border-color: transparent;
 }
 
@@ -159,7 +159,7 @@ onBeforeUnmount(() => clearTimer())
 .circle-button-label {
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #1f2937;
+  color: #52635b;
   line-height: 1.2;
   text-align: center;
   white-space: nowrap;
@@ -168,7 +168,7 @@ onBeforeUnmount(() => clearTimer())
 .circle-button-tooltip {
   position: absolute;
   bottom: 104rpx;
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(37, 60, 52, 0.94);
   color: #ffffff;
   font-size: 24rpx;
   padding: 8rpx 16rpx;

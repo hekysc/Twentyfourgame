@@ -278,7 +278,7 @@ body {
 /* .icon-btn{ width:64rpx; height:64rpx; border-radius:50%; background:#e5e7eb; display:flex; align-items:center; justify-content:center; border:none; } */
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
+.floating-hint{ max-width:70%; background:rgba(37,60,52,.94); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(37,60,52,.25); backdrop-filter:blur(12px) }
 .login-body {
   flex: 1;  /* 占据剩余空间 */
   padding: 10rpx 2.5rpx 0 2.5rpx;
@@ -327,9 +327,9 @@ body {
 .user-list::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
-.user-item{ display:flex; align-items:center; padding:10rpx; height:100rpx;width:100%; border-radius:12rpx; border:2rpx solid #cfd8e3; background:#ffffff; box-shadow:0 2rpx 4rpx rgba(15,23,42,0.02) }
+.user-item{ display:flex; align-items:center; padding:10rpx; height:100rpx;width:100%; border-radius:12rpx; border:2rpx solid var(--tf24-line); background:var(--tf24-surface); box-shadow:0 2rpx 4rpx rgba(57,65,49,.04) }
 .user-item:active{ transform:scale(0.98) }
-.avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; font-weight:800; color:#0f172a; margin-right:20rpx }
+.avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e4c777; display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--tf24-ink); margin-right:20rpx }
 .avatar-img{ width:72rpx; height:72rpx; border-radius:50%; margin-right:20rpx; background:#e2e8f0 }
 .user-list .user-col{
   flex-direction: row;
@@ -380,8 +380,8 @@ body {
   text-align:right;
   color:#94a3b8; font-size:40rpx; font-weight:800; margin-left:12rpx;
 }
-.create-btn{ margin-top:20rpx; height:100rpx; border-radius:24rpx; background:#e2e8f0; color:#0f172a; font-size:32rpx; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:12rpx }
-.create-btn.highlight{ background:#145751; color:#fff }
+.create-btn{ margin-top:20rpx; height:100rpx; border-radius:24rpx; background:#ece5d5; color:var(--tf24-ink); font-size:32rpx; font-weight:800; border:none; display:flex; align-items:center; justify-content:center; gap:12rpx }
+.create-btn.highlight{ background:var(--tf24-primary); color:#fff }
 .create-plus{ font-size:36rpx }
 /* 底部区块相关样式已移除（guest 入口下线） */
 button{ -webkit-tap-highlight-color:rgba(0,0,0,0) }
@@ -404,7 +404,7 @@ button{ -webkit-tap-highlight-color:rgba(0,0,0,0) }
 }
 .empty-ill{ font-size:88rpx }
 .empty-text{ color:#6b7280 }
-.err-title{ font-weight:800; color:#b91c1c }
+.err-title{ font-weight:800; color:var(--tf24-danger) }
 .err-text{ color:#6b7280; text-align:center }
-.btn.danger{ background:#ef4444; color:#fff; border:none; padding:20rpx 28rpx; border-radius:14rpx }
+.btn.danger{ background:var(--tf24-danger); color:#fff; border:none; padding:20rpx 28rpx; border-radius:14rpx }
 </style>

@@ -39,7 +39,8 @@ export default {
 <style>
 /* 全局样式可放在 uni.scss 中 */
 page {
-  background-color: #f8f8f8;
+  background-color: #f7f3e8;
+  color: #253c34;
 }
 
 /* uni-h5 旧版头部兜底隐藏（仅当 navigationStyle 未生效时） */

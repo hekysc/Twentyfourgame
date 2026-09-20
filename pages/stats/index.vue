@@ -165,7 +165,7 @@
       </view>
       <view class="mistake-controls">
         <label class="mistake-filter">
-          <switch :checked="mistakeFilterActiveOnly" @change="onToggleMistakeActive" color="#145751" />
+          <switch :checked="mistakeFilterActiveOnly" @change="onToggleMistakeActive" color="#24715C" />
           <text>仅看活动</text>
         </label>
       </view>
@@ -296,7 +296,7 @@ const pageStyle = computed(() => {
     display: 'flex',
     flexDirection: 'column',
     rowGap: '18rpx',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f7f3e8',
     boxSizing: 'border-box',
     minHeight: 'calc(var(--vh, 1vh) * 100)',
   }
@@ -1012,14 +1012,14 @@ onShareTimeline(() => {
 
 <style scoped>
 .page{ min-height:100vh; box-sizing:border-box; position:relative; }
-.section{ background:#fff; border:2rpx solid #e5e7eb; border-radius:16rpx; padding:16rpx; box-shadow:0 6rpx 16rpx rgba(15,23,42,.06) }
+.section{ background:var(--tf24-surface); border:2rpx solid var(--tf24-line); border-radius:20rpx; padding:20rpx; box-shadow:var(--tf24-shadow) }
 .section.title{ background:#313030; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
 .title{ font-size:32rpx; font-weight:800 }
 .table { 
   margin-top: 12rpx; 
   border-radius: 12rpx; 
   overflow: hidden; 
-  border: 1rpx solid #e5e7eb; 
+  border: 1rpx solid var(--tf24-line);
 }
 .thead, .tr { 
   display: grid; 
@@ -1037,7 +1037,7 @@ onShareTimeline(() => {
 }
 .tr { 
   padding: 10rpx 12rpx; 
-  border-top: 1rpx solid #f1f5f9;
+  border-top: 1rpx solid var(--tf24-line);
   font-size: 26rpx;
   transition: background-color 0.2s;
 }
@@ -1062,12 +1062,12 @@ onShareTimeline(() => {
   color: #1e293b;
 }
 .ok { 
-  color: #059669; 
+  color: var(--tf24-primary);
   font-weight: 700; 
 }
 
 .fail { 
-  color: #dc2626; 
+  color: var(--tf24-danger);
   font-weight: 700; 
 }
 /* 数值列居中对齐，更紧凑 */
@@ -1088,17 +1088,17 @@ onShareTimeline(() => {
   color: #7c3aed;
 }
 .btn.mini{ padding:10rpx 16rpx; border-radius:12rpx; background:#eef2f7 }
-.btn.link{ background:transparent; color:#2563eb }
-.seg{ display:flex; background:#f1f5f9; border-radius:12rpx; overflow:hidden }
+.btn.link{ background:transparent; color:var(--tf24-primary) }
+.seg{ display:flex; background:#f0eadc; border-radius:12rpx; overflow:hidden }
 .seg-btn{ padding:10rpx 16rpx; background:transparent; border:none }
-.seg-btn.active{ background:#fff; font-weight:700 }
+.seg-btn.active{ background:var(--tf24-surface); color:var(--tf24-primary); font-weight:700 }
 .trend-chart{ width:100%; overflow-x:auto; }
 .trend-chart-inner{ position:relative; }
 .trend-bars{ display:flex; align-items:flex-end; height:100%; }
 .trend-item{ display:flex; justify-content:center; align-items:flex-end; height:100%; }
-.trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:12rpx 12rpx 0 0; overflow:hidden; background:#f1f5f9; }
-.trend-item .bar-fail{ width:100%; background:#dc2626; }
-.trend-item .bar-success{ width:100%; background:#16a34a; }
+.trend-item .bar{ width:100%; display:flex; flex-direction:column; justify-content:flex-end; border-radius:12rpx 12rpx 0 0; overflow:hidden; background:#f0eadc; }
+.trend-item .bar-fail{ width:100%; background:var(--tf24-danger); }
+.trend-item .bar-success{ width:100%; background:var(--tf24-primary); }
 .trend-labels{ display:flex; justify-content:flex-start; margin-top:6rpx; }
 .trend-labels .bar-label{ text-align:center; color:#64748b; font-size:22rpx; white-space:nowrap; }
 .trend-labels.rotate {
@@ -1157,8 +1157,8 @@ onShareTimeline(() => {
   color: #0f172a;
   font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
 }
-.r-result.ok{ color:#16a34a; font-weight:700 }
-.r-result.fail{ color:#dc2626; font-weight:700 }
+.r-result.ok{ color:var(--tf24-primary); font-weight:700 }
+.r-result.fail{ color:var(--tf24-danger); font-weight:700 }
 .picker-trigger{ padding:8rpx 14rpx; background:none; border-radius:12rpx;color:#fff }
 .difficulty-heatmaps{
   display:grid;
@@ -1175,7 +1175,7 @@ onShareTimeline(() => {
   }
 }
 .mistake-summary{ margin-top:16rpx; display:flex; flex-wrap:wrap; gap:24rpx; }
-.mistake-summary-item{ background:#f8fafc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
+.mistake-summary-item{ background:#f2ecdc; border-radius:16rpx; padding:16rpx 24rpx; min-width:200rpx; display:flex; flex-direction:column; gap:8rpx; }
 .mistake-summary-label{ color:#6b7280; font-size:26rpx; }
 .mistake-summary-value{ color:#111827; font-size:36rpx; font-weight:700; }
 .mistake-controls{ display:flex; align-items:center; justify-content:flex-start; gap:16rpx; margin-top:16rpx; flex-wrap:wrap; }
@@ -1221,6 +1221,6 @@ onShareTimeline(() => {
 
 .floating-hint-layer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:999 }
 .floating-hint-layer.interactive{ pointer-events:auto }
-.floating-hint{ max-width:70%; background:rgba(15,23,42,0.86); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(15,23,42,0.25); backdrop-filter:blur(12px) }
+.floating-hint{ max-width:70%; background:rgba(37,60,52,.94); color:#fff; padding:24rpx 36rpx; border-radius:24rpx; text-align:center; font-size:30rpx; box-shadow:0 20rpx 48rpx rgba(37,60,52,.25); backdrop-filter:blur(12px) }
 
 </style>
