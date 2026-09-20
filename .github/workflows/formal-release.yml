@@ -28,10 +28,17 @@ jobs:
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "RELEASE_REF=release/$VERSION" >> "$GITHUB_ENV"
 
+      - name: Checkout release automation
+        uses: actions/checkout@v7
+        with:
+          path: release-automation
+          persist-credentials: false
+
       - name: Checkout frozen release candidate
         uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_REF }}
+          path: candidate
           persist-credentials: false
 
       - uses: actions/setup-node@v7
@@ -40,31 +47,34 @@ jobs:
           package-manager-cache: false
 
       - name: Verify frozen candidate identity
+        working-directory: candidate
         run: |
           echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
           test "$(node -p "JSON.parse(require('fs').readFileSync('manifest.json','utf8')).versionName")" = "$RELEASE_VERSION"
 
-      - name: Install dependencies
+      - name: Install candidate dependencies
+        working-directory: candidate
         run: npm install --no-audit --no-fund
 
       - name: Build frozen candidate
+        working-directory: candidate
         run: npm run build:mp-weixin
 
       - name: Verify build output
         run: |
-          test -f dist/build/mp-weixin/app.js
-          test -f dist/build/mp-weixin/app.json
-          test -f dist/build/mp-weixin/project.config.json
-          test -f dist/build/mp-weixin/pages/login/index.wxml
-          test -f dist/build/mp-weixin/pages/index/index.wxml
-          test -f dist/build/mp-weixin/pages/settings/index.wxml
+          test -f candidate/dist/build/mp-weixin/app.js
+          test -f candidate/dist/build/mp-weixin/app.json
+          test -f candidate/dist/build/mp-weixin/project.config.json
+          test -f candidate/dist/build/mp-weixin/pages/login/index.wxml
+          test -f candidate/dist/build/mp-weixin/pages/index/index.wxml
+          test -f candidate/dist/build/mp-weixin/pages/settings/index.wxml
 
       - name: Save formal release candidate artifact
         uses: actions/upload-artifact@v6
         with:
           name: formal-release-candidate-${{ env.RELEASE_VERSION }}
-          path: dist/build/mp-weixin
+          path: candidate/dist/build/mp-weixin
           if-no-files-found: error
           retention-days: 90
 
@@ -82,8 +92,8 @@ jobs:
           WECHAT_VERSION: ${{ env.RELEASE_VERSION }}
           WECHAT_DESC: Formal release candidate ${{ env.RELEASE_VERSION }} from ${{ env.RELEASE_SHA }}
           WECHAT_APPID: wx58faf81d08ca037c
-          WECHAT_PROJECT_PATH: dist/build/mp-weixin
-        run: npm run wechat:upload
+          WECHAT_PROJECT_PATH: candidate/dist/build/mp-weixin
+        run: node release-automation/scripts/wechat-upload.cjs
 
       - name: Submit candidate to WeChat review
         env:
@@ -96,7 +106,7 @@ jobs:
           WECHAT_AUDIT_FIRST_ID: ${{ vars.WECHAT_AUDIT_FIRST_ID }}
           WECHAT_AUDIT_SECOND_ID: ${{ vars.WECHAT_AUDIT_SECOND_ID }}
           WECHAT_AUDIT_TAG: ${{ vars.WECHAT_AUDIT_TAG }}
-        run: npm run wechat:audit
+        run: node release-automation/scripts/wechat-audit.cjs
 
       - name: Generate candidate preview QR
         env:
@@ -104,9 +114,9 @@ jobs:
           WECHAT_VERSION: ${{ env.RELEASE_VERSION }}
           WECHAT_DESC: Formal release candidate ${{ env.RELEASE_VERSION }}
           WECHAT_APPID: wx58faf81d08ca037c
-          WECHAT_PROJECT_PATH: dist/build/mp-weixin
+          WECHAT_PROJECT_PATH: candidate/dist/build/mp-weixin
           WECHAT_QR_PATH: ${{ runner.temp }}/formal-release-preview.jpg
-        run: npm run wechat:preview
+        run: node release-automation/scripts/wechat-upload.cjs --preview
 
       - name: Save candidate preview QR
         uses: actions/upload-artifact@v6
