@@ -53,6 +53,10 @@ jobs:
           test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
           test "$(node -p "JSON.parse(require('fs').readFileSync('manifest.json','utf8')).versionName")" = "$RELEASE_VERSION"
 
+      - name: Install release automation dependencies
+        working-directory: release-automation
+        run: npm install --no-audit --no-fund
+
       - name: Install candidate dependencies
         working-directory: candidate
         run: npm install --no-audit --no-fund
