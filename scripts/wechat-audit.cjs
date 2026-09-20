@@ -18,8 +18,12 @@ function request(method, path, body) {
   return new Promise((resolve, reject) => {
     const req = https.request({ hostname: 'api.weixin.qq.com', method, path, headers: body ? {'Content-Type':'application/json'} : {} }, res => {
       let data=''; res.on('data', d => data += d); res.on('end', () => {
-        let parsed; try { parsed=JSON.parse(data) } catch { return reject(new Error('Invalid JSON from WeChat')) }
-        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error('HTTP '+res.statusCode))
+        let parsed
+        try { parsed=JSON.parse(data) } catch {
+          const preview=String(data).replace(/[\r\n]+/g,' ').slice(0,160)
+          return reject(new Error('Invalid JSON from WeChat: HTTP '+res.statusCode+' content-type='+(res.headers['content-type']||'unknown')+' body='+preview))
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error('HTTP '+res.statusCode+' errcode='+(parsed.errcode??'n/a')+' errmsg='+(parsed.errmsg||'n/a')))
         resolve(parsed)
       })
     })
