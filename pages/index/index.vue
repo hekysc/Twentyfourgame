@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 23904)
-Total output lines: 2467
-
 ﻿<!--
   页面整体结构说明：
   1. 顶部区域：导航栏、用户信息、即时统计。
@@ -921,7 +918,532 @@ function handleRankModeChange(newRankMode) {
     console.log('handleRankModeChange new solution:', solution.value)
   } catch (_) { 
     solution.value = null 
-    console.log('handleRankModeChange error calculating soluti…3904 tokens truncated…ernalModeChange)
+    console.log('handleRankModeChange error calculating solution')
+  }
+}
+
+function handleGameplayPrefsChange(prefs) {
+  console.log('handleGameplayPrefsChange called with:', prefs)
+  if (!prefs || typeof prefs !== 'object') return
+  
+  // 处理JQK设置变化
+  if (prefs.rankMode && prefs.rankMode !== appliedGameplay.value.rankMode) {
+    console.log('Rank mode changed from', appliedGameplay.value.rankMode, 'to', prefs.rankMode)
+    handleRankModeChange(prefs.rankMode)
+  }
+  
+  // 处理其他设置变化
+  if (prefs.deckSource !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, deckSource: prefs.deckSource }
+    pendingGameplay.value = { ...pendingGameplay.value, deckSource: prefs.deckSource }
+    deckSource.value = prefs.deckSource
+  }
+  
+  if (prefs.mixWeight !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, mixWeight: prefs.mixWeight }
+    pendingGameplay.value = { ...pendingGameplay.value, mixWeight: prefs.mixWeight }
+    mixWeight.value = prefs.mixWeight
+  }
+  
+  if (prefs.haptics !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, haptics: prefs.haptics }
+    pendingGameplay.value = { ...pendingGameplay.value, haptics: prefs.haptics }
+    hapticsEnabled.value = prefs.haptics
+  }
+  
+  if (prefs.sfx !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, sfx: prefs.sfx }
+    pendingGameplay.value = { ...pendingGameplay.value, sfx: prefs.sfx }
+    sfxEnabled.value = prefs.sfx
+  }
+  
+  if (prefs.reducedMotion !== undefined) {
+    appliedGameplay.value = { ...appliedGameplay.value, reducedMotion: prefs.reducedMotion }
+    pendingGameplay.value = { ...pendingGameplay.value, reducedMotion: prefs.reducedMotion }
+    reducedMotion.value = prefs.reducedMotion
+  }
+}
+
+function applyLatestModePreference() {
+  try {
+    const latestMode = getLastMode ? getLastMode() : null
+    if (latestMode) applyModeFromPreference(latestMode)
+  } catch (_) {
+    /* noop */
+  }
+}
+const undoDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : (basicHistory.value.length === 0))
+const resetDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : false)
+const submitDisabled = computed(() => mode.value !== 'pro' || tokens.value.length === 0)
+
+let lastUndoEventStamp = 0
+let lastUndoStateSignature = ''
+
+function calcUndoStateSignature() {
+  return (mode.value === 'pro')
+    ? `pro:${tokens.value.length}`
+    : `basic:${basicHistory.value.length}`
+}
+
+function clearExprOverride() {
+  if (exprOverrideText.value) exprOverrideText.value = ''
+}
+
+function showExpressionErrorToast() { showHint('表达式不合法，请重试', 1600) }
+
+function basicCardClass(idx) {
+  const slot = basicSlots.value[idx]
+  return {
+    hidden: !slot || !slot.alive,
+    selected: basicSelection.value.first === idx,
+    result: !!(slot && slot.alive && slot.source === 'value'),
+  }
+}
+
+
+function resetBasicStateFromCards() {
+  const base = createBasicState(cards.value || [], faceUseHigh.value)
+  basicSlots.value = base.slots
+  basicSelection.value = { first: null, operator: null }
+  basicHistory.value = []
+  basicExpression.value = base.expression
+  basicDisplayExpression.value = base.displayExpression
+}
+
+function handleBasicOperator(op) {
+  if (mode.value !== 'basic' || handSettled.value) return
+  if (basicSelection.value.first === null) {
+    showHint('请先选择一个数字', { interactive: true })
+    return
+  }
+  if (basicSelection.value.operator === op) {
+    basicSelection.value.operator = null
+    return
+  }
+  basicSelection.value.operator = op
+}
+
+function handleBasicCardTap(idx) {
+  if (mode.value !== 'basic' || handSettled.value) return
+  const slot = basicSlots.value[idx]
+  if (!slot || !slot.alive) return
+  const selection = basicSelection.value
+  if (selection.operator && selection.first !== null) {
+    if (selection.first === idx) {
+      basicSelection.value = { first: null, operator: null }
+      return
+    }
+    applyBasicCombination(selection.first, idx, selection.operator)
+    return
+  }
+  if (selection.first === idx) {
+    basicSelection.value = { first: null, operator: null }
+    return
+  }
+  basicSelection.value = { first: idx, operator: null }
+}
+
+function applyBasicCombination(firstIdx, secondIdx, op) {
+  const res = combineBasicSlots({
+    slots: basicSlots.value,
+    history: basicHistory.value,
+    expression: basicExpression.value,
+    displayExpression: basicDisplayExpression.value,
+  }, firstIdx, secondIdx, op)
+
+  if (!res.ok) {
+    basicSelection.value = { first: null, operator: null }
+    if (res.err) {
+      showBasicError(res.err)
+    }
+    return
+  }
+
+  const data = res.data
+  basicSlots.value = data.slots
+  basicHistory.value = data.history
+  basicExpression.value = data.expression
+  basicDisplayExpression.value = data.displayExpression
+
+
+  // 找到运算结果所在的槽位
+  let resultSlotIndex = null
+  for (let i = 0; i < data.slots.length; i++) {
+    if (data.slots[i] && data.slots[i].alive && data.slots[i].source === 'value') {
+      resultSlotIndex = i
+      break
+    }
+  }
+
+  basicSelection.value = { first: resultSlotIndex, operator: null }
+  errorValueText.value = ''
+
+  if (data.aliveCount === 1) {
+    settleHandResult({
+      ok: !!data.isSolved,
+      expression: data.exprForRecord,
+      valueFraction: data.result,
+      stats: data.stats,
+      origin: 'basic',
+      allowRetry: !data.isSolved,
+    })
+  }
+  try { saveSession() } catch (_) {}
+}
+
+function undoBasicStep() {
+  const res = undoBasicHistory(basicHistory.value)
+  if (!res.ok) return
+  const data = res.data
+  basicHistory.value = data.history
+  basicSlots.value = data.slots
+  basicExpression.value = data.expression
+  basicDisplayExpression.value = data.displayExpression
+  basicSelection.value = { first: null, operator: null }
+  errorValueText.value = ''
+  try { saveSession() } catch (_) {}
+}
+
+function resetBasicBoard() {
+  resetBasicStateFromCards()
+  errorValueText.value = ''
+  try { saveSession() } catch (_) {}
+}
+
+function handleUndo(evt) {
+  const evtStamp = (evt && typeof evt.timeStamp === 'number') ? evt.timeStamp : 0
+  const stateSignature = calcUndoStateSignature()
+  if (evtStamp && evtStamp === lastUndoEventStamp && stateSignature === lastUndoStateSignature) {
+    return
+  }
+  if (mode.value === 'pro') {
+    if (!tokens.value.length) return
+    removeTokenAt(tokens.value.length - 1)
+    try { saveSession() } catch (_) {}
+  } else {
+    undoBasicStep()
+  }
+  lastUndoStateSignature = calcUndoStateSignature()
+  lastUndoEventStamp = evtStamp
+}
+
+function handleReset() {
+  if (mode.value === 'pro') {
+    if (!tokens.value.length && usedByCard.value.every(v => !v)) return
+    tokens.value = []
+    usedByCard.value = [0, 0, 0, 0]
+    exprOverrideText.value = ''
+    errorValueText.value = ''
+    nextTick(() => { updateExprHeight(); updateExprScale() })
+    try { saveSession() } catch (_) {}
+  } else {
+    resetBasicBoard()
+  }
+}
+
+// 校验流程：将 tokens 转换为表达式并比对结果
+function handleSubmit() {
+  if (submitDisabled.value) return
+  check()
+}
+
+function handleHint() {
+  if (hintWasUsed.value) {
+    showSolution()
+    return
+  }
+  try {
+    uni.showModal({
+      title: '查看答案',
+      content: '查看答案将结束本局并记为失败，是否继续？',
+      confirmText: '查看答案',
+      confirmColor: '#A44C43',
+      cancelText: '继续作答',
+      success: (res) => {
+        if (res.confirm) showSolution()
+      },
+    })
+  } catch (_) {
+    showSolution()
+  }
+}
+
+function refresh() { nextHand() }
+
+function initDeck() {
+  deck.value = newDeck()
+}
+
+function closeTimerPopover() { timerPopover.value = { visible: false, left: 0, top: 0 } }
+
+function openTimerPopover() {
+  try {
+    const q = uni.createSelectorQuery().in(proxy)
+    q.select('#timerCell').boundingClientRect().exec(res => {
+      const [rect] = res || []
+      if (!rect) {
+        timerPopover.value = { visible: true, left: 0, top: 0 }
+        return
+      }
+      const sys = getSystemInfo()
+      let top = (rect.bottom || (rect.top || 0) + (rect.height || 0)) + 8
+      const limit = (sys && Number.isFinite(sys.windowHeight)) ? sys.windowHeight - 96 : 0
+      if (limit && top > limit) top = limit
+      const center = rect.left + rect.width / 2
+      timerPopover.value = { visible: true, left: center, top }
+    })
+  } catch (_) {
+    timerPopover.value = { visible: true, left: 0, top: 0 }
+  }
+}
+
+function handleTimerTap() {
+  if (timerPopover.value.visible) {
+    closeTimerPopover()
+  } else {
+    openTimerPopover()
+  }
+}
+
+function redealHand() {
+  closeTimerPopover()
+  errorValueText.value = ''
+  exprOverrideText.value = ''
+  nextHand()
+}
+
+// 核心流程：生成下一题并初始化计时器/状态
+async function nextHand() {
+  stopHandTimer()
+  applyPendingGameplayPrefs()
+  closeTimerPopover()
+  const res = await getNextDraw()
+  if (!res) {
+    startHandTimer()
+    return
+  }
+
+  resetHandStateForNext()
+  if (Array.isArray(res.deck)) deck.value = res.deck
+  cards.value = Array.isArray(res.cards) ? res.cards : []
+  currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'regular'
+  currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
+  solution.value = res.solution || null
+  tokens.value = []
+  usedByCard.value = [0, 0, 0, 0]
+  // 只有在这里才真正重置 handRecorded，表示新一局开始
+  handRecorded.value = false
+  handStartTs.value = Date.now()
+  hintWasUsed.value = false
+  attemptCount.value = 0
+  nextTick(() => { updateExprHeight(); syncBasicOpsHeight() })
+  try { saveSession() } catch (_) {}
+  startHandTimer()
+}
+
+async function getNextDraw() {
+  if (deckSource.value === 'mistakes') {
+    const res = await drawFromMistakePool()
+    if (res) return res
+    return await drawFromNormalDeck()
+  }
+  if (deckSource.value === 'mix') {
+    const preferMistake = Math.random() * 100 < clampMixWeightValue(mixWeight.value)
+    if (preferMistake) {
+      const res = await drawFromMistakePool({ silent: true })
+      if (res) return res
+    }
+    const normal = await drawFromNormalDeck()
+    if (normal) return normal
+    return await drawFromMistakePool({ silent: true })
+  }
+  return await drawFromNormalDeck()
+}
+
+async function drawFromNormalDeck() {
+  if (!Array.isArray(deck.value) || deck.value.length < 4) {
+    initDeck()
+  }
+  if (!Array.isArray(deck.value) || deck.value.length < 4) {
+    promptDeckReshuffle()
+    return null
+  }
+  const res = drawSolvableHand(deck.value, faceUseHigh.value, solve24)
+  if (!res.ok) {
+    promptDeckReshuffle()
+    return null
+  }
+  return { source: 'normal', cards: res.data.cards, deck: res.data.deck, solution: res.data.solution }
+}
+
+async function drawFromMistakePool(options = {}) {
+  const silent = !!options.silent
+  const uid = selectedUserId.value
+  if (!uid) {
+    if (!silent) {
+      showHint('请先选择用户', 1600)
+      switchDeckSource('regular', { scheduleNext: false })
+    }
+    return null
+  }
+  const pool = getActivePool(uid) || []
+  if (!Array.isArray(pool) || pool.length === 0) {
+    if (silent) {
+      return null
+    }
+    await new Promise(resolve => {
+      const fallback = () => {
+        switchDeckSource('regular')
+        resolve(null)
+      }
+      try {
+        uni.showModal({
+          title: '提示',
+          content: '无错题，切换到整副牌。',
+          confirmText: 'OK',
+          showCancel: false,
+          success: () => fallback(),
+          fail: () => fallback(),
+        })
+      } catch (_) {
+        fallback()
+      }
+    })
+    return null
+  }
+  const used = mistakeRunUsed.value instanceof Set ? mistakeRunUsed.value : new Set()
+  const available = pool.filter(item => item && item.key && !used.has(item.key))
+  if (!available.length) {
+    if (silent) {
+      return null
+    }
+    await new Promise(resolve => {
+      const fallback = () => {
+        restartMistakeRun()
+        resolve(null)
+      }
+      try {
+        uni.showActionSheet({
+          title: '本轮错题已出完',
+          itemList: ['重新出题', '切换整副', '去统计'],
+          success: (res) => {
+            const idx = typeof res?.tapIndex === 'number' ? res.tapIndex : -1
+            if (idx === 0) {
+              restartMistakeRun()
+            } else if (idx === 1) {
+              switchDeckSource('regular')
+            } else if (idx === 2) {
+              goStats()
+            } else {
+              restartMistakeRun()
+            }
+            resolve(null)
+          },
+          fail: () => fallback(),
+        })
+      } catch (_) {
+        fallback()
+      }
+    })
+    return null
+  }
+  const item = available[Math.floor(Math.random() * available.length)]
+  const cardsFromNums = convertNumsToCards(Array.isArray(item?.nums) ? item.nums : [])
+  let sol = null
+  try {
+    const mapped = cardsFromNums.map(c => mapCardRank(c.rank, faceUseHigh.value))
+    sol = mapped.length === 4 ? solve24(mapped) : null
+  } catch (_) {
+    sol = null
+  }
+  const updatedSet = new Set(used)
+  updatedSet.add(item.key)
+  mistakeRunUsed.value = updatedSet
+  try { saveSession() } catch (_) {}
+  return { source: 'mistake', cards: cardsFromNums, deck: deck.value, solution: sol, mistakeKey: item.key }
+}
+
+function convertNumsToCards(nums) {
+  const suits = ['S', 'H', 'D', 'C']
+  const arr = Array.isArray(nums) ? nums : []
+  return arr.map((n, idx) => {
+    const rank = Number.isFinite(+n) ? Math.min(13, Math.max(1, Math.floor(+n))) : 1
+    const suit = suits[idx % suits.length]
+    return { rank, suit }
+  })
+}
+
+function resetMistakeRun(stamp = 0) {
+  mistakeRunUsed.value = new Set()
+  mistakeRunStamp.value = stamp
+  currentMistakeKey.value = ''
+}
+
+function restartMistakeRun() {
+  resetMistakeRun(Date.now())
+  try { saveSession() } catch (_) {}
+  nextTick(() => { if (deckSource.value === 'mistakes') nextHand() })
+}
+
+function switchDeckSource(target, options = {}) {
+  const next = normalizeDeckSourceValue(target)
+  if (deckSource.value === next) return
+  if (next === 'mistakes' && !selectedUserId.value) {
+    showHint('请先选择用户', 1600)
+    return
+  }
+  deckSource.value = next
+  pendingGameplay.value = { ...pendingGameplay.value, deckSource: next }
+  appliedGameplay.value = { ...appliedGameplay.value, deckSource: next }
+  if (next !== 'mix') {
+    pendingGameplay.value.mixWeight = mixWeight.value
+  }
+  if (options.persist !== false) {
+    try { setGameplayPrefs({ deckSource: next }) } catch (_) {}
+    syncPendingGameplayPrefs()
+  }
+  if (next === 'regular' && (!Array.isArray(deck.value) || deck.value.length < 4)) initDeck()
+  try { saveSession() } catch (_) {}
+  if (options.scheduleNext !== false) {
+    nextTick(() => { nextHand() })
+  }
+}
+
+function promptDeckReshuffle() {
+  try {
+    uni.showModal({
+      title: '牌库用尽',
+      content: '余牌无解或整副用完，是否重新洗牌？',
+      confirmText: '重洗',
+      cancelText: '进入统计',
+      success: (res) => {
+        if (res.confirm) {
+          initDeck()
+          handsPlayed.value = 0
+          successCount.value = 0
+          failCount.value = 0
+          nextTick(() => nextHand())
+        } else {
+          try { uni.reLaunch({ url: '/pages/stats/index' }) }
+          catch (e1) { try { uni.navigateTo({ url: '/pages/stats/index' }) } catch (_) {} }
+        }
+      },
+    })
+  } catch (_) {
+    initDeck()
+    handsPlayed.value = 0
+    successCount.value = 0
+    failCount.value = 0
+    nextTick(() => nextHand())
+  }
+}
+
+onMounted(() => {
+  syncPendingGameplayPrefs()
+  try {
+    if (typeof uni.$on === 'function') {
+      try { uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange) } catch (_) {}
+      uni.$on(MODE_CHANGE_EVENT, handleExternalModeChange)
       // 监听JQK设置变化
       try { uni.$off('tf24:rank-mode-changed', handleRankModeChange) } catch (_) {}
       uni.$on('tf24:rank-mode-changed', handleRankModeChange)
