@@ -2,8 +2,13 @@
   <view class="settings-page">
     <AppNavBar title="设置" :show-back="true" :back-to-index="true" />
     <view class="settings-body" :style="bodyStyle">
+      <view class="settings-intro">
+        <text class="settings-kicker">GAME SETTINGS</text>
+        <text class="settings-heading">自定义你的挑战</text>
+        <text class="settings-copy">规则、题库和偏好会在下一局即时生效。</text>
+      </view>
       <view class="section">
-        <view class="section-title">默认模式</view>
+        <view class="section-head"><text class="section-icon">♠</text><view><view class="section-title">默认模式</view><text class="section-desc">选择更适合你的解题方式</text></view></view>
         <radio-group class="radio-group" @change="onModeChange" :value="playMode">
           <label class="radio-item" v-for="item in modeOptions" :key="item.value">
             <radio :value="item.value" :checked="playMode === item.value" />
@@ -13,7 +18,7 @@
         <view class="section-tip">切换后返回题目页时会自动应用</view>
       </view>
       <view class="section">
-        <view class="section-title">JQK 数值</view>
+        <view class="section-head"><text class="section-icon">A</text><view><view class="section-title">JQK 数值</view><text class="section-desc">决定面牌在算式中的取值</text></view></view>
         <radio-group class="radio-group" @change="onRankModeChange" :value="rankMode">
           <label class="radio-item" v-for="item in rankOptions" :key="item.value">
             <radio :value="item.value" :checked="rankMode === item.value" />
@@ -24,7 +29,7 @@
       </view>
 
       <view class="section">
-        <view class="section-title">题库来源</view>
+        <view class="section-head"><text class="section-icon">▤</text><view><view class="section-title">题库来源</view><text class="section-desc">针对性训练或随机挑战</text></view></view>
         <radio-group class="radio-group" @change="onDeckSourceChange" :value="deckSource">
           <label class="radio-item" v-for="item in deckOptions" :key="item.value">
             <radio :value="item.value" :checked="deckSource === item.value" />
@@ -62,7 +67,8 @@
       </view>
 
       <view class="section">
-        <button class="clear-cache" @tap="clearCache">清理缓存</button>
+        <view class="cache-copy"><text>局内缓存</text><text>清除临时牌局，不会影响用户与战绩。</text></view>
+        <button class="clear-cache" @tap="clearCache">清理局内缓存</button>
       </view>
     </view>
   </view>
@@ -323,6 +329,10 @@ onShareTimeline(() => {
   margin-top: 16rpx;
   box-sizing: border-box;
 }
+.settings-intro{ padding:20rpx 6rpx 28rpx; display:flex; flex-direction:column; gap:8rpx }
+.settings-kicker{ color:#aa8d47; font-size:20rpx; font-weight:800; letter-spacing:4rpx }
+.settings-heading{ color:var(--tf24-ink); font-size:42rpx; font-weight:800 }
+.settings-copy{ color:var(--tf24-muted); font-size:24rpx; line-height:1.5 }
 
 .section {
   background: var(--tf24-surface);
@@ -338,6 +348,10 @@ onShareTimeline(() => {
   color: var(--tf24-ink);
   margin-bottom: 24rpx;
 }
+.section-head{ display:flex; align-items:center; gap:16rpx; margin-bottom:24rpx }
+.section-head .section-title{ margin:0 }
+.section-icon{ width:52rpx; height:52rpx; border-radius:16rpx; display:flex; align-items:center; justify-content:center; background:#f1e8cd; color:#8a702f; font-family:Georgia,serif; font-size:28rpx; font-weight:800 }
+.section-desc{ display:block; margin-top:4rpx; color:var(--tf24-muted); font-size:22rpx }
 
 .section-tip {
   font-size: 24rpx;
@@ -405,4 +419,6 @@ onShareTimeline(() => {
   font-size: 28rpx;
   border-radius: 9999rpx;
 }
+.cache-copy{ display:flex; flex-direction:column; gap:6rpx; margin-bottom:20rpx; color:var(--tf24-ink); font-size:26rpx; font-weight:800 }
+.cache-copy text:last-child{ color:var(--tf24-muted); font-size:22rpx; font-weight:500 }
 </style>

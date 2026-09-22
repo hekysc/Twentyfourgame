@@ -18,7 +18,7 @@
         @touchcancel="handleTouchEnd"
         @longpress="showTooltip"
       >
-        <text class="circle-icon" :style="iconStyle">{{ iconGlyph }}</text>
+        <text class="circle-icon" :class="`circle-icon--${icon}`" :style="iconStyle">{{ iconGlyph }}</text>
       </view>
       <view v-if="tooltipVisible" class="circle-button-tooltip">{{ label }}</view>
     </view>
@@ -42,13 +42,13 @@ const props = defineProps({
 const emit = defineEmits(['tap'])
 
 const ICON_GLYPHS = {
-  account_circle: 'O',
-  insights: '=',
-  settings: '*',
-  undo: 'U',
-  refresh: 'R',
-  lightbulb: 'L',
-  skip_next: '>',
+  account_circle: '♙',
+  insights: '▥',
+  settings: '⚙',
+  undo: '↩',
+  refresh: '↻',
+  lightbulb: '✦',
+  skip_next: '≫',
   help: '?'
 }
 
@@ -126,7 +126,11 @@ onBeforeUnmount(() => clearTimer())
 
 .circle-icon {
   line-height: 1;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
 }
+.circle-icon--settings { font-family: sans-serif; }
+.circle-icon--undo, .circle-icon--refresh, .circle-icon--skip_next { font-family: Arial, sans-serif; }
 
 .circle-button-core.circle-button-disabled {
   opacity: 0.4;
@@ -153,7 +157,8 @@ onBeforeUnmount(() => clearTimer())
 }
 
 .circle-button-hover {
-  transform: scale(0.98);
+  transform: translateY(2rpx) scale(0.96);
+  background: #f2ecdc;
 }
 
 .circle-button-label {

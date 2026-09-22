@@ -6,22 +6,33 @@
         @touchend="edgeHandlers.handleTouchEnd"
         @touchcancel="edgeHandlers.handleTouchCancel">
     <AppNavBar title="用户管理" :show-back="true" :with-safe-top="false" :back-to-index="true" />
-    <view class="row" style="gap:12rpx; align-items:center;">
-      <input v-model="newName" placeholder="新用户名称" class="input" />
-      <button class="btn btn-primary" @tap="create">添加</button>
-    </view>
-    <view class="list">
+    <view class="user-page-body">
+      <view class="user-hero">
+        <text class="hero-kicker">PLAYERS</text>
+        <text class="hero-title">选择你的挑战身份</text>
+        <text class="hero-copy">每位玩家都有独立的战绩与进度。</text>
+      </view>
+      <view class="create-panel">
+        <text class="create-panel-title">新建玩家</text>
+        <view class="row create-row">
+          <input v-model="newName" placeholder="输入玩家名称" class="input" />
+          <button class="btn btn-primary create-button" @tap="create">添加</button>
+        </view>
+      </view>
+      <view class="list">
+        <view class="list-heading"><text>玩家列表</text><text>{{ visibleUsers.length }} 位玩家</text></view>
       <view v-for="u in visibleUsers" :key="u.id" class="item card section" :class="{ active: u.id===users.currentId }">
         <view class="user-left" @tap="choose(u.id)">
           <image v-if="u.avatar" class="avatar-img" :src="u.avatar" mode="aspectFill" />
           <view v-else class="avatar" :style="{ backgroundColor: u.color || '#e2e8f0' }">{{ avatarText(u.name) }}</view>
-          <view class="name">{{ u.name }}</view>
+          <view><view class="name">{{ u.name }}</view><text v-if="u.id===users.currentId" class="current-player">当前玩家</text><text v-else class="switch-player">点击切换到此玩家</text></view>
         </view>
         <view class="ops">
           <button class="mini" @tap="rename(u)">改名</button>
           <button class="mini" @tap="changeAvatar(u)">头像</button>
           <button class="mini danger" @tap="remove(u.id)">删除</button>
         </view>
+      </view>
       </view>
     </view>
     <view
@@ -211,13 +222,27 @@ onShareTimeline(() => {
 
 <style scoped>
 .input{ flex:1; border:2rpx solid var(--tf24-line); border-radius:12rpx; padding:16rpx; background:var(--tf24-surface) }
+.user-page-body{ display:flex; flex-direction:column; gap:24rpx }
+.user-hero{ padding:20rpx 12rpx 4rpx; display:flex; flex-direction:column; gap:8rpx }
+.hero-kicker{ color:#aa8d47; font-size:20rpx; font-weight:800; letter-spacing:4rpx }
+.hero-title{ color:var(--tf24-ink); font-size:42rpx; font-weight:800; letter-spacing:.5rpx }
+.hero-copy{ color:var(--tf24-muted); font-size:25rpx }
+.create-panel{ padding:24rpx; border:2rpx solid #e7dec9; border-radius:24rpx; background:linear-gradient(135deg,#fffdf6,#f3ead5); box-shadow:0 10rpx 24rpx rgba(86,78,49,.07) }
+.create-panel-title{ display:block; margin-bottom:16rpx; color:var(--tf24-ink); font-size:27rpx; font-weight:800 }
+.create-row{ gap:12rpx; align-items:center }
+.create-button{ flex:0 0 auto }
 .list{ display:flex; flex-direction:column; gap:12rpx }
-.item{ display:flex; justify-content:space-between; align-items:center; padding:16rpx; border-radius:16rpx; border:2rpx solid var(--tf24-line); background:var(--tf24-surface); box-shadow:var(--tf24-shadow) }
-.item.active{ border-color:rgba(36,113,92,.45); box-shadow:0 6rpx 16rpx rgba(36,113,92,.12) }
+.list-heading{ display:flex; justify-content:space-between; align-items:center; padding:0 8rpx 4rpx; color:var(--tf24-ink); font-size:28rpx; font-weight:800 }
+.list-heading text:last-child{ color:var(--tf24-muted); font-size:22rpx; font-weight:600 }
+.item{ display:flex; justify-content:space-between; align-items:center; padding:20rpx; border-radius:20rpx; border:2rpx solid var(--tf24-line); background:var(--tf24-surface); box-shadow:var(--tf24-shadow) }
+.item.active{ border-color:rgba(36,113,92,.55); background:#fbfdf9; box-shadow:0 10rpx 24rpx rgba(36,113,92,.13) }
 .user-left{ display:flex; align-items:center; gap:12rpx }
 .avatar{ width:72rpx; height:72rpx; border-radius:50%; background:#e4c777; display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--tf24-ink); }
 .avatar-img{ width:72rpx; height:72rpx; border-radius:50%; background:#e2e8f0 }
 .name{ font-size:32rpx; font-weight:700 }
+.current-player,.switch-player{ display:block; margin-top:4rpx; font-size:21rpx }
+.current-player{ color:var(--tf24-primary); font-weight:800 }
+.switch-player{ color:var(--tf24-muted) }
 .ops{ display:flex; gap:8rpx }
 .mini{ padding:8rpx 12rpx; border-radius:10rpx; background:#eef2f7; font-size:24rpx }
 .mini.danger{ background:#f4dfdb; color:var(--tf24-danger) }

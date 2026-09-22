@@ -1,15 +1,15 @@
 <template>
   <view class="ctb" :style="wrapStyle">
     <button class="ctb-item" :class="{ active: isActive('stats') }" @click="go('/pages/stats/index')">
-      <text class="icon" :class="{ active: isActive('stats') }">📊</text>
+      <text class="icon" :class="{ active: isActive('stats') }">▥</text>
       <text class="label" :class="{ active: isActive('stats') }">统计</text>
     </button>
     <button class="ctb-item" :class="{ active: isActive('index') }" @click="go('/pages/index/index')">
-      <text class="icon" :class="{ active: isActive('index') }">🎮</text>
+      <text class="icon" :class="{ active: isActive('index') }">♠</text>
       <text class="label" :class="{ active: isActive('index') }">程序</text>
     </button>
     <button class="ctb-item" :class="{ active: isActive('user') }" @click="go('/pages/user/index')">
-      <text class="icon" :class="{ active: isActive('user') }">👤</text>
+      <text class="icon" :class="{ active: isActive('user') }">♙</text>
       <text class="label" :class="{ active: isActive('user') }">用户</text>
     </button>
   </view>
@@ -178,8 +178,9 @@ function measureHeight() {
   z-index: 999; 
   display: grid; 
   grid-template-columns: repeat(3, 1fr); 
-  background: #ffffff; 
-  box-shadow: 0 -6rpx 16rpx rgba(15,23,42,.06); 
+  background: #fffdf6;
+  border-top: 2rpx solid #e6dece;
+  box-shadow: 0 -8rpx 24rpx rgba(57,65,49,.08);
   padding: 10rpx 8rpx; 
   transition: background-color 0.3s ease;
 }
@@ -209,13 +210,15 @@ function measureHeight() {
 }
 .ctb-item:active {
   transform: scale(0.8);
-  background: rgba(58, 122, 254, 0.08);
+  background: rgba(36,113,92,0.08);
 }
 .icon { 
   font-size: 28rpx; 
   line-height: 1; 
   transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  filter: grayscale(1) opacity(0.6);
+  color: #8a9187;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
 }
 .icon.active {
   transform: scale(1.2);
@@ -224,13 +227,13 @@ function measureHeight() {
 .label { 
   font-size: 28rpx; 
   font-weight: 800; 
-  color: #94a3b8; /* 未选中为灰 */
+  color: #7a8175;
   transition: all 0.2s ease;
   white-space: nowrap;
   overflow: visible;
 }
 .label.active { 
   transform: scale(1.2);
-  color: #0953e9; /* 选中为主色 */
+  color: #24715c;
 }
 </style>

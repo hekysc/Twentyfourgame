@@ -12,7 +12,9 @@
     <!-- 主体 -->
     <view class="login-body">
       <view class="login-heading">
+        <text class="login-kicker">24 POINTS</text>
         <text class="h1">选择玩家</text>
+        <text class="login-copy">从这里开始你的纸牌算式挑战</text>
       </view>
 
       <!-- 错误状态 -->
@@ -39,7 +41,7 @@
           <view v-else class="avatar" :style="{ backgroundColor: u.color || colorFrom(u) }">{{ avatarText(u.name) }}</view>
           <view class="user-col">
             <view class="user-name">{{ u.name }}</view>
-            <view class="user-sub">最近：{{ lastPlayedText(u.lastPlayedAt) }}</view>
+            <view class="user-sub">最近挑战：{{ lastPlayedText(u.lastPlayedAt) }}</view>
           </view>
           <text class="chev">›</text>
         </button>
@@ -253,7 +255,7 @@ onShareTimeline(() => {
   /* 视口高度填满，兼容移动端动态地址栏 */
   min-height: 100dvh;
   min-height: -webkit-fill-available;
-  background-color: #f1f5f9;
+  background-color: var(--tf24-paper);
   background-image: repeating-linear-gradient(
     135deg,
     rgba(20, 87, 81, 0.07) 0,
@@ -292,12 +294,16 @@ body {
   flex-shrink: 0;  /* 不收缩 */
   text-align: center; 
   margin: 0rpx 0 24rpx 0;
-  height: 80rpx;  /* 固定高度 */
+  height: 154rpx;
+  flex-direction:column;
+  gap:5rpx;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.h1{ font-size:56rpx; font-weight:900; color:#0e141b }
+.login-kicker{ color:#aa8d47; font-size:20rpx; font-weight:800; letter-spacing:4rpx }
+.h1{ font-size:48rpx; font-weight:900; color:var(--tf24-ink) }
+.login-copy{ color:var(--tf24-muted); font-size:23rpx }
 .user-list {
   flex: 1;
   display: flex;

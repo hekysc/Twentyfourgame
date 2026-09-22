@@ -8,6 +8,11 @@
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
     <AppNavBar title="历史统计" :show-back="true" :with-safe-top="false" :back-to-index="true" />
+    <view class="stats-intro">
+      <text class="stats-kicker">GAME INSIGHTS</text>
+      <text class="stats-heading">看见你的进步</text>
+      <text class="stats-copy">用每一局的结果，找到最适合你的练习节奏。</text>
+    </view>
     <view class="section">
       <view class="row" style="justify-content:space-between; align-items:center; gap:12rpx; flex-wrap:wrap;">
         <text class="title">玩家总览</text>
@@ -1011,6 +1016,10 @@ onShareTimeline(() => {
 </script>
 
 <style scoped>
+.stats-intro{ padding:28rpx 32rpx 8rpx; display:flex; flex-direction:column; gap:8rpx; }
+.stats-kicker{ color:#aa8d47; font-size:20rpx; font-weight:800; letter-spacing:4rpx; }
+.stats-heading{ color:var(--tf24-ink); font-size:42rpx; font-weight:800; }
+.stats-copy{ color:var(--tf24-muted); font-size:24rpx; line-height:1.5; }
 .page{ min-height:100vh; box-sizing:border-box; position:relative; }
 .section{ background:var(--tf24-surface); border:2rpx solid var(--tf24-line); border-radius:20rpx; padding:20rpx; box-shadow:var(--tf24-shadow) }
 .section.title{ background:#313030; font-size:36rpx; font-weight:800; margin-bottom:12rpx }
