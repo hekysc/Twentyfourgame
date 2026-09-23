@@ -18,6 +18,8 @@ on:
       - 'package.json'
       - 'vite.config.js'
       - 'scripts/wechat-upload.cjs'
+  issues:
+    types: [reopened]
   workflow_dispatch:
     inputs:
       upload:
@@ -37,6 +39,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: wechat-${{ github.workflow }}-${{ github.ref }}
@@ -44,6 +47,9 @@ concurrency:
 
 jobs:
   build:
+    if: >-
+      github.event_name != 'issues' ||
+      (github.event.action == 'reopened' && github.event.issue.number == 72)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -72,15 +78,19 @@ jobs:
           retention-days: 30
 
       - name: Resolve release metadata
-        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
+        if: ${{ github.event_name == 'push' || github.event_name == 'issues' || (github.event_name == 'workflow_dispatch' && inputs.upload) }}
         env:
           DISPATCH_VERSION: ${{ inputs.version }}
           DISPATCH_DESC: ${{ inputs.description }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "push" ] || [ "$GITHUB_EVENT_NAME" = "issues" ]; then
             BASE_VERSION="$(node -p "require('./package.json').version")"
             echo "WECHAT_VERSION=$BASE_VERSION" >> "$GITHUB_ENV"
-            echo "WECHAT_DESC=Auto dev release from main: ${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+            if [ "$GITHUB_EVENT_NAME" = "issues" ]; then
+              echo "WECHAT_DESC=QR refresh from automation issue #72" >> "$GITHUB_ENV"
+            else
+              echo "WECHAT_DESC=Auto dev release from main: ${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+            fi
           else
             test -n "$DISPATCH_VERSION"
             if ! printf '%s' "$DISPATCH_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z]+)*$'; then
@@ -127,5 +137,16 @@ jobs:
           retention-days: 7
 
       - name: Remove WeChat private key
-        if: ${{ always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.upload)) }}
+        if: ${{ always() && (github.event_name == 'push' || github.event_name == 'issues' || (github.event_name == 'workflow_dispatch' && inputs.upload)) }}
         run: rm -f "$RUNNER_TEMP/wechat.key" "$RUNNER_TEMP/wechat-preview.jpg"
+
+  reset-qr-trigger:
+    needs: build
+    if: ${{ always() && github.event_name == 'issues' && github.event.issue.number == 72 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset QR refresh trigger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: gh issue close "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --reason not-planned
