@@ -1,10 +1,10 @@
 <script>
-import { ensureUserAvatars } from './utils/avatar.js'
+import { initializeCloudListeners } from './utils/online.js'
 import { scheduleTabWarmup } from './utils/tab-cache.js'
 
 export default {
   onLaunch() {
-    try { ensureUserAvatars && ensureUserAvatars().catch(() => {}) } catch (_) {}
+    initializeCloudListeners()
     try { scheduleTabWarmup({ immediate: true }) } catch (_) {}
     try {
       // 仅 App 端支持预加载，H5 忽略

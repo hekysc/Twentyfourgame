@@ -266,6 +266,8 @@
 </template>
 
 <script setup>
+import { isOnline } from '../../utils/identity.js'
+import { refreshOnline } from '../../utils/online.js'
 import { ref, onMounted, computed, watch } from 'vue'
 import MiniBar from '../../components/MiniBar.vue'
 import AppNavBar from '../../components/AppNavBar.vue'
@@ -394,7 +396,8 @@ onMounted(() => {
   }
 })
 
-onShow(() => {
+onShow(async () => {
+  if(isOnline()) {try {await refreshOnline()}catch(e){uni.showToast({title:e.message,icon:'none'})}}
   load();
   loadExt();
   if (consumeAvatarRestoreNotice()) {
@@ -402,7 +405,8 @@ onShow(() => {
   }
 })
 
-onPullDownRefresh(() => {
+onPullDownRefresh(async () => {
+  if(isOnline()) {try{await refreshOnline()}catch(e){uni.showToast({title:e.message,icon:'none'})}}
   try {
     load();
     loadExt();

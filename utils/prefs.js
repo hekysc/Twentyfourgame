@@ -1,4 +1,5 @@
-const PREFS_KEY = 'tf24_prefs_v2'
+import { storageScope } from './identity.js'
+const prefsKey = () => 'tf24_prefs:' + storageScope()
 const LEGACY_PREFS_KEY = 'tf24_prefs_v1'
 
 const RANK_MODES = {
@@ -35,7 +36,7 @@ function readJson(key) {
 
 function writePrefs(data) {
   try {
-    uni.setStorageSync(PREFS_KEY, JSON.stringify(data || {}))
+    uni.setStorageSync(prefsKey(), JSON.stringify(data || {}))
   } catch (_) { /* noop */ }
 }
 
@@ -96,7 +97,7 @@ function detectLegacyRankMode() {
 }
 
 function migrateLegacyPrefs() {
-  const legacy = readJson(PREFS_KEY) || readJson(LEGACY_PREFS_KEY) || {}
+  const legacy = readJson(prefsKey()) || readJson(LEGACY_PREFS_KEY) || {}
   const merged = { ...DEFAULT_PREFS, ...legacy }
   const faceRanks = readLegacyFaceRanks()
   let migrationNotice = false
@@ -119,10 +120,12 @@ function migrateLegacyPrefs() {
 }
 
 let cachedPrefs = null
+let cachedScope = null
 
 function readPrefs() {
+  if (cachedScope !== storageScope()) { cachedScope = storageScope(); cachedPrefs = null }
   if (cachedPrefs) return cachedPrefs
-  const stored = readJson(PREFS_KEY)
+  const stored = readJson(prefsKey())
   if (stored) {
     cachedPrefs = normalizePrefs(stored)
     writePrefs(cachedPrefs)
@@ -136,7 +139,8 @@ function setPrefs(data) {
   // 清除缓存，确保下次读取时获取最新数据
   cachedPrefs = null
   cachedPrefs = normalizePrefs(data)
-  console.log('setPrefs normalized data:', cachedPrefs)
+  cachedScope = storageScope()
+  try { uni.$emit('tf24:prefs-save', { ...cachedPrefs }) } catch (_) {}
   writePrefs(cachedPrefs)
   return cachedPrefs
 }
@@ -253,3 +257,5 @@ export function setGameplayPrefs(partial) {
 export function consumeRankMigrationNotice() {
   updatePrefs(p => ({ ...p, rankMigrationNotice: false }))
 }
+
+export function restorePrefs(data) { cachedScope = storageScope(); cachedPrefs = normalizePrefs(data); writePrefs(cachedPrefs) }

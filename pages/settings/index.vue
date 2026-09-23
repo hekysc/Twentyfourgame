@@ -76,7 +76,8 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { onBackPress, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
+import { flushPrefs } from '../../utils/online.js'
+import { onHide, onBackPress, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { useSafeArea } from '../../utils/useSafeArea.js'
 import { getGameplayPrefs, setGameplayPrefs, consumeRankMigrationNotice, getLastMode, setLastMode } from '../../utils/prefs.js'
@@ -133,6 +134,8 @@ const toggles = computed(() => ([
     checked: reducedMotion.value,
   },
 ]))
+
+onHide(() => { flushPrefs().catch(()=>{}) })
 
 onBackPress(() => {
   navigateToHome()

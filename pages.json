@@ -56,6 +56,13 @@
           }
         }
       }
+    },
+    {
+      "path": "pages/ranking/index",
+      "style": {
+        "navigationBarTitleText": "排行榜",
+        "enablePullDownRefresh": true
+      }
     }
   ],
   "globalStyle": {

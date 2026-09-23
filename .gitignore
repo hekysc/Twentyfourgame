@@ -50,3 +50,9 @@ local.properties
 private.*.key
 *.private.key
 wechat-preview.jpg
+
+# Local CloudBase credentials and build output
+.cloudbase-auth/
+cloudbase-credentials*.json
+cloudbase-device*.json
+dist/
