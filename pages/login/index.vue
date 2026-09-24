@@ -75,13 +75,25 @@ function practice() {
 }
 const profileOpen = ref(false),
   profileName = ref(''),
-  profileAvatar = ref('')
-function openProfile() {
+  profileAvatar = ref(''),
+  originalName = ref(''),
+  originalAvatar = ref('')
+async function openProfile() {
   if (busy.value) return
+  busy.value = true
   error.value = ''
-  profileName.value = ''
-  profileAvatar.value = ''
-  profileOpen.value = true
+  try {
+    const user = await loginOnline()
+    profileName.value = user.name || '微信玩家'
+    profileAvatar.value = user.avatar || ''
+    originalName.value = profileName.value
+    originalAvatar.value = profileAvatar.value
+    profileOpen.value = true
+  } catch (e) {
+    error.value = e.message || '登录失败，请重试'
+  } finally {
+    busy.value = false
+  }
 }
 function onChooseAvatar(e) {
   profileAvatar.value = e?.detail?.avatarUrl || ''
@@ -101,12 +113,12 @@ async function confirmLogin() {
   busy.value = true
   error.value = ''
   try {
-    await loginOnline()
-    await saveProfile(name, profileAvatar.value)
+    if (name !== originalName.value || profileAvatar.value !== originalAvatar.value)
+      await saveProfile(name, profileAvatar.value)
     profileOpen.value = false
     uni.reLaunch({ url: '/pages/index/index' })
   } catch (e) {
-    error.value = e.message || '登录失败，请重试'
+    error.value = e.message || '资料保存失败，请修改后重试'
   } finally {
     busy.value = false
   }
