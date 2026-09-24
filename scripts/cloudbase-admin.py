@@ -41,12 +41,21 @@ def complete(directory):
     print('Authorization saved; credentials are not printed.')
 
 class Client:
-    def __init__(self, directory): self.c = json.loads((directory / 'credentials.json').read_text())
+    def __init__(self, directory):
+        credentials_file = directory / 'credentials.json'
+        if credentials_file.exists():
+            self.c = json.loads(credentials_file.read_text())
+        else:
+            # GitHub Actions uses a dedicated CAM sub-user key stored as Actions secrets.
+            self.c = {
+                'secretId': os.environ['TENCENTCLOUD_SECRET_ID'],
+                'secretKey': os.environ['TENCENTCLOUD_SECRET_KEY'],
+            }
     def call(self, action, payload, service='tcb', version='2018-06-08'):
         host = service + '.tencentcloudapi.com'; ts = int(time.time())
         date = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime('%Y-%m-%d')
         sid = self.c.get('secretId') or self.c['tmpSecretId']; secret = self.c.get('secretKey') or self.c['tmpSecretKey']
-        token = self.c.get('token') or self.c['tmpToken']
+        token = self.c.get('token') or self.c.get('tmpToken')
         body = json.dumps(payload, separators=(',', ':'))
         sha = lambda s: hashlib.sha256(s.encode()).hexdigest()
         mac = lambda key, s: hmac.new(key, s.encode(), hashlib.sha256).digest()
@@ -54,7 +63,8 @@ class Client:
         scope = date + '/' + service + '/tc3_request'
         key = mac(mac(mac(('TC3' + secret).encode(), date), service), 'tc3_request')
         signature = hmac.new(key, ('TC3-HMAC-SHA256\n' + str(ts) + '\n' + scope + '\n' + sha(canonical)).encode(), hashlib.sha256).hexdigest()
-        headers = {'X-TC-Action': action, 'X-TC-Version': version, 'X-TC-Region': REGION, 'X-TC-Timestamp': str(ts), 'X-TC-Token': token, 'Authorization': 'TC3-HMAC-SHA256 Credential=' + sid + '/' + scope + ', SignedHeaders=content-type;host, Signature=' + signature}
+        headers = {'X-TC-Action': action, 'X-TC-Version': version, 'X-TC-Region': REGION, 'X-TC-Timestamp': str(ts), 'Authorization': 'TC3-HMAC-SHA256 Credential=' + sid + '/' + scope + ', SignedHeaders=content-type;host, Signature=' + signature}
+        if token: headers['X-TC-Token'] = token
         response = post('https://' + host, payload, headers)['Response']
         if 'Error' in response: raise RuntimeError(action + ': ' + response['Error']['Code'] + ' ' + response['Error']['Message'])
         if response.get('SCFErrorCode'): raise RuntimeError(action + ': ' + response['SCFErrorCode'] + ' ' + response.get('SCFErrorMsg', ''))
