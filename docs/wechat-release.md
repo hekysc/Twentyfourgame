@@ -1,92 +1,44 @@
 # 微信小程序构建与上传流程
 
-本仓库已经完成 Uni-App Vue 3 CLI 化，并通过 GitHub Actions + 微信官方 `miniprogram-ci` 实际验证了从源码到微信开发版本的自动上传链路。
+本仓库通过 GitHub Actions 和微信官方 `miniprogram-ci` 构建、上传开发版本并生成预览二维码。
 
-## 自动发布（推荐）
+工作流配置：`.github/workflows/wechat-release.yml`。
 
-工作流：`.github/workflows/wechat-release.yml`
+## 日常开发与开发版
 
-PR 到 `main` 时自动执行：
+1. PR 指向 `main` 时，工作流安装依赖、运行 `npm test`、执行 `npm run build:mp-weixin`、校验 `dist/build/mp-weixin` 关键文件，并保存构建 Artifact（30 天）。PR 检查不读取微信上传密钥，也不上传开发版。
+2. PR 合并到 `main` 后，若变更命中工作流的微信源码/构建路径，工作流会重新测试和构建，使用 `miniprogram-ci` 上传微信开发版，并生成预览二维码。纯文档、CI 配置变更不会自动触发 main push 上传。
+3. 自动上传版本号取自 `package.json`，描述包含 main 提交短 SHA。常规开发不自动修改版本号；仅在明确版本管理需要时调整。
+4. 上传成功后，二维码以 `wechat-preview-qr-<version>` Artifact 保存 7 天。打开成功的 GitHub Actions 运行记录下载该 Artifact，提供给微信扫码体验。上传或二维码步骤失败时，先修复/重跑并确认成功再交付。
+5. 手动备用入口：GitHub Actions 的 **WeChat Mini Program** → **Run workflow**。输入 `version`（如 `1.4.0`）并将 `upload` 设为 true；只在明确需要手动重传时使用。
 
-1. 安装依赖。
-2. 执行 `npm run build:mp-weixin`。
-3. 校验 `dist/build/mp-weixin` 的关键文件。
-4. 保存 `mp-weixin` Artifact（30 天）。
+当前发布目录为 CLI 构建生成的 `dist/build/mp-weixin`。不要手工修改 `unpackage/` 或将其中历史产物用于上传。
 
-合并到 `main` 后，如果提交涉及小程序源码/构建相关路径（如 `pages/**`、`components/**`、`core/**`、`utils/**`、`App.vue`、`main.js`、`pages.json`、`manifest.json`、`package.json` 等），工作流会自动发布微信开发版本并生成预览二维码。纯文档和 CI 配置变更不会触发自动发布。
-
-自动版本号使用 `1.0.<GitHub Actions run number>`，例如 Run #15 对应 `1.0.15`。该编号由 GitHub 单调递增，避免人工维护开发版本号。
-
-手动发布入口继续保留作为故障备用。在 GitHub Actions 的 **WeChat Mini Program** 工作流选择 **Run workflow**：
-
-- Branch：`main`
-- Upload a WeChat development version：开启
-- Version：使用类似 `1.0.1` 的版本号
-- Description：填写本次上传说明
-
-工作流会从 GitHub Actions Secret `WECHAT_PRIVATE_KEY` 临时生成密钥文件，调用 `miniprogram-ci` 上传，并在任务结束时删除临时密钥。
-
-开发版本上传成功后，工作流还会调用 `miniprogram-ci preview` 生成体验/预览二维码，并以 `wechat-preview-qr-<version>` Artifact 保存 7 天。二维码 Artifact 可直接下载用于手机微信扫码测试；临时二维码文件随后与私钥一起从 runner 删除。
-
-> 2026-09-19 已实测：版本 `1.0.1` 成功通过该链路上传到微信开发版本。
-
-## 本地构建
+## 本地构建与预览
 
 ```bash
 npm install
+npm test
 npm run build:mp-weixin
 ```
 
-CLI 构建输出目录：
-
-```
-dist/build/mp-weixin
-```
-
-`unpackage/` 是 HBuilderX 历史/生成目录，不作为 CI 发布输入，也不要手工修改。
-
-## 本地预览与上传
-
-先在微信公众平台下载对应 AppID 的代码上传密钥，并只保存在安全的本地路径。
-
-macOS/Linux 示例：
-
-```bash
-WECHAT_PRIVATE_KEY_PATH=/secure/private.wx58faf81d08ca037c.key \
-WECHAT_VERSION=1.0.1 \
-WECHAT_PROJECT_PATH=dist/build/mp-weixin \
-npm run wechat:preview
-```
-
-上传开发版本：
-
-```bash
-WECHAT_PRIVATE_KEY_PATH=/secure/private.wx58faf81d08ca037c.key \
-WECHAT_VERSION=1.0.1 \
-WECHAT_DESC="release 1.0.1" \
-WECHAT_PROJECT_PATH=dist/build/mp-weixin \
-npm run wechat:upload
-```
+本地上传/预览需要微信代码上传私钥及对应 AppID。私钥只允许通过安全路径或 GitHub Actions Secret 提供，不得提交到仓库、PR、Issue、日志或聊天。工作流使用 `WECHAT_PRIVATE_KEY` Secret，将临时密钥写入 runner 并在结束时删除。
 
 ## 安全与发布边界
 
-- 微信上传私钥不得进入 Git、PR、Issue、日志或聊天正文。
-- GitHub 中只保存为 Actions Secret：`WECHAT_PRIVATE_KEY`。
-- 普通 PR 构建不会读取 Secret，也不会上传微信；只有命中发布路径的 `main` push 或明确开启 Upload 的手动 workflow_dispatch 才读取上传密钥。
-- 发布目录必须是当前 CLI 生成的 `dist/build/mp-weixin`，禁止使用历史 `unpackage` 产物。
-- `miniprogram-ci upload` 只产生微信**开发版本**，不会自动提交审核或正式发布。
-- 审核与正式发布继续作为独立人工安全门，避免代码合并后直接影响线上用户。
-- 如以后需要自动提交审核/发布，应另建受保护的 production Environment，并配置人工审批，不应复用普通构建 Job。
+- 普通 PR 不访问微信密钥；main push 上传和明确开启上传的手动 workflow 才使用该密钥。
+- 开发上传只创建微信开发版本，不提交微信审核，也不正式上线。
+- 微信审核及正式上线是独立步骤，需依照正式发布流程及其明确指令执行。
+- CloudBase 后端部署是独立工作流。前端二维码不能替代云端部署/功能验证，详情见 [项目标准开发流程](development-workflow.md)。
 
-## 依赖可重复性
+## 依赖
 
-当前 Uni-App/DCloud 编译器与 `miniprogram-ci` 已固定版本，但仓库暂未提交 `package-lock.json`，因此 CI 仍使用 `npm install`。后续生成并验证 lockfile 后，应切换到 `npm ci`；在此之前不要直接改成 `npm ci`，否则 CI 会因缺少 lockfile 失败。
-
+工作流使用 `npm install`，因为当前仓库尚未提交 `package-lock.json`。提交并验证 lockfile 后，才可将 CI 安装命令切换为 `npm ci`。
 
 ## 正式发布流程
 
 正式发布与自动开发流程分离。正式候选固定在 `release/<version>` 分支；只有收到明确的“准备正式发布 X.Y.Z”指令后，才创建对应的 `release-trigger/<version>` 触发分支。
 
-触发后，Formal Release Preparation 工作流会检出冻结的 `release/<version>`，校验 package.json 与 manifest.json 版本一致，重新构建并保存 90 天候选 Artifact，再将同一候选上传为微信开发版本并生成保存 30 天的候选预览二维码。
+Formal Release Preparation 工作流会检出冻结的 `release/<version>`，校验 `package.json` 与 `manifest.json` 版本一致，重新构建并保存 90 天候选 Artifact，再将同一候选上传为微信开发版本并生成保存 30 天的候选预览二维码。
 
-该流程只准备正式候选，不提交微信审核，也不正式上线。最终线上发布必须收到独立的“正式上线 X.Y.Z”明确指令；在正式上线能力完成官方接口验证前，不允许用开发上传流程代替正式发布。
+该流程只准备正式候选，不提交微信审核，也不正式上线。最终线上发布必须收到独立的“正式上线 X.Y.Z”明确指令；不得用开发上传流程代替正式发布。
