@@ -1,4 +1,4 @@
-name: CloudBase dev deployment
+name: CloudBase dev deployment and verification
 
 on:
   push:
