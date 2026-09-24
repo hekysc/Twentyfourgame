@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDBASE_API_KEY" || { echo "CLOUDBASE_API_KEY is missing"; exit 1; }
           tcb login --cloudbase-api-key "$CLOUDBASE_API_KEY" --env-id twentyfour-d3gpwyy2p3484bd77
-      - name: Verify access to the configured environment
+      - name: Verify CloudBase CLI environment access
         run: |
           set -euo pipefail
           tcb env list --json | node -e '
@@ -41,4 +41,25 @@ jobs:
               if (!found) process.exit(1);
               console.log("CloudBase environment authorization verified.");
             });
+          '
+      - name: Verify read-only Cloud API management access
+        run: |
+          set -euo pipefail
+          tcb api tcb DescribeEnvs \
+            --body '{"EnvId":"twentyfour-d3gpwyy2p3484bd77"}' \
+            --api-version 2018-06-08 --json > "$RUNNER_TEMP/cloudbase-env.json"
+          node -e '
+            const fs = require("fs");
+            const root = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/cloudbase-env.json", "utf8"));
+            const stack = [root];
+            let found = false;
+            while (stack.length) {
+              const value = stack.pop();
+              if (!value || typeof value !== "object") continue;
+              if (value.EnvId === "twentyfour-d3gpwyy2p3484bd77") found = true;
+              if (Array.isArray(value)) stack.push(...value);
+              else stack.push(...Object.values(value));
+            }
+            if (!found) process.exit(1);
+            console.log("Read-only Cloud API access verified.");
           '
