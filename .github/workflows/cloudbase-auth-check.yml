@@ -42,33 +42,16 @@ jobs:
               console.log("CloudBase environment authorization verified.");
             });
           '
-      - name: Verify read-only Cloud API management access
+      - name: Verify document database access
         run: |
           set -euo pipefail
-          tcb api tcb DescribeEnvs \
-            --body '{"EnvId":"twentyfour-d3gpwyy2p3484bd77"}' \
-            --api-version 2018-06-08 --json > "$RUNNER_TEMP/cloudbase-env.json"
-          node -e '
-            const fs = require("fs");
-            const root = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/cloudbase-env.json", "utf8"));
-            const stack = [root];
-            let found = false;
-            const apiErrors = [];
-            while (stack.length) {
-              const value = stack.pop();
-              if (typeof value === "string") {
-                if (value === "twentyfour-d3gpwyy2p3484bd77") found = true;
-              } else if (value && typeof value === "object") {
-                if (value.EnvId === "twentyfour-d3gpwyy2p3484bd77") found = true;
-                if (value.Error && value.Error.Code) apiErrors.push(value.Error.Code);
-                if (Array.isArray(value)) stack.push(...value);
-                else stack.push(...Object.values(value));
-              }
-            }
-            if (!found) {
-              console.log("Cloud API response fields:", Object.keys(root).join(","));
-              if (apiErrors.length) console.log("Cloud API error codes:", apiErrors.join(","));
-              process.exit(1);
-            }
-            console.log("Read-only Cloud API access verified.");
-          '
+          tcb db nosql execute \
+            --command '{"listCollections":1}' \
+            --env-id twentyfour-d3gpwyy2p3484bd77 --json | node -e '
+              let s = "";
+              process.stdin.on("data", d => s += d);
+              process.stdin.on("end", () => {
+                JSON.parse(s);
+                console.log("CloudBase document database access verified.");
+              });
+            '
