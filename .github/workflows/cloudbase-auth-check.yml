@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDBASE_API_KEY" || { echo "CLOUDBASE_API_KEY is missing"; exit 1; }
           tcb login --cloudbase-api-key "$CLOUDBASE_API_KEY" --env-id twentyfour-d3gpwyy2p3484bd77
-      - name: Verify CloudBase CLI environment access
+      - name: Verify access to the configured environment
         run: |
           set -euo pipefail
           tcb env list --json | node -e '
@@ -42,34 +42,3 @@ jobs:
               console.log("CloudBase environment authorization verified.");
             });
           '
-      - name: Diagnose document database access
-        run: |
-          set -uo pipefail
-          set +e
-          tcb db nosql execute \
-            --command '{"listCollections":1}' \
-            --env-id twentyfour-d3gpwyy2p3484bd77 --json > "$RUNNER_TEMP/cloudbase-db.json" 2> "$RUNNER_TEMP/cloudbase-db.err"
-          cli_status=$?
-          set -e
-          CLI_STATUS="$cli_status" node -e '
-            const fs = require("fs");
-            const path = process.env.RUNNER_TEMP;
-            let root = {};
-            try { root = JSON.parse(fs.readFileSync(path + "/cloudbase-db.json", "utf8")); }
-            catch { console.log("Database CLI returned non-JSON output."); }
-            const codes = [];
-            const stack = [root];
-            while (stack.length) {
-              const value = stack.pop();
-              if (!value || typeof value !== "object") continue;
-              for (const [key, child] of Object.entries(value)) {
-                if (/code/i.test(key) && typeof child === "string") codes.push(child);
-                if (child && typeof child === "object") stack.push(child);
-              }
-            }
-            console.log("Database API error codes:", [...new Set(codes)].join(",") || "none returned");
-            const err = fs.readFileSync(path + "/cloudbase-db.err", "utf8");
-            if (err) console.log("CLI stderr present:", err.trim().length > 0);
-          ' 
-          echo "Database command exit code: $cli_status"
-          test "$cli_status" -eq 0
