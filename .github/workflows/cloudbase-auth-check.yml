@@ -53,13 +53,22 @@ jobs:
             const root = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/cloudbase-env.json", "utf8"));
             const stack = [root];
             let found = false;
+            const apiErrors = [];
             while (stack.length) {
               const value = stack.pop();
-              if (!value || typeof value !== "object") continue;
-              if (value.EnvId === "twentyfour-d3gpwyy2p3484bd77") found = true;
-              if (Array.isArray(value)) stack.push(...value);
-              else stack.push(...Object.values(value));
+              if (typeof value === "string") {
+                if (value === "twentyfour-d3gpwyy2p3484bd77") found = true;
+              } else if (value && typeof value === "object") {
+                if (value.EnvId === "twentyfour-d3gpwyy2p3484bd77") found = true;
+                if (value.Error && value.Error.Code) apiErrors.push(value.Error.Code);
+                if (Array.isArray(value)) stack.push(...value);
+                else stack.push(...Object.values(value));
+              }
             }
-            if (!found) process.exit(1);
+            if (!found) {
+              console.log("Cloud API response fields:", Object.keys(root).join(","));
+              if (apiErrors.length) console.log("Cloud API error codes:", apiErrors.join(","));
+              process.exit(1);
+            }
             console.log("Read-only Cloud API access verified.");
           '
