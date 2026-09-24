@@ -8,6 +8,7 @@
 - 拖拽编辑的边界用例梳理（插入占位、撤销等）
 
 ## 完成记录
+- 2026-09-24：修复在线模式下 Basic/Pro 计算完成后等待 CloudBase 返回才显示判定的问题：本地判定立即反馈，云端继续权威结算，确认后再发下一题。12 项自动测试通过；mp-weixin 构建通过；PR #78 检查通过并合并；开发版 1.4.0 上传与二维码生成成功（Actions Run #52）。
 - 2026-09-19：打通并加固微信小程序 CI/CD：GitHub Actions 在 Linux 上通过 Uni-App CLI 构建 `dist/build/mp-weixin`，校验并保存 Artifact，使用 `miniprogram-ci` 与 Actions Secret 成功上传微信开发版本；开发版现已支持源码合并到 `main` 后自动触发并自动生成版本号与体验二维码；审核/正式发布继续保留人工安全门。
 
 - 2025-09-20：精简提示/反馈系统，Basic 模式自动结算失败可重试，Pro 模式提示改为 Toast 与答案覆盖。
