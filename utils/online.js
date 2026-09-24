@@ -15,7 +15,28 @@ let initialized = false,
   epoch = 0,
   prefsTimer = null,
   prefsChain = Promise.resolve(),
-  pendingPrefs = null
+  pendingPrefs = null,
+  activeSyncRequests = 0,
+  syncStatus = { status: 'synced', retryable: false }
+function publishSyncStatus(status, retryable = false) {
+  syncStatus = { status, retryable }
+  try { uni.$emit('tf24:sync-status', { ...syncStatus }) } catch (_) {}
+}
+export function getCloudSyncStatus() {
+  return { ...syncStatus }
+}
+function beginSync() {
+  activeSyncRequests++
+  publishSyncStatus('syncing')
+}
+function endSync(success, retryable = false) {
+  activeSyncRequests = Math.max(0, activeSyncRequests - 1)
+  if (!success) publishSyncStatus('error', retryable)
+  else if (activeSyncRequests === 0 && !pendingPrefs) publishSyncStatus('synced')
+}
+export async function retryCloudSync() {
+  try { await flushPrefs() } catch (_) {}
+}
 function sdk() {
   if (typeof wx === 'undefined' || !wx.cloud)
     throw new Error('请在微信小程序中使用在线模式')
@@ -110,18 +131,33 @@ export function hasOnlineRound() {
   return !!currentRound
 }
 export async function beginOnlineRound(options) {
-  const stamp = epoch,
-    r = await cloudCall('start', options)
-  if (stamp !== epoch) throw new Error('在线题目已作废')
-  currentRound = r
-  return r
+  const stamp = epoch
+  beginSync()
+  try {
+    const r = await cloudCall('start', options)
+    if (stamp !== epoch) throw new Error('在线题目已作废')
+    currentRound = r
+    endSync(true)
+    return r
+  } catch (e) {
+    endSync(false)
+    throw e
+  }
 }
 export async function finishOnlineRound(arg, kind) {
   if (!isOnline() || !currentRound) throw new Error('请重新开始在线题目')
   const stamp = epoch,
     id = currentRound.id
-  const res = await cloudCall('finish', { id, kind, expr: arg.expr || '' })
-  if (stamp !== epoch) throw new Error('网络中断，当局不计入统计')
+  beginSync()
+  let res
+  try {
+    res = await cloudCall('finish', { id, kind, expr: arg.expr || '' })
+    if (stamp !== epoch) throw new Error('网络中断，当局不计入统计')
+  } catch (e) {
+    endSync(false)
+    throw e
+  }
+  endSync(true)
   const uid = currentIdentity().id
   writeJSON('mistakes:' + uid, res.book)
   if (res.round) {
@@ -168,24 +204,31 @@ export async function saveProfile(name, avatarPath) {
 export function queuePrefs(prefs) {
   if (!isOnline()) return
   pendingPrefs = { prefs, epoch }
+  publishSyncStatus('syncing')
   clearTimeout(prefsTimer)
-  prefsTimer = setTimeout(() => flushPrefs().catch(() => {}), 350)
+  prefsTimer = setTimeout(() => flushPrefs().catch(() => {}), 500)
 }
 export async function flushPrefs() {
   clearTimeout(prefsTimer)
   const pending = pendingPrefs
   pendingPrefs = null
-  if (pending)
+  if (pending) {
+    beginSync()
     prefsChain = prefsChain
       .catch(() => {})
       .then(async () => {
         if (pending.epoch !== epoch || !isOnline()) return
         await cloudCall('prefs', { prefs: pending.prefs })
       })
+  }
   try {
     await prefsChain
+    if (pending) endSync(true)
   } catch (e) {
-    uni.showToast({ title: '设置未同步，请联网后重试', icon: 'none' })
+    if (pending) {
+      if (pending.epoch === epoch && isOnline()) pendingPrefs = pending
+      endSync(false, true)
+    }
     throw e
   }
 }
