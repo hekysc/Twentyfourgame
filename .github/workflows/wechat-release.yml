@@ -62,6 +62,8 @@ jobs:
           package-manager-cache: false
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Verify game and online rules
+        run: npm test
       - name: Build mp-weixin
         run: npm run build:mp-weixin
       - name: Verify build output

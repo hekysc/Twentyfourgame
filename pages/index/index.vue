@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   页面整体结构说明：
   1. 顶部区域：导航栏、用户信息、即时统计。
   2. 中部区域：根据当前模式（pro/basic）展示拖拽或点选式的牌面编辑界面。
@@ -15,13 +15,14 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
+    <view v-if="networkBusy" class="online-blocker"><text>正在同步云端…</text></view>
     <view class="page-scroll-container">
       <view id="gameTopBox" class="game-header top-fixed">
         <AppNavBar :showBack="false" :with-safe-top="false">
           <template #title>
             <view class="nav-title-stack">
               <text class="nav-title-main">24 点</text>
-              <text class="nav-title-sub">纸牌算式挑战</text>
+              <text class="nav-title-sub">{{ onlineMode ? '在线挑战 · 云端保存' : '本地练习 · 不参与排名' }}</text>
             </view>
           </template>
         </AppNavBar>
@@ -40,6 +41,7 @@
           <!-- 按钮组 -->
           <view class="topbar-actions">
             <CircleActionButton icon="account_circle" label="用户" @tap="goUser" />
+            <CircleActionButton icon="insights" label="排名" @tap="goRanking" />
             <CircleActionButton icon="insights" label="统计" @tap="goStats" />
             <CircleActionButton icon="settings" label="设置" @tap="goSettings" />
           </view>
@@ -245,6 +247,8 @@ import AppNavBar from '../../components/AppNavBar.vue'
 import CircleActionButton from '../../components/CircleActionButton.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
+import { isOnline } from '../../utils/identity.js'
+import { beginOnlineRound, finishOnlineRound, hasOnlineRound, cancelOnlineRound, handleConnectionFailure } from '../../utils/online.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
 import { scheduleTabWarmup, mergeCachedStatsExt } from '../../utils/tab-cache.js'
@@ -271,6 +275,11 @@ import { getSystemInfo } from '../../utils/system-compat.js'
 // --------------------
 // 状态：牌面、模式与表达式
 // --------------------
+const onlineMode = ref(isOnline())
+const networkBusy = ref(false)
+let dealing = false
+let pageAlive = true
+let resetServerDeck = false
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
 const solution = ref(null)
 const usedByCard = ref([0,0,0,0])
@@ -504,7 +513,7 @@ function applyPendingGameplayPrefs() {
   sfxEnabled.value = appliedGameplay.value.sfx
   reducedMotion.value = appliedGameplay.value.reducedMotion
   updateExprHeight()
-  
+
   // 如果JQK模式发生变化，需要重新计算当前牌面的解法
   if (previousRankMode !== appliedGameplay.value.rankMode) {
     console.log('Rank mode changed from', previousRankMode, 'to', appliedGameplay.value.rankMode, ', recalculating')
@@ -514,14 +523,14 @@ function applyPendingGameplayPrefs() {
         nextTick(() => syncBasicOpsHeight())
       }
     }
-    
+
     // 重新计算当前题目解法
     try {
       const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
       solution.value = mapped.length === 4 ? solve24(mapped) : null
       console.log('New solution:', solution.value)
-    } catch (_) { 
-      solution.value = null 
+    } catch (_) {
+      solution.value = null
       console.log('Error calculating solution')
     }
   } else {
@@ -605,6 +614,7 @@ function onAvatarError() {
 }
 
 function saveSession() {
+  if (isOnline()) return
   try {
     const data = {
       deck: deck.value || [],
@@ -639,6 +649,7 @@ function saveSession() {
 }
 
 function loadSession() {
+  if (isOnline()) return false
   try {
     const raw = uni.getStorageSync(SESSION_KEY)
     if (!raw) return false
@@ -747,7 +758,7 @@ function startHandTimer() {
       const now = Date.now()
       nowTs.value = now
       const start = handStartTs.value || now
-      if (!timeoutRecorded.value && (now - start) >= 120000) {
+      if (!networkBusy.value && !dealing && !timeoutRecorded.value && (now - start) >= 120000) {
         handleTimeout()
       }
     }, 100)
@@ -755,7 +766,9 @@ function startHandTimer() {
 }
 function stopHandTimer() { if (handTimer) { try { clearInterval(handTimer) } catch(_){} handTimer = null } }
 
-function handleTimeout() {
+async function handleTimeout() {
+  if (networkBusy.value || dealing) return
+  if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'timeout')) return
   if (timeoutRecorded.value || handRecorded.value) return
   timeoutRecorded.value = true
   handRecorded.value = true
@@ -763,10 +776,10 @@ function handleTimeout() {
   const elapsed = Date.now() - (handStartTs.value || Date.now())
   const normalizedElapsed = elapsed > 0 ? elapsed : 120000
   const statsData = computeExprStats(tokens.value)
-  handsPlayed.value += 1
-  failCount.value += 1
+  if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
+  if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
   try {
-    pushRound({
+    if (!isOnline()) pushRound({
       success: false,
       timeMs: normalizedElapsed,
       hintUsed: !!hintWasUsed.value,
@@ -780,7 +793,7 @@ function handleTimeout() {
     })
     updateLastSuccess()
   } catch (_) {}
-  if (selectedUserId.value) {
+  if (!isOnline() && selectedUserId.value) {
     try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
   }
   try { showHint('超过120秒，已记失败，可继续作答', 2000) } catch (_) {}
@@ -902,7 +915,7 @@ function handleRankModeChange(newRankMode) {
   appliedGameplay.value = { ...appliedGameplay.value, rankMode: newRankMode }
   faceUseHigh.value = newRankMode === 'jqk-11-12-13'
   console.log('handleRankModeChange faceUseHigh set to:', faceUseHigh.value)
-  
+
   // 重新初始化当前牌面
   if (cards.value && cards.value.length === 4) {
     resetBasicStateFromCards()
@@ -910,14 +923,14 @@ function handleRankModeChange(newRankMode) {
       nextTick(() => syncBasicOpsHeight())
     }
   }
-  
+
   // 重新计算当前题目解法（无论当前是否有解法）
   try {
     const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
     solution.value = mapped.length === 4 ? solve24(mapped) : null
     console.log('handleRankModeChange new solution:', solution.value)
-  } catch (_) { 
-    solution.value = null 
+  } catch (_) {
+    solution.value = null
     console.log('handleRankModeChange error calculating solution')
   }
 }
@@ -925,38 +938,38 @@ function handleRankModeChange(newRankMode) {
 function handleGameplayPrefsChange(prefs) {
   console.log('handleGameplayPrefsChange called with:', prefs)
   if (!prefs || typeof prefs !== 'object') return
-  
+
   // 处理JQK设置变化
   if (prefs.rankMode && prefs.rankMode !== appliedGameplay.value.rankMode) {
     console.log('Rank mode changed from', appliedGameplay.value.rankMode, 'to', prefs.rankMode)
     handleRankModeChange(prefs.rankMode)
   }
-  
+
   // 处理其他设置变化
   if (prefs.deckSource !== undefined) {
     appliedGameplay.value = { ...appliedGameplay.value, deckSource: prefs.deckSource }
     pendingGameplay.value = { ...pendingGameplay.value, deckSource: prefs.deckSource }
     deckSource.value = prefs.deckSource
   }
-  
+
   if (prefs.mixWeight !== undefined) {
     appliedGameplay.value = { ...appliedGameplay.value, mixWeight: prefs.mixWeight }
     pendingGameplay.value = { ...pendingGameplay.value, mixWeight: prefs.mixWeight }
     mixWeight.value = prefs.mixWeight
   }
-  
+
   if (prefs.haptics !== undefined) {
     appliedGameplay.value = { ...appliedGameplay.value, haptics: prefs.haptics }
     pendingGameplay.value = { ...pendingGameplay.value, haptics: prefs.haptics }
     hapticsEnabled.value = prefs.haptics
   }
-  
+
   if (prefs.sfx !== undefined) {
     appliedGameplay.value = { ...appliedGameplay.value, sfx: prefs.sfx }
     pendingGameplay.value = { ...pendingGameplay.value, sfx: prefs.sfx }
     sfxEnabled.value = prefs.sfx
   }
-  
+
   if (prefs.reducedMotion !== undefined) {
     appliedGameplay.value = { ...appliedGameplay.value, reducedMotion: prefs.reducedMotion }
     pendingGameplay.value = { ...pendingGameplay.value, reducedMotion: prefs.reducedMotion }
@@ -1214,6 +1227,10 @@ function redealHand() {
 
 // 核心流程：生成下一题并初始化计时器/状态
 async function nextHand() {
+  if (dealing || !pageAlive) return
+  dealing = true
+  networkBusy.value = isOnline()
+  try {
   stopHandTimer()
   applyPendingGameplayPrefs()
   closeTimerPopover()
@@ -1226,6 +1243,10 @@ async function nextHand() {
   resetHandStateForNext()
   if (Array.isArray(res.deck)) deck.value = res.deck
   cards.value = Array.isArray(res.cards) ? res.cards : []
+  if (isOnline() && res.source === 'mistake') {
+    const issued = await beginOnlineRound({practice:true,mistakeKey:res.mistakeKey,high:faceUseHigh.value,mode:mode.value})
+    cards.value = issued.cards
+  }
   currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'regular'
   currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
   solution.value = res.solution || null
@@ -1239,6 +1260,8 @@ async function nextHand() {
   nextTick(() => { updateExprHeight(); syncBasicOpsHeight() })
   try { saveSession() } catch (_) {}
   startHandTimer()
+  } catch (e) { if(isOnline()) handleConnectionFailure(e); else showHint(e.message || '发牌失败',2000) }
+  finally { dealing = false; networkBusy.value = false }
 }
 
 async function getNextDraw() {
@@ -1261,6 +1284,12 @@ async function getNextDraw() {
 }
 
 async function drawFromNormalDeck() {
+  if (isOnline()) {
+    const r = await beginOnlineRound({high:faceUseHigh.value,mode:mode.value,resetDeck:resetServerDeck})
+    resetServerDeck = false
+    const mapped = r.cards.map(c=>mapCardRank(c.rank,faceUseHigh.value))
+    return {source:'normal',cards:r.cards,deck:Array.from({length:r.remaining},()=>({rank:1,suit:'S'})),solution:solve24(mapped)}
+  }
   if (!Array.isArray(deck.value) || deck.value.length < 4) {
     initDeck()
   }
@@ -1493,6 +1522,7 @@ onMounted(() => {
 })
 
 onShow(() => {
+  if(isOnline()) uni.getNetworkType({success:r=>{if(r.networkType==='none')handleConnectionFailure()}})
   // 清除缓存，强制重新读取最新的设置
   try {
     if (typeof uni.$off === 'function') {
@@ -1505,17 +1535,17 @@ onShow(() => {
       uni.$on('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
     }
   } catch (_) {}
-  
+
   // 重新同步设置，确保即使事件没有触发也能获取最新设置
   const previousRankMode = appliedGameplay.value.rankMode
   syncPendingGameplayPrefs()  // 这个函数现在会立即应用新的设置
-  
+
   // 如果rankMode发生变化，触发额外的处理
   if (previousRankMode !== appliedGameplay.value.rankMode) {
     console.log('Rank mode changed in onShow from', previousRankMode, 'to', appliedGameplay.value.rankMode)
     handleRankModeChange(appliedGameplay.value.rankMode)
   }
-  
+
   currentUser.value = getCurrentUser() || null
   loadSession()
   applyLatestModePreference()
@@ -1530,6 +1560,8 @@ onShow(() => {
 })
 onHide(() => { saveSession(); stopHandTimer(); closeTimerPopover() })
 onUnmounted(() => {
+  pageAlive = false
+  if(isOnline()) cancelOnlineRound().catch(()=>{})
   try {
     if (typeof uni.$off === 'function') {
       uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange)
@@ -1545,6 +1577,17 @@ onUnmounted(() => {
 })
 
 // 已移除“清空表达式”功能，避免误触清空
+
+async function persistOnline(arg, kind) {
+  networkBusy.value = true
+  try {
+    if(!hasOnlineRound())throw new Error('请重新开局')
+    const result = await finishOnlineRound(arg,kind)
+    updateLastSuccess()
+    return result
+  } catch(e) { handleConnectionFailure(e); return null }
+  finally { networkBusy.value=false }
+}
 
 function updateLastSuccess() {
   try {
@@ -1573,7 +1616,13 @@ function resetHandStateForNext() {
   // handStartTs 在发新题时重置
 }
 
-function settleHandResult({ ok, expression, valueFraction, stats, origin, allowRetry = false }) {
+async function settleHandResult({ ok, expression, valueFraction, stats, origin, allowRetry = false }) {
+  if (networkBusy.value || dealing) return
+  if (isOnline() && !handRecorded.value) {
+    const result = await persistOnline({ success:ok, expr:expression }, 'answer')
+    if (!result) return
+    ok = result.success
+  }
   const exprStr = expression || ''
   const statsData = stats || statsFromExpressionString(exprStr)
   const value = valueFraction || (exprStr ? evaluateExprToFraction(exprStr) : null)
@@ -1583,11 +1632,11 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
   const retryableFailure = allowRetry && !ok
 
   const recordRound = (success) => {
-    if (selectedUserId.value) {
+    if (!isOnline() && selectedUserId.value) {
       try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success }) } catch (_) {}
     }
     try {
-      pushRound({
+      if (!isOnline()) pushRound({
         success,
         timeMs: elapsed,
         hintUsed: !!hintWasUsed.value,
@@ -1605,6 +1654,7 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
   }
 
   if (ok) {
+    if (isOnline() && handRecorded.value) { nextHand(); return }
     const timedOut = timeoutRecorded.value
     errorValueText.value = ''
     if (timedOut) {
@@ -1646,8 +1696,8 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
     handSettled.value = true
     settledResult.value = 'success'
     handRecorded.value = true
-    handsPlayed.value += 1
-    successCount.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') successCount.value += 1
     recordRound(true)
     try {
       successAnimating.value = true
@@ -1675,8 +1725,8 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
       handFailedOnce.value = true
       settledResult.value = 'fail'
       handRecorded.value = true
-      handsPlayed.value += 1
-      failCount.value += 1
+      if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
+      if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
       recordRound(false)
     }
     try {
@@ -1692,8 +1742,8 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
     handSettled.value = true
     settledResult.value = 'fail'
     handRecorded.value = true
-    handsPlayed.value += 1
-    failCount.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
     recordRound(false)
   }
   try {
@@ -1704,6 +1754,7 @@ function settleHandResult({ ok, expression, valueFraction, stats, origin, allowR
 }
 
 function check() {
+  if (networkBusy.value || dealing) return
   const usedCount = usedByCard.value.reduce((a, b) => a + (b ? 1 : 0), 0)
   errorValueText.value = ''
   if (usedCount !== 4 || !isExpressionComplete(tokens.value)) {
@@ -1729,7 +1780,9 @@ function check() {
   })
 }
 
-function showSolution() {
+async function showSolution() {
+  if (networkBusy.value || dealing) return
+  if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'hint')) return
   hintWasUsed.value = true
 
   // 兜底：若 solution 为空，尝试即时计算一份
@@ -1742,11 +1795,11 @@ function showSolution() {
 
   if (!handRecorded.value) {
     handRecorded.value = true
-    handsPlayed.value += 1
-    failCount.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
     try {
       const stats = computeExprStats(tokens.value)
-      pushRound({
+      if (!isOnline()) pushRound({
         success: false,
         timeMs: Date.now() - (handStartTs.value || Date.now()),
         hintUsed: true,
@@ -1760,7 +1813,7 @@ function showSolution() {
       })
       updateLastSuccess()
     } catch (_) {}
-    if (selectedUserId.value) {
+    if (!isOnline() && selectedUserId.value) {
       try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
     }
   }
@@ -1776,20 +1829,21 @@ function showSolution() {
 }
 
 async function skipHand() {
-  if (skipInProgress.value) return
+  if (skipInProgress.value || networkBusy.value || dealing) return
+  if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'skip')) return
   skipInProgress.value = true
-  
+
   // 只有在本局未记录的情况下才记录失败
   if (!handRecorded.value) {
     handRecorded.value = true
     handSettled.value = true
     settledResult.value = 'fail'
     handFailedOnce.value = true
-    handsPlayed.value += 1
-    failCount.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
+    if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
     try {
       const stats = computeExprStats(tokens.value)
-      pushRound({
+      if (!isOnline()) pushRound({
         success: false,
         timeMs: Date.now() - (handStartTs.value || Date.now()),
         hintUsed: !!hintWasUsed.value,
@@ -1803,11 +1857,11 @@ async function skipHand() {
       })
       updateLastSuccess()
     } catch (_) {}
-    if (selectedUserId.value) {
+    if (!isOnline() && selectedUserId.value) {
       try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
     }
   }
-  
+
   try {
     await nextHand()
   } finally {
@@ -1819,6 +1873,8 @@ async function skipHand() {
 }
 
 function reshuffle() {
+  if(networkBusy.value || dealing) return
+  resetServerDeck = true
   // 主动重洗：不计失败，清零本副统计并开始新副牌
   initDeck()
   handsPlayed.value = 0
@@ -1853,6 +1909,8 @@ function exitGamePage() {
 // --------------------
 // 导航函数：统一处理页面跳转与回退逻辑
 // --------------------
+function goRanking() { uni.navigateTo({url:'/pages/ranking/index'}) }
+
 function goLogin(){
   try {
     uni.navigateTo({ url:'/pages/login/index' })
@@ -1866,7 +1924,7 @@ function goUser(){ try { uni.reLaunch({ url:'/pages/user/index' }) } catch(e1){ 
 function goSettings() {
   try {
     // 统一使用redirectTo，避免页面重复创建
-    uni.redirectTo({ 
+    uni.redirectTo({
       url: '/pages/settings/index',
       success: () => {
         // 导航成功，不需要其他操作
@@ -2066,17 +2124,18 @@ watch(cards, () => {
 })
 
 watch(faceUseHigh, (newVal, oldVal) => {
+  if (isOnline() && booted.value && newVal !== oldVal) nextTick(() => nextHand())
   console.log('faceUseHigh changed from', oldVal, 'to', newVal)
   resetBasicStateFromCards()
   if (mode.value === 'basic') nextTick(() => syncBasicOpsHeight())
-  
+
   // 重新计算当前题目解法
   if (cards.value && cards.value.length === 4) {
     try {
       const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
       solution.value = mapped.length === 4 ? solve24(mapped) : null
       console.log('Solution recalculated due to faceUseHigh change:', solution.value)
-    } catch (_) { 
+    } catch (_) {
       solution.value = null
       console.log('Error recalculating solution')
     }
@@ -2170,7 +2229,8 @@ onShareTimeline(() => {
 })
 </script>
 
-<style scoped> 
+<style scoped>
+.online-blocker{position:fixed;inset:0;background:rgba(247,243,232,.82);z-index:9999;display:flex;align-items:center;justify-content:center;color:#275c48;font-size:30rpx}
 /* 样式说明：
    1. 采用 flex 布局保证多端自适应。
    2. 关键尺寸使用 rpx，兼容小程序与 App。
@@ -2266,8 +2326,8 @@ onShareTimeline(() => {
 .mode-option.active { background:var(--tf24-primary); color:#fff; box-shadow:0 4rpx 10rpx rgba(36,113,92,.2); }
 .deck-badge { display:flex; align-items:center; gap:8rpx; color:#796d59; font-size:24rpx; font-weight:700; }
 .deck-dot { width:12rpx; height:12rpx; border-radius:50%; background:#d19c35; box-shadow:0 0 0 5rpx rgba(209,156,53,.12); }
- 
-/* 牌区 */ 
+
+/* 牌区 */
 .card-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12rpx; }
 .playing-card { position:relative; width:100%; background:none; border-radius:16rpx; overflow:visible; }
 .playing-card::before { content:""; display:block; }

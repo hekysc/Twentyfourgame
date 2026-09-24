@@ -1,0 +1,42 @@
+name: CloudBase dev deployment and verification
+
+on:
+  push:
+    branches:
+      - feat/cloudbase-online-1.4.0
+    paths:
+      - .github/workflows/cloudbase-deploy.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudbase-dev-twentyfour
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/feat/cloudbase-online-1.4.0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          package-manager-cache: false
+      - name: Install cloud function dependencies
+        run: npm ci --prefix cloudfunctions/tf24 --ignore-scripts
+      - name: Provision secured collections and deploy function
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$TENCENTCLOUD_SECRET_ID" || { echo "::error::TENCENTCLOUD_SECRET_ID is missing"; exit 1; }
+          test -n "$TENCENTCLOUD_SECRET_KEY" || { echo "::error::TENCENTCLOUD_SECRET_KEY is missing"; exit 1; }
+          python3 scripts/cloudbase-admin.py deploy --auth-dir "$RUNNER_TEMP/cloudbase-auth"
+          python3 scripts/cloudbase-admin.py check --auth-dir "$RUNNER_TEMP/cloudbase-auth"

@@ -1,0 +1,44 @@
+name: CloudBase authorization check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/cloudbase-online-1.4.0
+    paths:
+      - .github/workflows/cloudbase-auth-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  auth-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install CloudBase CLI
+        run: npm install --global @cloudbase/cli@latest
+      - name: Authenticate with the environment API key
+        env:
+          CLOUDBASE_API_KEY: ${{ secrets.CLOUDBASE_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDBASE_API_KEY" || { echo "CLOUDBASE_API_KEY is missing"; exit 1; }
+          tcb login --cloudbase-api-key "$CLOUDBASE_API_KEY" --env-id twentyfour-d3gpwyy2p3484bd77
+      - name: Verify access to the configured environment
+        run: |
+          set -euo pipefail
+          tcb env list --json | node -e '
+            let s = "";
+            process.stdin.on("data", d => s += d);
+            process.stdin.on("end", () => {
+              const result = JSON.parse(s);
+              const envs = result.data || result.EnvList || [];
+              const found = envs.some(env => env.EnvId === "twentyfour-d3gpwyy2p3484bd77");
+              if (!found) process.exit(1);
+              console.log("CloudBase environment authorization verified.");
+            });
+          '
