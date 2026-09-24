@@ -1,6 +1,7 @@
 <template>
   <view class="settings-page">
     <AppNavBar title="设置" :show-back="true" :back-to-index="true" />
+    <view v-if="onlineMode" class="settings-sync-row"><CloudSyncStatus :online="onlineMode" /></view>
     <view class="settings-body" :style="bodyStyle">
       <view class="settings-intro">
         <text class="settings-kicker">GAME SETTINGS</text>
@@ -79,11 +80,14 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { flushPrefs } from '../../utils/online.js'
 import { onHide, onBackPress, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
+import CloudSyncStatus from '../../components/CloudSyncStatus.vue'
+import { isOnline } from '../../utils/identity.js'
 import { useSafeArea } from '../../utils/useSafeArea.js'
 import { getGameplayPrefs, setGameplayPrefs, consumeRankMigrationNotice, getLastMode, setLastMode } from '../../utils/prefs.js'
 import { navigateToHome } from '../../utils/navigation.js'
 
 const { safeBottom } = useSafeArea()
+const onlineMode = ref(isOnline())
 const MODE_CHANGE_EVENT = 'tf24:mode-changed'
 
 const playMode = ref(getLastMode ? getLastMode() : 'basic')
@@ -213,13 +217,6 @@ function onModeChange(e) {
       uni.$emit(MODE_CHANGE_EVENT, normalized)
     }
   } catch (_) {}
-  try {
-    uni.showToast({
-      title: normalized === 'pro' ? '已切换为专业模式' : '已切换为基础模式',
-      icon: 'none',
-      duration: 1600,
-    })
-  } catch (_) {}
 }
 
 function onRankModeChange(e) {
@@ -243,15 +240,6 @@ function onRankModeChange(e) {
     console.error('Error emitting rank mode change event:', err)
   }
   
-  // 显示提示
-  try {
-    const modeText = value === 'jqk-1' ? 'JQK 记作 1' : 'JQK 记作 11/12/13'
-    uni.showToast({
-      title: `已切换：${modeText}`,
-      icon: 'none',
-      duration: 1600,
-    })
-  } catch (_) {}
 }
 
 function onDeckSourceChange(e) {
@@ -424,4 +412,10 @@ onShareTimeline(() => {
 }
 .cache-copy{ display:flex; flex-direction:column; gap:6rpx; margin-bottom:20rpx; color:var(--tf24-ink); font-size:26rpx; font-weight:800 }
 .cache-copy text:last-child{ color:var(--tf24-muted); font-size:22rpx; font-weight:500 }
+.settings-sync-row {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 34rpx;
+  padding: 8rpx 40rpx 0;
+}
 </style>

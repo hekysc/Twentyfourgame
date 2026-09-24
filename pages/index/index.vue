@@ -15,14 +15,16 @@
     @touchend="edgeHandlers.handleTouchEnd"
     @touchcancel="edgeHandlers.handleTouchCancel"
   >
-    <view v-if="networkBusy" class="online-blocker"><text>正在同步云端…</text></view>
     <view class="page-scroll-container">
       <view id="gameTopBox" class="game-header top-fixed">
         <AppNavBar :showBack="false" :with-safe-top="false">
           <template #title>
             <view class="nav-title-stack">
               <text class="nav-title-main">24 点</text>
-              <text class="nav-title-sub">{{ onlineMode ? '在线挑战 · 云端保存' : '本地练习 · 不参与排名' }}</text>
+              <view class="nav-title-meta">
+                <text class="nav-title-sub">{{ onlineMode ? '在线挑战' : '本地练习 · 不参与排名' }}</text>
+                <CloudSyncStatus :online="onlineMode" :busy="onlineMode && networkBusy" />
+              </view>
             </view>
           </template>
         </AppNavBar>
@@ -245,6 +247,7 @@ import { ref, onMounted, onUnmounted, getCurrentInstance, computed, watch, nextT
 import { onBackPress, onHide, onShow, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import CircleActionButton from '../../components/CircleActionButton.vue'
+import CloudSyncStatus from '../../components/CloudSyncStatus.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { isOnline } from '../../utils/identity.js'
@@ -2230,7 +2233,7 @@ onShareTimeline(() => {
 </script>
 
 <style scoped>
-.online-blocker{position:fixed;inset:0;background:rgba(247,243,232,.82);z-index:9999;display:flex;align-items:center;justify-content:center;color:#275c48;font-size:30rpx}
+
 /* 样式说明：
    1. 采用 flex 布局保证多端自适应。
    2. 关键尺寸使用 rpx，兼容小程序与 App。
@@ -2524,4 +2527,10 @@ onShareTimeline(() => {
 @keyframes pop-in { from { transform:scale(0.85); opacity:.2; } to { transform:scale(1); opacity:1; } }
 @keyframes shimmer { from { background-position-x:0%; } to { background-position-x:200%; } }
 @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.nav-title-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
 </style>
