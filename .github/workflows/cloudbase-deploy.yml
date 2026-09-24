@@ -34,6 +34,7 @@ jobs:
         env:
           TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
           TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+          CLOUDBASE_ENV_ID: twentyfour-d6g4wbv3c4f226753
         run: |
           set -euo pipefail
           test -n "$TENCENTCLOUD_SECRET_ID" || { echo "::error::TENCENTCLOUD_SECRET_ID is missing"; exit 1; }

@@ -1,5 +1,5 @@
 {
-  "envId": "twentyfour-d3gpwyy2p3484bd77",
+  "envId": "twentyfour-d6g4wbv3c4f226753",
   "region": "ap-shanghai",
   "functionRoot": "cloudfunctions",
   "functions": [{"name":"tf24","runtime":"Nodejs18.15","handler":"index.main","memorySize":256,"timeout":30,"installDependency":true}]

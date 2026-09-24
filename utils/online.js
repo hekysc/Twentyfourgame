@@ -8,7 +8,7 @@ import { readJSON, writeJSON, emptyStats } from './migration.js'
 import { replaceOnlineStats } from './store.js'
 import { restorePrefs } from './prefs.js'
 import { clearTabCache } from './tab-cache.js'
-export const CLOUD_ENV = 'twentyfour-d3gpwyy2p3484bd77'
+export const CLOUD_ENV = 'twentyfour-d6g4wbv3c4f226753'
 let initialized = false,
   listeners = false,
   currentRound = null,

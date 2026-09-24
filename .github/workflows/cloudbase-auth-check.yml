@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$CLOUDBASE_API_KEY" || { echo "CLOUDBASE_API_KEY is missing"; exit 1; }
-          tcb login --cloudbase-api-key "$CLOUDBASE_API_KEY" --env-id twentyfour-d3gpwyy2p3484bd77
+          tcb login --cloudbase-api-key "$CLOUDBASE_API_KEY" --env-id twentyfour-d6g4wbv3c4f226753
       - name: Verify access to the configured environment
         run: |
           set -euo pipefail
@@ -37,7 +37,7 @@ jobs:
             process.stdin.on("end", () => {
               const result = JSON.parse(s);
               const envs = result.data || result.EnvList || [];
-              const found = envs.some(env => env.EnvId === "twentyfour-d3gpwyy2p3484bd77");
+              const found = envs.some(env => env.EnvId === "twentyfour-d6g4wbv3c4f226753");
               if (!found) process.exit(1);
               console.log("CloudBase environment authorization verified.");
             });
