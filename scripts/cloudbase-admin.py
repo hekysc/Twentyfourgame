@@ -3,7 +3,7 @@
 Uses official Tencent Cloud TC3 APIs and CloudBase CLI device authorization endpoints.
 """
 import argparse, base64, datetime, hashlib, hmac, io, json, os, pathlib, platform, time, urllib.request, zipfile
-ENV = 'twentyfour-d3gpwyy2p3484bd77'
+ENV = os.environ.get('CLOUDBASE_ENV_ID', 'twentyfour-d6g4wbv3c4f226753')
 REGION = 'ap-shanghai'
 OAUTH = 'https://tcb-api.cloud.tencent.com/qcloud-tcb/v1/oauth'
 ROOT = pathlib.Path(__file__).resolve().parents[1]
