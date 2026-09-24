@@ -39,3 +39,4 @@ jobs:
           test -n "$TENCENTCLOUD_SECRET_ID" || { echo "::error::TENCENTCLOUD_SECRET_ID is missing"; exit 1; }
           test -n "$TENCENTCLOUD_SECRET_KEY" || { echo "::error::TENCENTCLOUD_SECRET_KEY is missing"; exit 1; }
           python3 scripts/cloudbase-admin.py deploy --auth-dir "$RUNNER_TEMP/cloudbase-auth"
+          python3 scripts/cloudbase-admin.py check --auth-dir "$RUNNER_TEMP/cloudbase-auth"
