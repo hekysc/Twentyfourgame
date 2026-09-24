@@ -78,7 +78,21 @@ class Client:
 def check(client):
     env = client.environment()
     print(json.dumps({k: env.get(k) for k in ['EnvId', 'Alias', 'Region', 'Status', 'PackageId']}, ensure_ascii=False))
-    print('Collections:', [r['TableName'] for r in client.collections(env).get('Tables') or []])
+    collections = [r['TableName'] for r in client.collections(env).get('Tables') or []]
+    missing = sorted(set(COLLECTIONS) - set(collections))
+    if missing: raise RuntimeError('Missing collections: ' + ', '.join(missing))
+    print('Collections verified:', ', '.join(sorted(COLLECTIONS)))
+    for attempt in range(36):
+        result = client.call('ListFunctions', {'EnvId': ENV, 'SearchKey': 'tf24', 'Limit': 100})
+        functions = result.get('Functions') or []
+        fn = next((item for item in functions if item.get('FunctionName') == 'tf24'), None)
+        if fn and fn.get('Status') == 'Active':
+            print('Cloud function tf24 is Active.')
+            return
+        if fn and fn.get('Status') in ('CreateFailed', 'UpdateFailed', 'Inactive'):
+            raise RuntimeError('Cloud function status: ' + str(fn.get('Status')) + ' ' + str(fn.get('StatusDesc', '')))
+        time.sleep(5)
+    raise RuntimeError('Cloud function tf24 did not become Active within 3 minutes')
 
 def deploy(client):
     env = client.environment(); existing = {t['TableName'] for t in client.collections(env).get('Tables') or []}
