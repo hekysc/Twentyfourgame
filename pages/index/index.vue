@@ -1621,11 +1621,11 @@ function resetHandStateForNext() {
 
 async function settleHandResult({ ok, expression, valueFraction, stats, origin, allowRetry = false }) {
   if (networkBusy.value || dealing) return
-  if (isOnline() && !handRecorded.value) {
-    const result = await persistOnline({ success:ok, expr:expression }, 'answer')
-    if (!result) return
-    ok = result.success
-  }
+  // Start server-authoritative settlement without blocking the local verdict UI.
+  // networkBusy prevents duplicate submissions until the response is received.
+  const onlineSettlement = isOnline() && !handRecorded.value
+    ? persistOnline({ success:ok, expr:expression }, 'answer')
+    : null
   const exprStr = expression || ''
   const statsData = stats || statsFromExpressionString(exprStr)
   const value = valueFraction || (exprStr ? evaluateExprToFraction(exprStr) : null)
@@ -1656,6 +1656,19 @@ async function settleHandResult({ ok, expression, valueFraction, stats, origin, 
     } catch (_) {}
   }
 
+  const scheduleSuccessAdvance = () => {
+    setTimeout(() => {
+      successAnimating.value = false
+      if (onlineSettlement) {
+        onlineSettlement.then((result) => {
+          if (result) nextHand()
+        })
+      } else {
+        nextHand()
+      }
+    }, 500)
+  }
+
   if (ok) {
     if (isOnline() && handRecorded.value) { nextHand(); return }
     const timedOut = timeoutRecorded.value
@@ -1669,7 +1682,7 @@ async function settleHandResult({ ok, expression, valueFraction, stats, origin, 
       settledResult.value = 'success'
       try {
         successAnimating.value = true
-        setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+        scheduleSuccessAdvance()
       } catch (_) { nextHand() }
       try { saveSession() } catch (_) {}
       return
@@ -1690,7 +1703,7 @@ async function settleHandResult({ ok, expression, valueFraction, stats, origin, 
       }
       try {
         successAnimating.value = true
-        setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+        scheduleSuccessAdvance()
       } catch (_) { nextHand() }
       try { saveSession() } catch (_) {}
       return
@@ -1704,7 +1717,7 @@ async function settleHandResult({ ok, expression, valueFraction, stats, origin, 
     recordRound(true)
     try {
       successAnimating.value = true
-      setTimeout(() => { successAnimating.value = false; nextHand() }, 500)
+      scheduleSuccessAdvance()
     } catch (_) { nextHand() }
     try { saveSession() } catch (_) {}
     return
