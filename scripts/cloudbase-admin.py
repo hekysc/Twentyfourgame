@@ -111,7 +111,7 @@ def deploy(client):
     try:
         client.call('CreateFunction', {'EnvId': ENV, 'FunctionName': 'tf24', 'Handler': 'index.main', 'Runtime': 'Nodejs18.15', 'MemorySize': 256, 'Timeout': 30, 'InstallDependency': 'FALSE', 'Code': code, 'Role': 'TCB_QcsRole', 'Description': '24点在线登录、统计与匿名排行榜'})
     except RuntimeError as e:
-        if 'AlreadyExist' not in str(e) and 'FunctionNameExist' not in str(e): raise
+        if not any(code in str(e) for code in ('AlreadyExist', 'FunctionNameExist', 'ResourceInUse.FunctionName')): raise
         client.call('UpdateFunctionCode', {'EnvId': ENV, 'FunctionName': 'tf24', 'Handler': 'index.main', 'InstallDependency': 'FALSE', 'Code': code})
     print('Function deployment requested. Verify function status, WeChat association and config.json OpenAPI permissions before merging main.')
 
