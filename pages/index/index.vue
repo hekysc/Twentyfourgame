@@ -378,6 +378,7 @@ const exprOverrideText = ref('')
 const errorValueText = ref('')
 const handStartTs = ref(Date.now())
 const nowTs = ref(Date.now())
+const handStoppedAtTs = ref(0)
 const hintWasUsed = ref(false)
 const attemptCount = ref(0)
 const lastSuccessMs = ref(null)
@@ -629,6 +630,9 @@ function saveSession() {
       handRecorded: !!handRecorded.value,
       timeoutRecorded: !!timeoutRecorded.value,
       handStartTs: handStartTs.value || 0,
+      handStoppedAtTs: handStoppedAtTs.value || 0,
+      handSettled: !!handSettled.value,
+      settledResult: settledResult.value || null,
       hintWasUsed: !!hintWasUsed.value,
       attemptCount: attemptCount.value || 0,
       handsPlayed: handsPlayed.value || 0,
@@ -698,6 +702,10 @@ function loadSession() {
       handRecorded.value = !!data.handRecorded
       timeoutRecorded.value = !!data.timeoutRecorded
       handStartTs.value = data.handStartTs || Date.now()
+      handStoppedAtTs.value = Number(data.handStoppedAtTs) || 0
+      handSettled.value = !!data.handSettled
+      settledResult.value = data.settledResult === 'success' || data.settledResult === 'fail' ? data.settledResult : null
+      nowTs.value = Date.now()
       hintWasUsed.value = !!data.hintWasUsed
       attemptCount.value = data.attemptCount || 0
       handsPlayed.value = data.handsPlayed || 0
@@ -748,14 +756,20 @@ const winRate = computed(() => {
 })
 const handElapsedMs = computed(() => {
   const start = handStartTs.value || Date.now()
-  const now = nowTs.value || Date.now()
+  const now = handStoppedAtTs.value || nowTs.value || Date.now()
   const d = now - start
   return d > 0 ? d : 0
 })
 
+function currentHandElapsedMs() {
+  const start = handStartTs.value || Date.now()
+  const end = handStoppedAtTs.value || Date.now()
+  return Math.max(0, end - start)
+}
+
 let handTimer = null
 function startHandTimer() {
-  if (handTimer) return
+  if (handTimer || handStoppedAtTs.value) return
   try {
     handTimer = setInterval(() => {
       const now = Date.now()
@@ -769,14 +783,24 @@ function startHandTimer() {
 }
 function stopHandTimer() { if (handTimer) { try { clearInterval(handTimer) } catch(_){} handTimer = null } }
 
+function freezeHandTimer(at = Date.now()) {
+  if (!handStoppedAtTs.value) {
+    handStoppedAtTs.value = Math.max(handStartTs.value || at, at)
+    nowTs.value = handStoppedAtTs.value
+  }
+  stopHandTimer()
+}
+
 async function handleTimeout() {
   if (networkBusy.value || dealing) return
+  if (timeoutRecorded.value || handRecorded.value) return
+  freezeHandTimer((handStartTs.value || Date.now()) + 120000)
   if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'timeout')) return
   if (timeoutRecorded.value || handRecorded.value) return
   timeoutRecorded.value = true
   handRecorded.value = true
   handFailedOnce.value = true
-  const elapsed = Date.now() - (handStartTs.value || Date.now())
+  const elapsed = currentHandElapsedMs()
   const normalizedElapsed = elapsed > 0 ? elapsed : 120000
   const statsData = computeExprStats(tokens.value)
   if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
@@ -1258,6 +1282,8 @@ async function nextHand() {
   // 只有在这里才真正重置 handRecorded，表示新一局开始
   handRecorded.value = false
   handStartTs.value = Date.now()
+  nowTs.value = handStartTs.value
+  handStoppedAtTs.value = 0
   hintWasUsed.value = false
   attemptCount.value = 0
   nextTick(() => { updateExprHeight(); syncBasicOpsHeight() })
@@ -1612,6 +1638,7 @@ function resetHandStateForNext() {
   // 不要在这里重置 handRecorded，因为有些逻辑需要知道上一局是否已记录
   // handRecorded.value = false;
   timeoutRecorded.value = false;
+  handStoppedAtTs.value = 0;
   attemptCount.value = 0;
   hintWasUsed.value = false;
   errorValueText.value = '';
@@ -1629,10 +1656,11 @@ async function settleHandResult({ ok, expression, valueFraction, stats, origin, 
   const exprStr = expression || ''
   const statsData = stats || statsFromExpressionString(exprStr)
   const value = valueFraction || (exprStr ? evaluateExprToFraction(exprStr) : null)
-  const elapsed = Date.now() - (handStartTs.value || Date.now())
   const retriesSuccess = origin === 'pro' ? Math.max(0, (attemptCount.value || 1) - 1) : 0
   const retriesFail = origin === 'pro' ? (attemptCount.value || 0) : 0
   const retryableFailure = allowRetry && !ok
+  if (!retryableFailure) freezeHandTimer()
+  const elapsed = currentHandElapsedMs()
 
   const recordRound = (success) => {
     if (!isOnline() && selectedUserId.value) {
@@ -1798,6 +1826,7 @@ function check() {
 
 async function showSolution() {
   if (networkBusy.value || dealing) return
+  freezeHandTimer()
   if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'hint')) return
   hintWasUsed.value = true
 
@@ -1817,7 +1846,7 @@ async function showSolution() {
       const stats = computeExprStats(tokens.value)
       if (!isOnline()) pushRound({
         success: false,
-        timeMs: Date.now() - (handStartTs.value || Date.now()),
+        timeMs: currentHandElapsedMs(),
         hintUsed: true,
         retries: attemptCount.value || 0,
         ops: stats.ops,
@@ -1846,6 +1875,7 @@ async function showSolution() {
 
 async function skipHand() {
   if (skipInProgress.value || networkBusy.value || dealing) return
+  freezeHandTimer()
   if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'skip')) return
   skipInProgress.value = true
 
@@ -1861,7 +1891,7 @@ async function skipHand() {
       const stats = computeExprStats(tokens.value)
       if (!isOnline()) pushRound({
         success: false,
-        timeMs: Date.now() - (handStartTs.value || Date.now()),
+        timeMs: currentHandElapsedMs(),
         hintUsed: !!hintWasUsed.value,
         retries: attemptCount.value || 0,
         ops: stats.ops,
