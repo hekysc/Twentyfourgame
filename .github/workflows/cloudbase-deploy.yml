@@ -3,9 +3,12 @@ name: CloudBase dev deployment and verification
 on:
   push:
     branches:
-      - feat/cloudbase-online-1.4.0
+      - main
+      - fix/round-settlement-flow
     paths:
       - .github/workflows/cloudbase-deploy.yml
+      - cloudfunctions/tf24/**
+      - scripts/cloudbase-admin.py
   workflow_dispatch:
 
 permissions:
@@ -17,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/feat/cloudbase-online-1.4.0'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/round-settlement-flow'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -28,6 +31,8 @@ jobs:
         with:
           node-version: 20
           package-manager-cache: false
+      - name: Verify backend rules before deployment
+        run: node --test tests/backend.test.cjs tests/online-rules.test.cjs
       - name: Install cloud function dependencies
         run: npm ci --prefix cloudfunctions/tf24 --ignore-scripts
       - name: Provision secured collections and deploy function

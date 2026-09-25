@@ -208,19 +208,21 @@ exports.main = async (event) => {
       const result = await db.runTransaction(async (tx) => {
         const s = await txget(tx, 'tf24_sessions', uid)
         if (s.id !== event.id) throw new Error('此题已失效，请重新开始')
-        if (s.status === 'done') return s.result
+        if (s.status === 'done') return { ...s.result, settled: true }
         if (s.status !== 'open') throw new Error('此题已作废')
         const kind = event.kind
         if (!['answer', 'skip', 'hint', 'timeout'].includes(kind))
           throw new Error('无效成绩')
         const timeMs = Math.max(1, now - s.startedAt)
-        if (kind === 'timeout' && timeMs < 120000)
-          throw new Error('未达到超时时间')
         const expression = String(event.expr || '').slice(0, 160)
         const success =
           kind === 'answer' &&
-          timeMs < 120000 &&
           R.validExpression(expression, s.cards, s.high)
+        // Incorrect attempts and legacy timeout requests leave the round open.
+        // Never update history, rankings or the mistake book for an attempt.
+        if (kind === 'timeout' || (kind === 'answer' && !success)) {
+          return { settled: false, success: false, round: null, total: null, book: p.book }
+        }
         const round = {
           id: s.id,
           uid,
@@ -251,6 +253,7 @@ exports.main = async (event) => {
           await tx.collection('tf24_rounds').doc(s.id).set({ data: round })
         }
         const result = {
+          settled: true,
           round: s.practice ? null : round,
           total: aggregate,
           book,

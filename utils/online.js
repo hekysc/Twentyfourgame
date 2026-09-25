@@ -158,6 +158,7 @@ export async function finishOnlineRound(arg, kind) {
     throw e
   }
   endSync(true)
+  if (res.settled === false) return res
   const uid = currentIdentity().id
   writeJSON('mistakes:' + uid, res.book)
   if (res.round) {

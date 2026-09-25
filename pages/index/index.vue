@@ -65,8 +65,7 @@
             <view class="stats-feature stats-feature-timer">
               <text class="stats-label">本局</text>
               <view class="timer-cell" id="timerCell" @tap="handleTimerTap">
-                <text v-if="handElapsedMs < 120000" class="stats-value">{{ fmtMs1(handElapsedMs) }}</text>
-                <text v-else class="timer-fail-text">失败</text>
+                <text class="stats-value">{{ fmtMs1(handElapsedMs) }}</text>
               </view>
             </view>
             <view class="stats-feature">
@@ -209,6 +208,7 @@
       </view>
     </view>
     <!-- 底部导航由全局 tabBar 提供（见 pages.json） -->
+    <view v-if="dealing" class="next-hand-loading"><text>正在准备下一题…</text></view>
     <!-- 成功动画覆盖层（0.5s） -->
     <view v-if="successAnimating" class="success-overlay">
       <view class="success-burst">24!</view>
@@ -280,7 +280,12 @@ import { getSystemInfo } from '../../utils/system-compat.js'
 // --------------------
 const onlineMode = ref(isOnline())
 const networkBusy = ref(false)
-let dealing = false
+const dealing = ref(false)
+const handReady = ref(false)
+let pageVisible = true
+let pendingSettlement = null
+let successAdvanceTimer = null
+let errorFeedbackTimer = null
 let pageAlive = true
 let resetServerDeck = false
 const cards = ref([{ rank:1, suit:'S' }, { rank:5, suit:'H' }, { rank:5, suit:'D' }, { rank:5, suit:'C' }])
@@ -342,7 +347,7 @@ const hapticsEnabled = ref(!!appliedGameplay.value.haptics)
 const sfxEnabled = ref(!!appliedGameplay.value.sfx)
 const reducedMotion = ref(!!appliedGameplay.value.reducedMotion)
 const handRecorded = ref(false)
-const timeoutRecorded = ref(false)
+const longTimeNotified = ref(false)
 const BASIC_EXPR_HEIGHT_PX = 90
 const PRO_EXPR_HEIGHT_PX = 200
 const exprZoneHeight = ref(initialMode === 'pro' ? PRO_EXPR_HEIGHT_PX : BASIC_EXPR_HEIGHT_PX)
@@ -385,7 +390,6 @@ const lastSuccessMs = ref(null)
 const SESSION_KEY = 'tf24_game_session_v1'
 const handSettled = ref(false);          // 是否已对本手“结算”（成功或失败）
 const settledResult = ref(null);         // 'success' | 'fail' | null
-const handFailedOnce = ref(false);       // Basic 模式失败是否已记录
 const skipInProgress = ref(false)
 
 const { safeTop, safeBottom, windowHeight, refreshSafeArea } = useSafeArea()
@@ -412,13 +416,15 @@ const basicErrorMessages = {
 
 const basicHelperText = computed(() => {
   if (handSettled.value && settledResult.value === 'success') return '答对了，即将进入下一题'
-  if (handFailedOnce.value) return '本局已记为失败，可撤销后继续练习'
+  if (hintWasUsed.value) return '已查看答案，本局已结束，点击下一题继续'
+  if (errorValueText.value) return '结果不正确，可撤销或重置后继续作答'
   if (basicSelection.value.first === null) return '选一张牌 → 运算符 → 另一张牌'
   if (basicSelection.value.operator) return '请选择另一张牌'
   return '请选择一个运算符'
 })
 
 function selectMode(nextMode) {
+  if (dealing.value || networkBusy.value || successAnimating.value) return
   const normalized = nextMode === 'pro' ? 'pro' : 'basic'
   if (mode.value === normalized) return
   try { setLastMode(normalized) } catch (_) {}
@@ -618,7 +624,7 @@ function onAvatarError() {
 }
 
 function saveSession() {
-  if (isOnline()) return
+  if (isOnline() || dealing.value || !handReady.value) return
   try {
     const data = {
       deck: deck.value || [],
@@ -628,7 +634,7 @@ function saveSession() {
       faceUseHigh: !!faceUseHigh.value,
       rankMode: appliedGameplay.value.rankMode,
       handRecorded: !!handRecorded.value,
-      timeoutRecorded: !!timeoutRecorded.value,
+      longTimeNotified: !!longTimeNotified.value,
       handStartTs: handStartTs.value || 0,
       handStoppedAtTs: handStoppedAtTs.value || 0,
       handSettled: !!handSettled.value,
@@ -638,7 +644,6 @@ function saveSession() {
       handsPlayed: handsPlayed.value || 0,
       successCount: successCount.value || 0,
       failCount: failCount.value || 0,
-      handFailedOnce: !!handFailedOnce.value,
       solution: solution.value || null, // persisted solution to avoid "暂无提示" after restore
       deckSource: deckSource.value || 'regular',
       mixWeight: mixWeight.value,
@@ -700,10 +705,11 @@ function loadSession() {
       sfxEnabled.value = finalGameplay.sfx
       reducedMotion.value = finalGameplay.reducedMotion
       handRecorded.value = !!data.handRecorded
-      timeoutRecorded.value = !!data.timeoutRecorded
+      longTimeNotified.value = !!data.longTimeNotified
       handStartTs.value = data.handStartTs || Date.now()
       handStoppedAtTs.value = Number(data.handStoppedAtTs) || 0
-      handSettled.value = !!data.handSettled
+      // Older recorded sessions must never become a second scored round.
+      handSettled.value = !!data.handSettled || !!data.handRecorded
       settledResult.value = data.settledResult === 'success' || data.settledResult === 'fail' ? data.settledResult : null
       nowTs.value = Date.now()
       hintWasUsed.value = !!data.hintWasUsed
@@ -711,7 +717,8 @@ function loadSession() {
       handsPlayed.value = data.handsPlayed || 0
       successCount.value = data.successCount || 0
       failCount.value = data.failCount || 0
-      handFailedOnce.value = !!data.handFailedOnce
+      if (handSettled.value && !handStoppedAtTs.value) handStoppedAtTs.value = nowTs.value
+      handReady.value = true
       // 恢复 solution（向后兼容老会话）
       solution.value = data.solution || null
       mistakeRunUsed.value = new Set(Array.isArray(data.mistakeRunUsed) ? data.mistakeRunUsed : [])
@@ -769,61 +776,35 @@ function currentHandElapsedMs() {
 
 let handTimer = null
 function startHandTimer() {
-  if (handTimer || handStoppedAtTs.value) return
+  if (handTimer || handStoppedAtTs.value || !handReady.value || dealing.value || !pageVisible || !pageAlive) return
+  nowTs.value = Date.now()
   try {
     handTimer = setInterval(() => {
       const now = Date.now()
       nowTs.value = now
       const start = handStartTs.value || now
-      if (!networkBusy.value && !dealing && !timeoutRecorded.value && (now - start) >= 120000) {
-        handleTimeout()
+      if (!handSettled.value && !dealing.value && !longTimeNotified.value && (now - start) >= 120000) {
+        notifyLongTime()
       }
     }, 100)
   } catch (_) { handTimer = null }
 }
-function stopHandTimer() { if (handTimer) { try { clearInterval(handTimer) } catch(_){} handTimer = null } }
+// Pause rendering only; elapsed wall time continues until freezeHandTimer is called.
+function pauseHandTimer() { if (handTimer) { try { clearInterval(handTimer) } catch(_){} handTimer = null } }
 
 function freezeHandTimer(at = Date.now()) {
   if (!handStoppedAtTs.value) {
     handStoppedAtTs.value = Math.max(handStartTs.value || at, at)
     nowTs.value = handStoppedAtTs.value
   }
-  stopHandTimer()
+  pauseHandTimer()
 }
 
-async function handleTimeout() {
-  if (networkBusy.value || dealing) return
-  if (timeoutRecorded.value || handRecorded.value) return
-  freezeHandTimer((handStartTs.value || Date.now()) + 120000)
-  if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'timeout')) return
-  if (timeoutRecorded.value || handRecorded.value) return
-  timeoutRecorded.value = true
-  handRecorded.value = true
-  handFailedOnce.value = true
-  const elapsed = currentHandElapsedMs()
-  const normalizedElapsed = elapsed > 0 ? elapsed : 120000
-  const statsData = computeExprStats(tokens.value)
-  if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
-  if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
-  try {
-    if (!isOnline()) pushRound({
-      success: false,
-      timeMs: normalizedElapsed,
-      hintUsed: !!hintWasUsed.value,
-      retries: attemptCount.value || 0,
-      ops: statsData.ops,
-      exprLen: statsData.exprLen,
-      maxDepth: statsData.maxDepth,
-      faceUseHigh: !!faceUseHigh.value,
-      hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-      expr: expr.value,
-    })
-    updateLastSuccess()
-  } catch (_) {}
-  if (!isOnline() && selectedUserId.value) {
-    try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
-  }
-  try { showHint('超过120秒，已记失败，可继续作答', 2000) } catch (_) {}
+function notifyLongTime() {
+  if (longTimeNotified.value || handSettled.value || !handReady.value) return
+  longTimeNotified.value = true
+  showHint('已用时超过 2 分钟，可以继续作答', 2000)
+  saveSession()
 }
 
 const drag = ref({ active: false, token: null, x: 0, y: 0, startX: 0, startY: 0, moved: false })
@@ -1012,9 +993,10 @@ function applyLatestModePreference() {
     /* noop */
   }
 }
-const undoDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : (basicHistory.value.length === 0))
-const resetDisabled = computed(() => (mode.value === 'pro') ? (tokens.value.length === 0) : false)
-const submitDisabled = computed(() => mode.value !== 'pro' || tokens.value.length === 0)
+const canEditHand = computed(() => handReady.value && !dealing.value && !networkBusy.value && !handSettled.value)
+const undoDisabled = computed(() => !canEditHand.value || ((mode.value === 'pro') ? (tokens.value.length === 0) : (basicHistory.value.length === 0)))
+const resetDisabled = computed(() => !canEditHand.value || (mode.value === 'pro' && tokens.value.length === 0))
+const submitDisabled = computed(() => !canEditHand.value || mode.value !== 'pro' || tokens.value.length === 0)
 
 let lastUndoEventStamp = 0
 let lastUndoStateSignature = ''
@@ -1051,7 +1033,7 @@ function resetBasicStateFromCards() {
 }
 
 function handleBasicOperator(op) {
-  if (mode.value !== 'basic' || handSettled.value) return
+  if (mode.value !== 'basic' || !canEditHand.value) return
   if (basicSelection.value.first === null) {
     showHint('请先选择一个数字', { interactive: true })
     return
@@ -1064,7 +1046,7 @@ function handleBasicOperator(op) {
 }
 
 function handleBasicCardTap(idx) {
-  if (mode.value !== 'basic' || handSettled.value) return
+  if (mode.value !== 'basic' || !canEditHand.value) return
   const slot = basicSlots.value[idx]
   if (!slot || !slot.alive) return
   const selection = basicSelection.value
@@ -1084,6 +1066,7 @@ function handleBasicCardTap(idx) {
 }
 
 function applyBasicCombination(firstIdx, secondIdx, op) {
+  if (!canEditHand.value) return
   const res = combineBasicSlots({
     slots: basicSlots.value,
     history: basicHistory.value,
@@ -1125,7 +1108,6 @@ function applyBasicCombination(firstIdx, secondIdx, op) {
       valueFraction: data.result,
       stats: data.stats,
       origin: 'basic',
-      allowRetry: !data.isSolved,
     })
   }
   try { saveSession() } catch (_) {}
@@ -1151,6 +1133,7 @@ function resetBasicBoard() {
 }
 
 function handleUndo(evt) {
+  if (!canEditHand.value) return
   const evtStamp = (evt && typeof evt.timeStamp === 'number') ? evt.timeStamp : 0
   const stateSignature = calcUndoStateSignature()
   if (evtStamp && evtStamp === lastUndoEventStamp && stateSignature === lastUndoStateSignature) {
@@ -1168,6 +1151,7 @@ function handleUndo(evt) {
 }
 
 function handleReset() {
+  if (!canEditHand.value) return
   if (mode.value === 'pro') {
     if (!tokens.value.length && usedByCard.value.every(v => !v)) return
     tokens.value = []
@@ -1188,6 +1172,7 @@ function handleSubmit() {
 }
 
 function handleHint() {
+  if (!handReady.value || dealing.value || successAnimating.value || (handSettled.value && !hintWasUsed.value)) return
   if (hintWasUsed.value) {
     showSolution()
     return
@@ -1247,50 +1232,63 @@ function handleTimerTap() {
 
 function redealHand() {
   closeTimerPopover()
-  errorValueText.value = ''
-  exprOverrideText.value = ''
-  nextHand()
+  skipHand()
 }
 
 // 核心流程：生成下一题并初始化计时器/状态
 async function nextHand() {
-  if (dealing || !pageAlive) return
-  dealing = true
+  if (dealing.value || !pageAlive) return
+  clearTimeout(successAdvanceTimer)
+  successAdvanceTimer = null
+  successAnimating.value = false
+  dealing.value = true
   networkBusy.value = isOnline()
+  let issued = false
+  pauseHandTimer()
   try {
-  stopHandTimer()
-  applyPendingGameplayPrefs()
-  closeTimerPopover()
-  const res = await getNextDraw()
-  if (!res) {
+    // The server keeps one active round: finish it before requesting another.
+    // The loading UI is already visible and the old clock remains frozen.
+    if (pendingSettlement) {
+      const result = await pendingSettlement
+      if (!result || !pageAlive) return
+      pendingSettlement = null
+    }
+    applyPendingGameplayPrefs()
+    closeTimerPopover()
+    const res = await getNextDraw()
+    if (!res || !pageAlive) return
+    let nextCards = Array.isArray(res.cards) ? res.cards : []
+    if (isOnline() && res.source === 'mistake') {
+      const round = await beginOnlineRound({practice:true,mistakeKey:res.mistakeKey,high:faceUseHigh.value,mode:mode.value})
+      if (!pageAlive) return
+      nextCards = round.cards
+    }
+    handReady.value = false
+    resetHandStateForNext()
+    if (Array.isArray(res.deck)) deck.value = res.deck
+    cards.value = nextCards
+    currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'regular'
+    currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
+    solution.value = res.solution || null
+    tokens.value = []
+    usedByCard.value = [0, 0, 0, 0]
+    updateExprHeight()
+    syncBasicOpsHeight()
+    await nextTick()
+    if (!pageAlive) return
+    handStartTs.value = Date.now()
+    nowTs.value = handStartTs.value
+    handReady.value = true
+    issued = true
+  } catch (e) {
+    if (isOnline()) handleConnectionFailure(e)
+    else showHint(e.message || '发牌失败', 2000)
+  } finally {
+    dealing.value = false
+    networkBusy.value = false
+    if (issued) saveSession()
     startHandTimer()
-    return
   }
-
-  resetHandStateForNext()
-  if (Array.isArray(res.deck)) deck.value = res.deck
-  cards.value = Array.isArray(res.cards) ? res.cards : []
-  if (isOnline() && res.source === 'mistake') {
-    const issued = await beginOnlineRound({practice:true,mistakeKey:res.mistakeKey,high:faceUseHigh.value,mode:mode.value})
-    cards.value = issued.cards
-  }
-  currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'regular'
-  currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
-  solution.value = res.solution || null
-  tokens.value = []
-  usedByCard.value = [0, 0, 0, 0]
-  // 只有在这里才真正重置 handRecorded，表示新一局开始
-  handRecorded.value = false
-  handStartTs.value = Date.now()
-  nowTs.value = handStartTs.value
-  handStoppedAtTs.value = 0
-  hintWasUsed.value = false
-  attemptCount.value = 0
-  nextTick(() => { updateExprHeight(); syncBasicOpsHeight() })
-  try { saveSession() } catch (_) {}
-  startHandTimer()
-  } catch (e) { if(isOnline()) handleConnectionFailure(e); else showHint(e.message || '发牌失败',2000) }
-  finally { dealing = false; networkBusy.value = false }
 }
 
 async function getNextDraw() {
@@ -1551,6 +1549,7 @@ onMounted(() => {
 })
 
 onShow(() => {
+  pageVisible = true
   if(isOnline()) uni.getNetworkType({success:r=>{if(r.networkType==='none')handleConnectionFailure()}})
   // 清除缓存，强制重新读取最新的设置
   try {
@@ -1576,8 +1575,9 @@ onShow(() => {
   }
 
   currentUser.value = getCurrentUser() || null
-  loadSession()
+  if (!dealing.value) loadSession()
   applyLatestModePreference()
+  if (handSettled.value && settledResult.value === 'success' && !successAdvanceTimer) nextHand()
   startHandTimer()
   try { refreshSafeArea() } catch (_) {}
   requestLayoutMeasure()
@@ -1587,10 +1587,12 @@ onShow(() => {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
 })
-onHide(() => { saveSession(); stopHandTimer(); closeTimerPopover() })
+onHide(() => { pageVisible = false; saveSession(); pauseHandTimer(); closeTimerPopover() })
 onUnmounted(() => {
   pageAlive = false
-  if(isOnline()) cancelOnlineRound().catch(()=>{})
+  clearTimeout(successAdvanceTimer)
+  clearTimeout(errorFeedbackTimer)
+  if(isOnline() && !handRecorded.value) cancelOnlineRound().catch(()=>{})
   try {
     if (typeof uni.$off === 'function') {
       uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange)
@@ -1598,7 +1600,7 @@ onUnmounted(() => {
       uni.$off('tf24:gameplay-prefs-changed', handleGameplayPrefsChange)
     }
   } catch (_) {}
-  stopHandTimer()
+  pauseHandTimer()
   if (layoutTimer) {
     try { clearTimeout(layoutTimer) } catch (_) {}
     layoutTimer = null
@@ -1612,6 +1614,7 @@ async function persistOnline(arg, kind) {
   try {
     if(!hasOnlineRound())throw new Error('请重新开局')
     const result = await finishOnlineRound(arg,kind)
+    if (!result.settled || result.success !== arg.success) throw new Error('判定结果不一致，请重新开局')
     updateLastSuccess()
     return result
   } catch(e) { handleConnectionFailure(e); return null }
@@ -1632,173 +1635,83 @@ function updateLastSuccess() {
 }
 
 function resetHandStateForNext() {
-  handSettled.value = false;
-  settledResult.value = null;
-  handFailedOnce.value = false;
-  // 不要在这里重置 handRecorded，因为有些逻辑需要知道上一局是否已记录
-  // handRecorded.value = false;
-  timeoutRecorded.value = false;
-  handStoppedAtTs.value = 0;
-  attemptCount.value = 0;
-  hintWasUsed.value = false;
-  errorValueText.value = '';
-  exprOverrideText.value = '';
-  // handStartTs 在发新题时重置
+  clearTimeout(errorFeedbackTimer)
+  handSettled.value = false
+  settledResult.value = null
+  handRecorded.value = false
+  longTimeNotified.value = false
+  handStoppedAtTs.value = 0
+  attemptCount.value = 0
+  hintWasUsed.value = false
+  errorAnimating.value = false
+  errorValueText.value = ''
+  exprOverrideText.value = ''
 }
 
-async function settleHandResult({ ok, expression, valueFraction, stats, origin, allowRetry = false }) {
-  if (networkBusy.value || dealing) return
-  // Start server-authoritative settlement without blocking the local verdict UI.
-  // networkBusy prevents duplicate submissions until the response is received.
-  const onlineSettlement = isOnline() && !handRecorded.value
-    ? persistOnline({ success:ok, expr:expression }, 'answer')
-    : null
-  const exprStr = expression || ''
-  const statsData = stats || statsFromExpressionString(exprStr)
-  const value = valueFraction || (exprStr ? evaluateExprToFraction(exprStr) : null)
-  const retriesSuccess = origin === 'pro' ? Math.max(0, (attemptCount.value || 1) - 1) : 0
-  const retriesFail = origin === 'pro' ? (attemptCount.value || 0) : 0
-  const retryableFailure = allowRetry && !ok
-  if (!retryableFailure) freezeHandTimer()
+// A wrong answer is only an attempt. Only answer/skip/hint can close a hand.
+function finishHand({ success, kind, expression, stats }) {
+  if (handSettled.value || !handReady.value || dealing.value || !pageAlive) return false
+  freezeHandTimer()
+  handSettled.value = true
+  settledResult.value = success ? 'success' : 'fail'
+  handRecorded.value = true
+  clearTimeout(errorFeedbackTimer)
+  errorAnimating.value = false
   const elapsed = currentHandElapsedMs()
-
-  const recordRound = (success) => {
-    if (!isOnline() && selectedUserId.value) {
-      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success }) } catch (_) {}
-    }
-    try {
-      if (!isOnline()) pushRound({
-        success,
-        timeMs: elapsed,
-        hintUsed: !!hintWasUsed.value,
-        retries: success ? retriesSuccess : retriesFail,
-        ops: statsData.ops,
-        exprLen: statsData.exprLen,
-        maxDepth: statsData.maxDepth,
-        faceUseHigh: !!faceUseHigh.value,
-        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-        expr: exprStr,
-      })
-      try { scheduleTabWarmup({ delay: 200 }) } catch (_) {}
-      if (success) updateLastSuccess()
-    } catch (_) {}
+  const statsData = stats || statsFromExpressionString(expression || '')
+  if (!isOnline() || currentHandSource.value !== 'mistake') {
+    handsPlayed.value += 1
+    if (success) successCount.value += 1
+    else failCount.value += 1
   }
-
-  const scheduleSuccessAdvance = () => {
-    setTimeout(() => {
-      successAnimating.value = false
-      if (onlineSettlement) {
-        onlineSettlement.then((result) => {
-          if (result) nextHand()
-        })
-      } else {
-        nextHand()
-      }
-    }, 500)
-  }
-
-  if (ok) {
-    if (isOnline() && handRecorded.value) { nextHand(); return }
-    const timedOut = timeoutRecorded.value
-    errorValueText.value = ''
-    if (timedOut) {
-      if (handSettled.value && settledResult.value === 'success') {
-        try { saveSession() } catch (_) {}
-        return
-      }
-      handSettled.value = true
-      settledResult.value = 'success'
-      try {
-        successAnimating.value = true
-        scheduleSuccessAdvance()
-      } catch (_) { nextHand() }
-      try { saveSession() } catch (_) {}
-      return
+  if (isOnline()) {
+    pendingSettlement = persistOnline({ success, expr: expression || '' }, kind)
+  } else {
+    if (selectedUserId.value) {
+      recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success })
     }
-    if (origin === 'basic' && handFailedOnce.value) {
-      try {
-        successAnimating.value = true
-        setTimeout(() => { successAnimating.value = false }, 500)
-      } catch (_) {}
-      try { saveSession() } catch (_) {}
-      return
-    }
-
-    if (handSettled.value) {
-      if (settledResult.value === 'success') {
-        try { saveSession() } catch (_) {}
-        return
-      }
-      try {
-        successAnimating.value = true
-        scheduleSuccessAdvance()
-      } catch (_) { nextHand() }
-      try { saveSession() } catch (_) {}
-      return
-    }
-
-    handSettled.value = true
-    settledResult.value = 'success'
-    handRecorded.value = true
-    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
-    if (!isOnline() || currentHandSource.value !== 'mistake') successCount.value += 1
-    recordRound(true)
-    try {
-      successAnimating.value = true
-      scheduleSuccessAdvance()
-    } catch (_) { nextHand() }
-    try { saveSession() } catch (_) {}
-    return
+    pushRound({
+      success,
+      timeMs: elapsed,
+      hintUsed: !!hintWasUsed.value,
+      retries: Math.max(0, attemptCount.value - (success ? 1 : 0)),
+      ops: statsData.ops,
+      exprLen: statsData.exprLen,
+      maxDepth: statsData.maxDepth,
+      faceUseHigh: !!faceUseHigh.value,
+      hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
+      expr: expression || '',
+    })
+    updateLastSuccess()
   }
+  saveSession()
+  scheduleTabWarmup({ delay: 200 })
+  return true
+}
 
-  const updateErrorValue = () => {
-    try {
-      if (value && typeof value.toString === 'function') {
-        errorValueText.value = '结果：' + value.toString()
-      } else {
-        errorValueText.value = ''
-      }
-    } catch (_) {
-      errorValueText.value = ''
-    }
-  }
-
-  if (retryableFailure) {
-    updateErrorValue()
-    if (!handFailedOnce.value) {
-      handFailedOnce.value = true
-      settledResult.value = 'fail'
-      handRecorded.value = true
-      if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
-      if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
-      recordRound(false)
-    }
-    try {
-      errorAnimating.value = true
-      setTimeout(() => { errorAnimating.value = false }, 500)
-    } catch (_) {}
-    try { saveSession() } catch (_) {}
-    return
-  }
-
-  updateErrorValue()
-  if (!handSettled.value) {
-    handSettled.value = true
-    settledResult.value = 'fail'
-    handRecorded.value = true
-    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
-    if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
-    recordRound(false)
-  }
-  try {
+function settleHandResult({ ok, expression, valueFraction, stats }) {
+  if (!canEditHand.value) return
+  attemptCount.value += 1
+  if (!ok) {
+    errorValueText.value = valueFraction ? '结果：' + valueFraction.toString() : '表达式不合法'
+    clearTimeout(errorFeedbackTimer)
     errorAnimating.value = true
-    setTimeout(() => { errorAnimating.value = false }, 500)
-  } catch (_) {}
-  try { saveSession() } catch (_) {}
+    errorFeedbackTimer = setTimeout(() => { errorAnimating.value = false }, 500)
+    saveSession()
+    return
+  }
+  if (!finishHand({ success: true, kind: 'answer', expression, stats })) return
+  errorValueText.value = ''
+  successAnimating.value = true
+  successAdvanceTimer = setTimeout(() => {
+    successAdvanceTimer = null
+    successAnimating.value = false
+    if (pageAlive && pageVisible) nextHand()
+  }, 500)
 }
 
 function check() {
-  if (networkBusy.value || dealing) return
+  if (!canEditHand.value) return
   const usedCount = usedByCard.value.reduce((a, b) => a + (b ? 1 : 0), 0)
   errorValueText.value = ''
   if (usedCount !== 4 || !isExpressionComplete(tokens.value)) {
@@ -1812,7 +1725,6 @@ function check() {
     return
   }
 
-  attemptCount.value += 1
   const v = evaluateExprToFraction(s)
   const ok = (v && v.equalsInt && v.equalsInt(24))
   settleHandResult({
@@ -1824,102 +1736,39 @@ function check() {
   })
 }
 
-async function showSolution() {
-  if (networkBusy.value || dealing) return
-  freezeHandTimer()
-  if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'hint')) return
+function showSolution() {
+  if (!handReady.value || dealing.value || successAnimating.value) return
+  if (handSettled.value && !hintWasUsed.value) return
   hintWasUsed.value = true
-
-  // 兜底：若 solution 为空，尝试即时计算一份
+  finishHand({ success: false, kind: 'hint', expression: expr.value })
   if (!solution.value) {
-    try {
-      const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
-      solution.value = mapped.length === 4 ? solve24(mapped) : null
-    } catch (_) { solution.value = null }
+    const mapped = (cards.value || []).map(c => mapCardRank(c.rank, faceUseHigh.value))
+    solution.value = mapped.length === 4 ? solve24(mapped) : null
   }
-
-  if (!handRecorded.value) {
-    handRecorded.value = true
-    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
-    if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
-    try {
-      const stats = computeExprStats(tokens.value)
-      if (!isOnline()) pushRound({
-        success: false,
-        timeMs: currentHandElapsedMs(),
-        hintUsed: true,
-        retries: attemptCount.value || 0,
-        ops: stats.ops,
-        exprLen: stats.exprLen,
-        maxDepth: stats.maxDepth,
-        faceUseHigh: !!faceUseHigh.value,
-        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-        expr: expr.value,
-      })
-      updateLastSuccess()
-    } catch (_) {}
-    if (!isOnline() && selectedUserId.value) {
-      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
-    }
-  }
+  const msg = solution.value ? '答案：' + solution.value : '暂无提示'
   if (mode.value === 'basic') {
-    handFailedOnce.value = true
-    const msg = solution.value ? ('答案：' + solution.value) : '暂无提示'
     basicDisplayExpression.value = msg
     showHint(msg, 2000)
   } else {
-    exprOverrideText.value = solution.value ? ('答案：' + solution.value) : '暂无提示'
+    exprOverrideText.value = msg
   }
-  try { saveSession() } catch (_) {}
+  saveSession()
 }
 
 async function skipHand() {
-  if (skipInProgress.value || networkBusy.value || dealing) return
-  freezeHandTimer()
-  if (isOnline() && !handRecorded.value && !await persistOnline({success:false,expr:expr.value}, 'skip')) return
+  if (skipInProgress.value || dealing.value || successAnimating.value || !handReady.value) return
   skipInProgress.value = true
-
-  // 只有在本局未记录的情况下才记录失败
-  if (!handRecorded.value) {
-    handRecorded.value = true
-    handSettled.value = true
-    settledResult.value = 'fail'
-    handFailedOnce.value = true
-    if (!isOnline() || currentHandSource.value !== 'mistake') handsPlayed.value += 1
-    if (!isOnline() || currentHandSource.value !== 'mistake') failCount.value += 1
-    try {
-      const stats = computeExprStats(tokens.value)
-      if (!isOnline()) pushRound({
-        success: false,
-        timeMs: currentHandElapsedMs(),
-        hintUsed: !!hintWasUsed.value,
-        retries: attemptCount.value || 0,
-        ops: stats.ops,
-        exprLen: stats.exprLen,
-        maxDepth: stats.maxDepth,
-        faceUseHigh: !!faceUseHigh.value,
-        hand: { cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })) },
-        expr: expr.value,
-      })
-      updateLastSuccess()
-    } catch (_) {}
-    if (!isOnline() && selectedUserId.value) {
-      try { recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success: false }) } catch (_) {}
-    }
-  }
-
   try {
+    // After viewing the answer this is navigation only, never a second failure.
+    if (!handSettled.value) finishHand({ success: false, kind: 'skip', expression: expr.value })
     await nextHand()
   } finally {
-    // 使用setTimeout延迟重置，避免快速连击导致的重复调用
-    setTimeout(() => {
-      skipInProgress.value = false
-    }, 300)
+    skipInProgress.value = false
   }
 }
 
 function reshuffle() {
-  if(networkBusy.value || dealing) return
+  if(networkBusy.value || dealing.value) return
   resetServerDeck = true
   // 主动重洗：不计失败，清零本副统计并开始新副牌
   initDeck()
@@ -1991,6 +1840,7 @@ function goSettings() {
 }
 
 function startDrag(token, e) {
+  if (!canEditHand.value) return
   drag.value.active = true
   drag.value.token = token
   const p = pointFromEvent(e)
@@ -2540,7 +2390,7 @@ onShareTimeline(() => {
 .stats-secondary { display:flex; flex-wrap:wrap; gap:8rpx 16rpx; padding:0 4rpx; color:var(--tf24-muted); font-size:22rpx; font-weight:700; }
 .stats-secondary .ok { color:var(--tf24-primary); }
 .stats-secondary .fail { color:var(--tf24-danger); }
-.timer-fail-text { color:var(--tf24-danger); font-weight:800; font-size:30rpx; }
+.next-hand-loading { position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center; background:var(--tf24-bg, #f6f3ea); color:var(--tf24-ink, #263c32); font-size:32rpx; }
 .hint-settled-note { display:block; padding:14rpx 4rpx 0; color:var(--tf24-danger); font-size:24rpx; font-weight:700; text-align:center; }
 
 .basic-mode { display:flex; flex-direction:column; gap:18rpx; flex:1; min-height:0; overflow:hidden; }

@@ -156,7 +156,9 @@ test('void, superseded sessions and wrong answers cannot become successful score
     success: true,
   })
   assert.equal(bad.data.success, false)
-  assert.equal(bad.data.total.total, 1)
+  assert.equal(bad.data.settled, false)
+  assert.equal(h.tables().tf24_stats[h.uid() + '_all'].total, 0)
+  assert.equal(h.tables().tf24_sessions[h.uid()].status, 'open')
 })
 test('mistake repeats update mastery only; history and rankings remain unchanged', async () => {
   const h = harness()
@@ -217,4 +219,41 @@ test('leaderboard masks other names, omits avatars and ids, and includes own ful
   assert.equal(stranger.avatar, undefined)
   assert.equal(r.data.rows[0].rank, 1)
   assert.equal(r.data.rows[1].rank, 1)
+})
+
+for (const mode of ['basic', 'pro']) {
+  test(`${mode}: wrong attempts and timeout leave the round open; a late correct answer settles once`, async () => {
+    const h = harness()
+    await h.call({ action: 'login' })
+    const r = (await h.call({ action: 'start', high: true, mode })).data
+    h.tables().tf24_sessions[h.uid()].startedAt = Date.now() - 130000
+    for (const kind of ['answer', 'answer', 'timeout']) {
+      const response = await h.call({ action: 'finish', id: r.id, kind, expr: '24' })
+      assert.equal(response.data.settled, false)
+      assert.equal(h.tables().tf24_stats[h.uid() + '_all'].total, 0)
+      assert.equal(Object.keys(h.tables().tf24_users[h.uid()].book.active).length, 0)
+      assert.equal(h.tables().tf24_sessions[h.uid()].status, 'open')
+    }
+    const result = await h.call({ action: 'finish', id: r.id, kind: 'answer', expr: solve24(r.cards.map(c => c.rank)) })
+    assert.equal(result.data.success, true)
+    assert.equal(result.data.settled, true)
+    assert.ok(result.data.round.timeMs >= 130000)
+    assert.equal(result.data.total.total, 1)
+    assert.equal(result.data.total.fail, 0)
+    assert.equal((await h.call({ action: 'finish', id: r.id, kind: 'skip' })).data.total.total, 1)
+  })
+}
+
+test('view answer then skip or solve remains one failed round with its original time', async () => {
+  const h = harness()
+  await h.call({ action: 'login' })
+  const r = (await h.call({ action: 'start', high: true })).data
+  const hint = (await h.call({ action: 'finish', id: r.id, kind: 'hint' })).data
+  for (const kind of ['skip', 'answer', 'hint']) {
+    const response = (await h.call({ action: 'finish', id: r.id, kind, expr: solve24(r.cards.map(c => c.rank)) })).data
+    assert.equal(response.success, false)
+    assert.equal(response.total.total, 1)
+    assert.equal(response.total.fail, 1)
+    assert.equal(response.round.timeMs, hint.round.timeMs)
+  }
 })
