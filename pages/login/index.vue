@@ -1,36 +1,49 @@
 <template>
-  <view class="entry"
-    ><AppNavBar title="24 点" :show-back="false" />
+  <view class="entry">
+    <AppNavBar title="24 点" :show-back="false" />
     <view class="entry-body">
-      <text class="eyebrow">TWENTY FOUR</text
-      ><text class="hero">四张纸牌，
+      <text class="eyebrow">TWENTY FOUR</text>
+      <text class="hero">四张纸牌，
 无限可能。</text>
       <text class="intro">用加减乘除，让答案成为 24。</text>
-      <view class="mode-card"
-        ><text class="card-title">微信在线挑战</text
-        ><text class="copy"
-          >云端保存战绩、错题和设置，换设备继续。
-参与成功率与最快时间排名，榜单匿名展示。</text
-        >
+
+      <view class="mode-card">
+        <text class="card-title">在线挑战</text>
+        <text class="copy">微信身份用于登录和找回帐号。每个微信身份对应一个在线帐号，无需密码；首次登录后可选择或自定义头像和昵称。</text>
         <button class="primary" :loading="busy" :disabled="busy" @tap="openProfile">
           微信登录
         </button>
       </view>
-      <view class="mode-card practice"
-        ><text class="card-title">本地练习</text
-        ><text class="copy">无需帐号，无需联网。练习记录只留在本机。</text
-        ><button :disabled="busy" @tap="practice">开始练习</button></view
-      >
+
+      <view class="mode-card practice">
+        <text class="card-title">本地练习</text>
+        <text class="copy">无需帐号，无需联网。练习记录只留在本机。</text>
+        <view class="practice-stats">
+          <view class="stat-item">
+            <text class="stat-value">{{ practiceTotal }}</text>
+            <text class="stat-label">已完成</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-value">{{ practiceRate }}%</text>
+            <text class="stat-label">正确率</text>
+          </view>
+          <view class="stat-item">
+            <text class="stat-value">{{ practiceAverage }}</text>
+            <text class="stat-label">平均用时</text>
+          </view>
+        </view>
+        <text v-if="!practiceTotal" class="empty-stats">还没有本地练习记录</text>
+        <button :disabled="busy" @tap="practice">开始本地练习</button>
+      </view>
+
       <text v-if="error" class="error">{{ error }}</text>
-      <text class="foot"
-        >原本地帐号记录已合并保留在练习模式中。
-在线成绩从登录后开始累计。</text
-      >
+      <text class="foot">在线成绩从微信身份登录后开始累计。本地练习数据与在线帐号相互独立。</text>
     </view>
+
     <view v-if="profileOpen" class="modal-mask">
       <view class="profile-modal">
-        <text class="modal-title">确认在线资料</text>
-        <text class="modal-copy">选择微信头像和昵称，或自行填写。你可以之后在“用户”页面修改。</text>
+        <text class="modal-title">确认在线帐号资料</text>
+        <text class="modal-copy">此微信身份对应一个在线帐号。选择微信头像和昵称，或自行设置；之后可在“用户”页面修改。</text>
         <button
           class="avatar-picker"
           open-type="chooseAvatar"
@@ -58,17 +71,29 @@
         <button class="cancel-button" :disabled="busy" @tap="cancelProfile">暂不登录</button>
       </view>
     </view>
-
   </view>
 </template>
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import AppNavBar from '../../components/AppNavBar.vue'
-import { ensureInit } from '../../utils/store.js'
+import { ensureInit, readStats } from '../../utils/store.js'
 import { loginOnline, saveProfile, enterPractice } from '../../utils/online.js'
 ensureInit()
 const busy = ref(false),
-  error = ref('')
+  error = ref(''),
+  practiceStats = ref(readStats())
+const practiceTotal = computed(() => Number(practiceStats.value?.totals?.total) || 0)
+const practiceRate = computed(() => {
+  const total = practiceTotal.value
+  return total ? Math.round((100 * (Number(practiceStats.value?.totals?.success) || 0)) / total) : 0
+})
+const practiceAverage = computed(() => {
+  const rounds = practiceStats.value?.rounds || []
+  const completed = rounds.filter((round) => Number.isFinite(round.timeMs) && round.timeMs > 0)
+  if (!completed.length) return '—'
+  const average = completed.reduce((sum, round) => sum + round.timeMs, 0) / completed.length
+  return average < 1000 ? (average / 1000).toFixed(1) + '秒' : Math.round(average / 1000) + '秒'
+})
 function practice() {
   enterPractice()
   uni.reLaunch({ url: '/pages/index/index' })
@@ -179,6 +204,34 @@ button {
 .primary {
   background: #275c48;
   color: white;
+}
+.practice-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24rpx;
+  padding: 22rpx 8rpx;
+  border-radius: 18rpx;
+  background: #f5f3e9;
+}
+.stat-item {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+}
+.stat-value {
+  color: #275c48;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+.stat-label, .empty-stats {
+  margin-top: 8rpx;
+  color: #738077;
+  font-size: 22rpx;
+}
+.empty-stats {
+  display: block;
+  text-align: center;
 }
 .foot {
   margin-top: 32rpx;
