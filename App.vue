@@ -1,5 +1,5 @@
 <script>
-import { initializeCloudListeners } from './utils/online.js'
+import { initializeCloudListeners, flushOnlineResults } from './utils/online.js'
 import { scheduleTabWarmup } from './utils/tab-cache.js'
 
 export default {
@@ -16,7 +16,7 @@ export default {
     } catch (e) {}
   },
   onShow() {},
-  onHide() {},
+  onHide() { flushOnlineResults().catch(() => {}) },
   // 全局分享给好友
   onShareAppMessage() {
     return {

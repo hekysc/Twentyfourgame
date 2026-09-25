@@ -7,7 +7,7 @@ ENV = os.environ.get('CLOUDBASE_ENV_ID', 'twentyfour-d6g4wbv3c4f226753')
 REGION = 'ap-shanghai'
 OAUTH = 'https://tcb-api.cloud.tencent.com/qcloud-tcb/v1/oauth'
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-COLLECTIONS = ['tf24_users', 'tf24_stats', 'tf24_rounds', 'tf24_sessions']
+COLLECTIONS = ['tf24_users', 'tf24_stats', 'tf24_rounds', 'tf24_sessions', 'tf24_question_batches']
 
 def private_write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)

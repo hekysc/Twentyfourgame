@@ -67,6 +67,35 @@ function draw(deck, high) {
   }
   throw new Error('暂时无法发牌，请重试')
 }
+function drawPack() {
+  let deck = freshDeck()
+  const questions = []
+  for (let i = 0; i < 13 && deck.length >= 4; i++) {
+    const ids = new Set()
+    let hand = null
+    for (let attempt = 0; attempt < 400 && !hand; attempt++) {
+      ids.clear()
+      while (ids.size < 4) ids.add(Math.floor(Math.random() * deck.length))
+      const cards = [...ids].map((index) => deck[index])
+      const low = cards.map((card) => (card.rank > 10 ? 1 : card.rank))
+      const high = cards.map((card) => card.rank)
+      const solutionLow = solve24(low)
+      const solutionHigh = solve24(high)
+      if (solutionLow && solutionHigh) {
+        hand = {
+          cards,
+          deck: deck.filter((_, index) => !ids.has(index)),
+        }
+      }
+    }
+    // Discard any unsolvable remainder rather than crossing into a new deck.
+    if (!hand) break
+    deck = hand.deck
+    questions.push({ cards: hand.cards, remaining: deck.length })
+  }
+  if (questions.length) questions[questions.length - 1].remaining = 0
+  return questions
+}
 function emptyAggregate(uid, period) {
   return {
     uid,
@@ -144,6 +173,7 @@ module.exports = {
   weekKey,
   validExpression,
   draw,
+  drawPack,
   emptyAggregate,
   updateAggregate,
   ranked,

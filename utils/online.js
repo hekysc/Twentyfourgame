@@ -2,7 +2,6 @@ import {
   currentIdentity,
   isOnline,
   setOnlineIdentity,
-  storageScope,
 } from './identity.js'
 import { readJSON, writeJSON, emptyStats } from './migration.js'
 import { replaceOnlineStats } from './store.js'
@@ -11,11 +10,16 @@ import { clearTabCache } from './tab-cache.js'
 export const CLOUD_ENV = 'twentyfour-d6g4wbv3c4f226753'
 let initialized = false,
   listeners = false,
-  currentRound = null,
   epoch = 0,
   prefsTimer = null,
   prefsChain = Promise.resolve(),
   pendingPrefs = null,
+  deckOwner = '',
+  deckState = null,
+  activeQuestion = null,
+  resultTimer = null,
+  resultFlush = null,
+  resultRetryDelay = 3000,
   activeSyncRequests = 0,
   syncStatus = { status: 'synced', retryable: false }
 function publishSyncStatus(status, retryable = false) {
@@ -36,6 +40,7 @@ function endSync(success, retryable = false) {
 }
 export async function retryCloudSync() {
   try { await flushPrefs() } catch (_) {}
+  try { await flushOnlineResults() } catch (_) {}
 }
 function sdk() {
   if (typeof wx === 'undefined' || !wx.cloud)
@@ -99,8 +104,11 @@ export async function loginOnline() {
   } while (cursor)
   setOnlineIdentity(snapshot.user)
   epoch++
-  currentRound = null
+  activeQuestion = null
+  deckOwner = ''
+  deckState = null
   applySnapshot(snapshot, rounds)
+  flushOnlineResults().catch(() => {})
   return snapshot.user
 }
 export async function refreshOnline() {
@@ -116,77 +124,182 @@ export async function refreshOnline() {
   } while (cursor)
   if (stamp !== epoch) return
   setOnlineIdentity(snapshot.user)
+  activeQuestion = null
+  deckOwner = ''
+  deckState = null
   applySnapshot(snapshot, rounds)
+  flushOnlineResults().catch(() => {})
 }
 export function enterPractice() {
-  if (currentRound && isOnline())
-    cloudCall('void', { id: currentRound.id }).catch(() => {})
   epoch++
-  currentRound = null
+  activeQuestion = null
   setOnlineIdentity(null)
   clearTabCache()
   restorePrefs(readJSON('tf24_prefs:practice', {}))
 }
 export function hasOnlineRound() {
-  return !!currentRound
+  return !!activeQuestion
 }
-export async function beginOnlineRound(options) {
-  const stamp = epoch
-  beginSync()
-  try {
-    const r = await cloudCall('start', options)
-    if (stamp !== epoch) throw new Error('在线题目已作废')
-    currentRound = r
-    endSync(true)
-    return r
-  } catch (e) {
-    endSync(false)
-    throw e
-  }
-}
-export async function finishOnlineRound(arg, kind) {
-  if (!isOnline() || !currentRound) throw new Error('请重新开始在线题目')
-  const stamp = epoch,
-    id = currentRound.id
-  beginSync()
-  let res
-  try {
-    res = await cloudCall('finish', { id, kind, expr: arg.expr || '' })
-    if (stamp !== epoch) throw new Error('网络中断，当局不计入统计')
-  } catch (e) {
-    endSync(false)
-    throw e
-  }
-  endSync(true)
-  if (res.settled === false) return res
+function deckKey(uid) { return `tf24_online_deck:${uid}` }
+function outboxKey(uid) { return `tf24_online_outbox:${uid}` }
+function loadDeckState() {
   const uid = currentIdentity().id
-  writeJSON('mistakes:' + uid, res.book)
-  if (res.round) {
-    const st = readJSON(`tf24_stats:${storageScope()}`, emptyStats())
-    if (!st.rounds.some((r) => r.id === res.round.id)) {
-      st.rounds.push(res.round)
-      const day = new Date(res.round.ts + 8 * 3600000)
-          .toISOString()
-          .slice(0, 10),
-        d = (st.days[day] ||= { total: 0, success: 0, fail: 0 })
-      d.total++
-      d[res.round.success ? 'success' : 'fail']++
-    }
-    st.totals = {
-      total: res.total.total,
-      success: res.total.success,
-      fail: res.total.fail,
-    }
-    st.agg.bestTimeMs = res.total.bestTimeMs
-    replaceOnlineStats(st)
-  }
-  clearTabCache()
-  return res
+  if (deckOwner === uid && deckState) return deckState
+  deckOwner = uid
+  deckState = readJSON(deckKey(uid), { current: null, next: null })
+  if (!deckState || typeof deckState !== 'object') deckState = { current: null, next: null }
+  activeQuestion = null
+  return deckState
 }
-export async function cancelOnlineRound() {
-  const r = currentRound
-  currentRound = null
-  if (r && isOnline()) await cloudCall('void', { id: r.id })
+function saveDeckState() {
+  if (deckOwner && deckState) writeJSON(deckKey(deckOwner), deckState)
+}
+async function fetchDeckBatch(high, closeBatchId = '') {
+  const batch = await cloudCall('prefetch', { high: !!high, closeBatchId })
+  return { ...batch, index: 0 }
+}
+let prefetchPromise = null
+async function ensureFollowingBatch(high, closeBatchId = '') {
+  if (deckState?.next) return deckState.next
+  if (!prefetchPromise) {
+    prefetchPromise = fetchDeckBatch(high, closeBatchId)
+      .then((batch) => {
+        loadDeckState().next = batch
+        saveDeckState()
+        return batch
+      })
+      .finally(() => { prefetchPromise = null })
+  }
+  return prefetchPromise
+}
+export async function nextOnlineQuestion(high) {
+  const state = loadDeckState()
+  if (!state.current || state.current.index >= state.current.questions.length) {
+    if (state.next) state.current = state.next
+    else state.current = await ensureFollowingBatch(high, state.current?.id || '')
+    state.next = null
+  }
+  if (!state.current || !state.current.questions?.length) throw new Error('预发题库为空，请重试')
+  const batch = state.current
+  const question = batch.questions[batch.index++]
+  saveDeckState()
+  activeQuestion = { ...question, batchId: batch.id }
+  if (batch.index >= batch.questions.length) ensureFollowingBatch(high, batch.id).catch(() => {})
+  return activeQuestion
+}
+function applyQueuedRound(event) {
+  const uid = currentIdentity().id
+  const key = `tf24_stats:online:${uid}`
+  const st = readJSON(key, emptyStats())
+  if (st.rounds.some((r) => r.id === event.questionId)) return
+  const success = event.kind === 'answer'
+  const ts = Date.now()
+  const round = {
+    id: event.questionId,
+    ts,
+    uid,
+    success,
+    timeMs: event.timeMs,
+    expr: event.expr || '',
+    hand: { cards: event.cards || [] },
+    faceUseHigh: !!event.high,
+    hintUsed: event.kind === 'hint',
+    mode: event.mode,
+  }
+  const day = new Date(ts + 8 * 3600000).toISOString().slice(0, 10)
+  st.days[day] ||= { total: 0, success: 0, fail: 0 }
+  for (const counter of [st.totals, st.days[day]]) {
+    counter.total++
+    counter[success ? 'success' : 'fail']++
+  }
+  st.rounds.push(round)
+  if (success) st.agg.bestTimeMs = Math.min(st.agg.bestTimeMs ?? Infinity, event.timeMs)
+  writeJSON(key, st)
+}
+function applySyncedRound(uid, round) {
+  if (!round?.id) return
+  const key = `tf24_stats:online:${uid}`
+  const st = readJSON(key, emptyStats())
+  if (st.rounds.some((item) => item.id === round.id)) return
+  const day = new Date(round.ts + 8 * 3600000).toISOString().slice(0, 10)
+  st.days[day] ||= { total: 0, success: 0, fail: 0 }
+  for (const counter of [st.totals, st.days[day]]) {
+    counter.total++
+    counter[round.success ? 'success' : 'fail']++
+  }
+  st.rounds.push(round)
+  st.rounds.sort((a, b) => a.ts - b.ts)
+  if (round.success) st.agg.bestTimeMs = Math.min(st.agg.bestTimeMs ?? Infinity, round.timeMs)
+  writeJSON(key, st)
+}
+export function finishOnlineRound(arg, kind) {
+  if (!isOnline() || !activeQuestion) throw new Error('当前没有可结算的预发题目')
+  const question = activeQuestion
+  const event = {
+    batchId: question.batchId,
+    questionId: question.id,
+    kind,
+    expr: arg.expr || '',
+    timeMs: Math.max(1, Math.floor(Number(arg.timeMs) || 1)),
+    mode: arg.mode === 'pro' ? 'pro' : 'basic',
+    practice: !!arg.practice,
+    mistakeKey: arg.mistakeKey || '',
+    high: !!arg.high,
+    cards: arg.cards || question.cards,
+  }
+  const uid = currentIdentity().id
+  const outbox = readJSON(outboxKey(uid), [])
+  if (!outbox.some((item) => item.questionId === event.questionId)) {
+    outbox.push(event)
+    writeJSON(outboxKey(uid), outbox)
+    activeQuestion = null
+    if (!event.practice) applyQueuedRound(event)
+  } else {
+    activeQuestion = null
+  }
+  if (outbox.length >= 5) flushOnlineResults().catch(() => {})
+  else {
+    clearTimeout(resultTimer)
+    resultTimer = setTimeout(() => flushOnlineResults().catch(() => {}), 1500)
+  }
+  return { settled: true, success: kind === 'answer', queued: true }
+}
+export async function flushOnlineResults() {
+  if (!isOnline() || resultFlush) return resultFlush
+  clearTimeout(resultTimer)
+  const uid = currentIdentity().id
+  resultFlush = (async () => {
+    let pending = readJSON(outboxKey(uid), [])
+    while (pending.length) {
+      const chunk = pending.slice(0, 13)
+      beginSync()
+      try {
+        const response = await cloudCall('syncBatch', { results: chunk })
+        const accepted = new Set((response.settled || []).filter((r) => r.settled).map((r) => r.questionId))
+        const permanent = new Set((response.settled || [])
+          .filter((r) => !r.settled && /过期|不属于此预发批次/.test(r.error || ''))
+          .map((r) => r.questionId))
+        for (const result of response.settled || []) {
+          if (!result.settled) continue
+          if (result.round) applySyncedRound(uid, result.round)
+          if (result.book) writeJSON(`mistakes:${uid}`, result.book)
+        }
+        pending = pending.filter((item) => !accepted.has(item.questionId) && !permanent.has(item.questionId))
+        writeJSON(outboxKey(uid), pending)
+        if (accepted.size + permanent.size !== chunk.length) throw new Error('部分答题记录尚未确认')
+        resultRetryDelay = 3000
+        endSync(true)
+        if (permanent.size) publishSyncStatus('error', false)
+      } catch (e) {
+        endSync(false, true)
+        clearTimeout(resultTimer)
+        resultTimer = setTimeout(() => flushOnlineResults().catch(() => {}), resultRetryDelay)
+        resultRetryDelay = Math.min(60000, resultRetryDelay * 2)
+        throw e
+      }
+    }
+  })().finally(() => { resultFlush = null })
+  return resultFlush
 }
 export async function saveProfile(name, avatarPath) {
   let avatar = avatarPath || ''
@@ -233,35 +346,14 @@ export async function flushPrefs() {
     throw e
   }
 }
-let offlinePrompt = false
-export function handleConnectionFailure(error) {
-  if (!isOnline() || offlinePrompt) return
-  offlinePrompt = true
-  const r = currentRound
-  currentRound = null
-  // An unfinished server session is invalidated before a later login starts a fresh one.
-  if (r) writeJSON('tf24_void_pending', r)
-  epoch++
-  setOnlineIdentity(null)
-  clearTabCache()
-  uni.showModal({
-    title: '在线题目已中止',
-    content:
-      '当前题目不计入统计。可进入本地练习，联网后重新登录并开局。' +
-      (error?.message ? '\n' + error.message : ''),
-    showCancel: false,
-    confirmText: '返回入口',
-    complete: () => {
-      offlinePrompt = false
-      uni.reLaunch({ url: '/pages/login/index' })
-    },
-  })
-}
 export function initializeCloudListeners() {
   if (listeners) return
   listeners = true
   uni.$on('tf24:prefs-save', queuePrefs)
   uni.onNetworkStatusChange?.((r) => {
-    if (!r.isConnected && isOnline()) handleConnectionFailure()
+    if (r.isConnected && isOnline()) {
+      flushPrefs().catch(() => {})
+      flushOnlineResults().catch(() => {})
+    }
   })
 }
