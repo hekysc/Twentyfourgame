@@ -27,7 +27,7 @@ async function harness({ online = false, mode = 'pro' } = {}) {
   const basic = await import('../core/basic-mode.js')
   let now = 1000, id = 0
   const timers = new Map(), records = [], requests = [], hints = []
-  const cloud = deferred(), draw = deferred()
+  const cloud = deferred()
   const cards = [1, 2, 3, 4].map((rank, i) => ({ rank, suit: ['S', 'H', 'D', 'C'][i] }))
   const ref = value => ({ value })
   const s = {
@@ -39,14 +39,14 @@ async function harness({ online = false, mode = 'pro' } = {}) {
     setInterval(fn, delay) { const n = ++id; timers.set(n, { at: now + delay, fn, interval: delay }); return n },
     clearInterval(n) { timers.delete(n) },
     isOnline: () => online, hasOnlineRound: () => true,
-    finishOnlineRound(arg, kind) { requests.push({ arg, kind }); return cloud.promise },
+    finishOnlineRound(arg, kind) { requests.push({ arg, kind }); return { settled:true, success:arg.success, queued:true } },
     handleConnectionFailure(e) { s.failure = e },
     pushRound(r) { records.push(r) }, recordRoundResult() {},
     saveSession() {}, updateLastSuccess() {}, scheduleTabWarmup() {},
     showHint(msg) { hints.push(msg) }, showExpressionErrorToast() { hints.push('invalid') },
     showBasicError() {}, applyPendingGameplayPrefs() {}, closeTimerPopover() {},
     updateExprHeight() {}, syncBasicOpsHeight() {}, nextTick: () => Promise.resolve(),
-    getNextDraw() { s.drawRequests++; return online ? draw.promise : Promise.resolve({cards, solution:'(1+3)×(2+4)'}) },
+    getNextDraw() { s.drawRequests++; return Promise.resolve({cards, solution:'(1+3)×(2+4)'}) },
     drawRequests: 0,
   }
   for (const [key, value] of Object.entries({dealing:false, handReady:true, networkBusy:false,
@@ -54,7 +54,7 @@ async function harness({ online = false, mode = 'pro' } = {}) {
     handStartTs:1000, nowTs:1000, handStoppedAtTs:0, attemptCount:0, hintWasUsed:false,
     errorAnimating:false, successAnimating:false, errorValueText:'', exprOverrideText:'',
     handsPlayed:0, successCount:0, failCount:0, selectedUserId:'local', currentHandNums:[1,2,3,4],
-    currentHandSource:'regular', currentMistakeKey:'', faceUseHigh:false, cards,
+    currentHandSource:'regular', currentMistakeKey:'', currentBatchId:'', currentQuestionId:'', faceUseHigh:false, cards,
     deck:[], solution:'(1+3)×(2+4)', tokens:[], usedByCard:[0,0,0,0], skipInProgress:false,
     mode, basicSelection:{first:null,operator:null}})) s[key] = ref(value)
   const state = basic.createBasicState(cards, false)
@@ -82,7 +82,7 @@ async function harness({ online = false, mode = 'pro' } = {}) {
     s.usedByCard.value = [1,1,1,1]
     s.check()
   }
-  return {s, advance, submit, cloud, draw, flush, cards, records, requests, hints}
+  return {s, advance, submit, cloud, flush, cards, records, requests, hints}
 }
 
 test('Pro wrong answers keep the original clock; correct answer freezes and advances exactly after 500ms', async () => {
@@ -133,21 +133,17 @@ test('answer reveal stops immediately and subsequent answer/skip cannot score th
   await h.s.skipHand(); assert.equal(h.records.length,1); assert.equal(h.s.drawRequests,1)
 })
 
-test('slow online settlement does not extend the clock or the 500ms success feedback', async () => {
+test('online result is queued locally and the next hand does not wait for CloudBase', async () => {
   const h = await harness({online:true})
   await h.advance(8000); h.submit('1+2+3+4')
   assert.equal(h.requests.length,0)
   await h.advance(15000); h.submit('(1+3)×(2+4)')
   assert.equal(h.requests.length,1); assert.equal(h.s.currentHandElapsedMs(),23000)
   await h.advance(500)
-  assert.equal(h.s.successAnimating.value,false); assert.equal(h.s.dealing.value,true)
-  assert.equal(h.s.drawRequests,0)
-  await h.advance(3000); assert.equal(h.s.currentHandElapsedMs(),23000)
-  h.cloud.resolve({settled:true,success:true}); await h.flush()
-  assert.equal(h.s.drawRequests,1); assert.equal(h.s.dealing.value,true)
-  await h.advance(2000); assert.equal(h.s.currentHandElapsedMs(),23000)
-  h.draw.resolve({cards:h.cards,solution:'(1+3)×(2+4)'}); await h.flush()
-  assert.equal(h.s.currentHandElapsedMs(),0); assert.equal(h.s.dealing.value,false)
+  assert.equal(h.s.successAnimating.value,false); assert.equal(h.s.dealing.value,false)
+  assert.equal(h.s.drawRequests,1)
+  assert.equal(h.s.currentHandElapsedMs(),0)
+  assert.equal(h.requests[0].arg.timeMs,23000)
 })
 
 test('online hint settles immediately; double skip waits for the same request and issues one new hand', async () => {
@@ -156,8 +152,7 @@ test('online hint settles immediately; double skip waits for the same request an
   assert.equal(h.requests.length,1); assert.equal(h.s.handStoppedAtTs.value,3000)
   const a = h.s.skipHand(), b = h.s.skipHand()
   assert.equal(h.requests.length,1)
-  h.cloud.resolve({settled:true,success:false}); await h.flush()
-  h.draw.resolve({cards:h.cards}); await Promise.all([a,b])
+  await Promise.all([a,b])
   assert.equal(h.s.drawRequests,1); assert.equal(h.s.handsPlayed.value,1)
 })
 
@@ -179,11 +174,11 @@ test('skip ends an unanswered local hand once, preserving its elapsed time', asy
   assert.equal(h.records[0].timeMs,4200); assert.equal(h.s.drawRequests,1)
 })
 
-test('failed online settlement does not start another round', async () => {
+test('queued online settlement transport is outside the next-hand critical path', async () => {
   const h = await harness({online:true})
   await h.advance(5000); h.submit('(1+3)×(2+4)')
   await h.advance(500)
-  h.cloud.resolve({settled:false,success:false}); await h.flush()
-  assert.ok(h.s.failure); assert.equal(h.s.drawRequests,0)
-  assert.equal(h.s.currentHandElapsedMs(),5000)
+  await h.flush()
+  assert.equal(h.s.failure,undefined); assert.equal(h.s.drawRequests,1)
+  assert.equal(h.s.currentHandElapsedMs(),0)
 })

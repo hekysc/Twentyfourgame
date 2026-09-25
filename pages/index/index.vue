@@ -23,7 +23,7 @@
               <text class="nav-title-main">24 点</text>
               <view class="nav-title-meta">
                 <text class="nav-title-sub">{{ onlineMode ? '在线挑战' : '本地练习 · 不参与排名' }}</text>
-                <CloudSyncStatus :online="onlineMode" :busy="onlineMode && networkBusy" />
+                <CloudSyncStatus :online="onlineMode" :busy="onlineMode && networkBusy" :quiet="onlineMode" />
               </view>
             </view>
           </template>
@@ -74,7 +74,7 @@
             </view>
             <view class="stats-feature">
               <text class="stats-label">剩余</text>
-              <text class="stats-value">{{ remainingCards }}</text>
+              <text class="stats-value">{{ remainingCards }}/52</text>
             </view>
           </view>
           <view class="stats-secondary">
@@ -251,7 +251,7 @@ import CloudSyncStatus from '../../components/CloudSyncStatus.vue'
 import PlayingCard from '../../components/PlayingCard.vue'
 import { evaluateExprToFraction, solve24 } from '../../utils/solver.js'
 import { isOnline } from '../../utils/identity.js'
-import { beginOnlineRound, finishOnlineRound, hasOnlineRound, cancelOnlineRound, handleConnectionFailure } from '../../utils/online.js'
+import { nextOnlineQuestion, finishOnlineRound, hasOnlineRound, flushOnlineResults } from '../../utils/online.js'
 import { ensureInit, getCurrentUser, getUsers, pushRound, readStatsExtended } from '../../utils/store.js'
 import { useSafeArea, rpxToPx } from '../../utils/useSafeArea.js'
 import { scheduleTabWarmup, mergeCachedStatsExt } from '../../utils/tab-cache.js'
@@ -371,6 +371,8 @@ const mistakeRunUsed = ref(new Set())
 const mistakeRunStamp = ref(0)
 const currentHandSource = ref('regular')
 const currentMistakeKey = ref('')
+const currentBatchId = ref('')
+const currentQuestionId = ref('')
 const handsPlayed = ref(0)
 const successCount = ref(0)
 const failCount = ref(0)
@@ -742,6 +744,7 @@ function loadSession() {
 }
 
 const remainingCards = computed(() => {
+  if (isOnline()) return Array.isArray(deck.value) ? deck.value.length : 0
   if (deckSource.value === 'mistakes') {
     const uid = selectedUserId.value
     if (!uid) return 0
@@ -1242,33 +1245,25 @@ async function nextHand() {
   successAdvanceTimer = null
   successAnimating.value = false
   dealing.value = true
-  networkBusy.value = isOnline()
+  networkBusy.value = isOnline() && (!Array.isArray(deck.value) || deck.value.length < 4)
   let issued = false
   pauseHandTimer()
   try {
-    // The server keeps one active round: finish it before requesting another.
-    // The loading UI is already visible and the old clock remains frozen.
-    if (pendingSettlement) {
-      const result = await pendingSettlement
-      if (!result || !pageAlive) return
-      pendingSettlement = null
-    }
+    // Regular challenge questions come from a locally cached 52-card batch.
+    // A batch request is needed only at pack boundaries, never between hands.
     applyPendingGameplayPrefs()
     closeTimerPopover()
     const res = await getNextDraw()
     if (!res || !pageAlive) return
     let nextCards = Array.isArray(res.cards) ? res.cards : []
-    if (isOnline() && res.source === 'mistake') {
-      const round = await beginOnlineRound({practice:true,mistakeKey:res.mistakeKey,high:faceUseHigh.value,mode:mode.value})
-      if (!pageAlive) return
-      nextCards = round.cards
-    }
     handReady.value = false
     resetHandStateForNext()
     if (Array.isArray(res.deck)) deck.value = res.deck
     cards.value = nextCards
     currentHandSource.value = res.source === 'mistake' ? 'mistake' : 'regular'
     currentMistakeKey.value = res.source === 'mistake' ? (res.mistakeKey || '') : ''
+    currentBatchId.value = res.batchId || ''
+    currentQuestionId.value = res.questionId || ''
     solution.value = res.solution || null
     tokens.value = []
     usedByCard.value = [0, 0, 0, 0]
@@ -1281,7 +1276,7 @@ async function nextHand() {
     handReady.value = true
     issued = true
   } catch (e) {
-    if (isOnline()) handleConnectionFailure(e)
+    if (isOnline()) showHint(e.message || '暂时无法获取下一副牌，请检查网络后重试', 2400)
     else showHint(e.message || '发牌失败', 2000)
   } finally {
     dealing.value = false
@@ -1292,30 +1287,36 @@ async function nextHand() {
 }
 
 async function getNextDraw() {
+  const ticket = isOnline() ? await nextOnlineQuestion(faceUseHigh.value) : null
+  const withTicket = (res) => res && ticket ? {
+    ...res,
+    deck: Array.from({ length: ticket.remaining }, () => ({ rank: 1, suit: 'S' })),
+    batchId: ticket.batchId,
+    questionId: ticket.id,
+  } : res
   if (deckSource.value === 'mistakes') {
     const res = await drawFromMistakePool()
-    if (res) return res
-    return await drawFromNormalDeck()
+    if (res) return withTicket(res)
+    return withTicket(await drawFromNormalDeck(ticket))
   }
   if (deckSource.value === 'mix') {
     const preferMistake = Math.random() * 100 < clampMixWeightValue(mixWeight.value)
     if (preferMistake) {
       const res = await drawFromMistakePool({ silent: true })
-      if (res) return res
+      if (res) return withTicket(res)
     }
-    const normal = await drawFromNormalDeck()
-    if (normal) return normal
-    return await drawFromMistakePool({ silent: true })
+    const normal = await drawFromNormalDeck(ticket)
+    if (normal) return withTicket(normal)
+    return withTicket(await drawFromMistakePool({ silent: true }))
   }
-  return await drawFromNormalDeck()
+  return withTicket(await drawFromNormalDeck(ticket))
 }
 
-async function drawFromNormalDeck() {
+async function drawFromNormalDeck(ticket) {
   if (isOnline()) {
-    const r = await beginOnlineRound({high:faceUseHigh.value,mode:mode.value,resetDeck:resetServerDeck})
-    resetServerDeck = false
-    const mapped = r.cards.map(c=>mapCardRank(c.rank,faceUseHigh.value))
-    return {source:'normal',cards:r.cards,deck:Array.from({length:r.remaining},()=>({rank:1,suit:'S'})),solution:solve24(mapped)}
+    if (!ticket) throw new Error('没有可用的预发题目')
+    const mapped = ticket.cards.map(c=>mapCardRank(c.rank,faceUseHigh.value))
+    return {source:'normal',cards:ticket.cards,deck:Array.from({length:ticket.remaining},()=>({rank:1,suit:'S'})),solution:solve24(mapped)}
   }
   if (!Array.isArray(deck.value) || deck.value.length < 4) {
     initDeck()
@@ -1550,7 +1551,7 @@ onMounted(() => {
 
 onShow(() => {
   pageVisible = true
-  if(isOnline()) uni.getNetworkType({success:r=>{if(r.networkType==='none')handleConnectionFailure()}})
+  if (isOnline()) flushOnlineResults().catch(() => {})
   // 清除缓存，强制重新读取最新的设置
   try {
     if (typeof uni.$off === 'function') {
@@ -1587,12 +1588,12 @@ onShow(() => {
     showHint('头像文件丢失，已为你恢复为默认头像', 2000)
   }
 })
-onHide(() => { pageVisible = false; saveSession(); pauseHandTimer(); closeTimerPopover() })
+onHide(() => { pageVisible = false; saveSession(); pauseHandTimer(); closeTimerPopover(); flushOnlineResults().catch(() => {}) })
 onUnmounted(() => {
   pageAlive = false
   clearTimeout(successAdvanceTimer)
   clearTimeout(errorFeedbackTimer)
-  if(isOnline() && !handRecorded.value) cancelOnlineRound().catch(()=>{})
+  if (isOnline()) flushOnlineResults().catch(() => {})
   try {
     if (typeof uni.$off === 'function') {
       uni.$off(MODE_CHANGE_EVENT, handleExternalModeChange)
@@ -1609,16 +1610,17 @@ onUnmounted(() => {
 
 // 已移除“清空表达式”功能，避免误触清空
 
-async function persistOnline(arg, kind) {
-  networkBusy.value = true
+function persistOnline(arg, kind) {
   try {
     if(!hasOnlineRound())throw new Error('请重新开局')
-    const result = await finishOnlineRound(arg,kind)
+    const result = finishOnlineRound(arg,kind)
     if (!result.settled || result.success !== arg.success) throw new Error('判定结果不一致，请重新开局')
     updateLastSuccess()
     return result
-  } catch(e) { handleConnectionFailure(e); return null }
-  finally { networkBusy.value=false }
+  } catch(e) {
+    showHint(e.message || '答题记录已暂存，联网后继续同步', 2000)
+    return null
+  }
 }
 
 function updateLastSuccess() {
@@ -1665,7 +1667,19 @@ function finishHand({ success, kind, expression, stats }) {
     else failCount.value += 1
   }
   if (isOnline()) {
-    pendingSettlement = persistOnline({ success, expr: expression || '' }, kind)
+    pendingSettlement = persistOnline({
+      success,
+      expr: expression || '',
+      timeMs: elapsed,
+      mode: mode.value,
+      high: faceUseHigh.value,
+      practice: currentHandSource.value === 'mistake',
+      mistakeKey: currentMistakeKey.value,
+      cards: (cards.value || []).map(c => ({ rank: c.rank, suit: c.suit })),
+    }, kind)
+    if (selectedUserId.value) {
+      recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success })
+    }
   } else {
     if (selectedUserId.value) {
       recordRoundResult({ userId: selectedUserId.value, nums: currentHandNums.value, success })
@@ -2020,7 +2034,6 @@ watch(cards, () => {
 })
 
 watch(faceUseHigh, (newVal, oldVal) => {
-  if (isOnline() && booted.value && newVal !== oldVal) nextTick(() => nextHand())
   console.log('faceUseHigh changed from', oldVal, 'to', newVal)
   resetBasicStateFromCards()
   if (mode.value === 'basic') nextTick(() => syncBasicOpsHeight())

@@ -5,6 +5,8 @@ const db = cloud.database(),
   $ = db.command
 const R = require('./rules')
 const APPID = 'wx58faf81d08ca037c'
+const BATCH_TTL = 7 * 24 * 60 * 60 * 1000
+const OPEN_BATCH_TTL = 30 * 24 * 60 * 60 * 1000
 const clean = (obj) => {
   const { _id, ...rest } = obj
   return rest
@@ -45,6 +47,7 @@ async function profile(uid) {
     prefs: sanitizePrefs(),
     book: { active: {}, ledger: {} },
     deck: [],
+    activeBatchId: '',
   })
   await ensure('tf24_stats', `${uid}_all`, R.emptyAggregate(uid, 'all'))
   return get('tf24_users', uid)
@@ -64,6 +67,112 @@ async function scan(coll, condition) {
     if (data.length < 100) return out
     cursor = data[data.length - 1]._id
   }
+}
+async function cleanExpiredBatches(uid, now) {
+  const { data = [] } = await db
+    .collection('tf24_question_batches')
+    .where({ uid })
+    .limit(100)
+    .get()
+  const expired = data.filter((item) => item.expiresAt <= now)
+  for (const batch of expired) {
+    await db.collection('tf24_question_batches').doc(batch._id).remove()
+  }
+  const user = await get('tf24_users', uid)
+  if (user?.activeBatchId && expired.some((batch) => batch._id === user.activeBatchId))
+    await db.collection('tf24_users').doc(uid).update({ data: { activeBatchId: '' } })
+}
+function publicBatch(batch) {
+  return {
+    id: batch.id || batch._id,
+    createdAt: batch.createdAt,
+    expiresAt: batch.expiresAt,
+    questions: batch.questions
+      .filter((q) => q.status !== 'settled')
+      .map((q) => ({
+        id: q.id,
+        cards: q.cards,
+        remaining: q.remaining,
+      })),
+  }
+}
+async function settleQueuedRound(uid, item, now) {
+  const period = R.weekKey(now)
+  await ensure('tf24_stats', `${uid}_${period}`, R.emptyAggregate(uid, period))
+  return db.runTransaction(async (tx) => {
+    const batch = await txget(tx, 'tf24_question_batches', item.batchId)
+    if (batch.uid !== uid || batch.expiresAt <= now)
+      throw new Error('预发题目已过期')
+    const question = (batch.questions || []).find((q) => q.id === item.questionId)
+    if (!question) throw new Error('题目不属于此预发批次')
+    if (question.status === 'settled') return { ...question.result, duplicate: true }
+
+    const kind = item.kind
+    if (!['answer', 'skip', 'hint'].includes(kind)) throw new Error('无效成绩')
+    const practice = item.practice === true
+    const user = await txget(tx, 'tf24_users', uid)
+    let cards = question.cards
+    if (practice) {
+      const key = String(item.mistakeKey || '')
+      const mistake = user.book?.active?.[key]
+      if (!mistake) throw new Error('错题已移除，无法同步本次练习')
+      cards = mistake.nums.map((rank, i) => ({ rank, suit: ['S', 'H', 'D', 'C'][i] }))
+    }
+    const high = item.high === true
+    const expression = String(item.expr || '').slice(0, 160)
+    const success = kind === 'answer' && R.validExpression(expression, cards, high)
+    if (kind === 'answer' && !success) return { settled: false, success: false }
+
+    const timeMs = Math.max(1, Math.min(24 * 60 * 60 * 1000, Math.floor(Number(item.timeMs) || 1)))
+    const round = {
+      id: question.id,
+      uid,
+      ts: now,
+      success,
+      timeMs,
+      expr: expression,
+      hand: { cards },
+      faceUseHigh: high,
+      hintUsed: kind === 'hint',
+      ops: expression.match(/[+\-×÷]/g) || [],
+      mode: item.mode === 'pro' ? 'pro' : 'basic',
+    }
+    const book = R.updateBook(user.book, cards, success, now)
+    await tx.collection('tf24_users').doc(uid).update({ data: { book } })
+
+    let aggregate = null
+    if (!practice) {
+      for (const key of ['all', period]) {
+        const a = await txget(tx, 'tf24_stats', `${uid}_${key}`)
+        const updated = R.updateAggregate(clean(a), round)
+        await tx.collection('tf24_stats').doc(`${uid}_${key}`).set({ data: updated })
+        if (key === 'all') aggregate = updated
+      }
+      await tx.collection('tf24_rounds').doc(question.id).set({ data: round })
+    }
+
+    const result = { settled: true, success, round: practice ? null : round, total: aggregate, book }
+    question.status = 'settled'
+    question.result = result
+    const allSettled = batch.questions.every((q) => q.status === 'settled')
+    if (allSettled) {
+      batch.status = 'closed'
+      batch.expiresAt = now + BATCH_TTL
+    } else {
+      batch.expiresAt = now + OPEN_BATCH_TTL
+    }
+    await tx.collection('tf24_question_batches').doc(item.batchId).update({
+      data: {
+        questions: batch.questions,
+        status: batch.status,
+        expiresAt: batch.expiresAt,
+        closedAt: allSettled ? now : batch.closedAt || null,
+      },
+    })
+    if (allSettled && user.activeBatchId === item.batchId)
+      await tx.collection('tf24_users').doc(uid).update({ data: { activeBatchId: '' } })
+    return result
+  })
 }
 exports.main = async (event) => {
   try {
@@ -92,6 +201,67 @@ exports.main = async (event) => {
     }
     const p = await get('tf24_users', uid)
     if (!p) throw new Error('请先登录')
+    if (action === 'prefetch') {
+      await cleanExpiredBatches(uid, now)
+      const batch = await db.runTransaction(async (tx) => {
+        const user = await txget(tx, 'tf24_users', uid)
+        let activeId = user.activeBatchId || ''
+        if (event.closeBatchId && event.closeBatchId === activeId) {
+          try {
+            const previous = await txget(tx, 'tf24_question_batches', activeId)
+            previous.status = 'closed'
+            previous.closedAt = now
+            await tx.collection('tf24_question_batches').doc(activeId).update({
+              data: { status: 'closed', closedAt: now, expiresAt: now + BATCH_TTL },
+            })
+          } catch (_) {}
+          activeId = ''
+        }
+        if (activeId) {
+          try {
+            const existing = await txget(tx, 'tf24_question_batches', activeId)
+            if (existing.uid === uid && existing.status === 'open' && existing.expiresAt > now &&
+              existing.questions.some((q) => q.status !== 'settled')) {
+              existing.expiresAt = now + OPEN_BATCH_TTL
+              await tx.collection('tf24_question_batches').doc(activeId).update({ data: { expiresAt: existing.expiresAt } })
+              return existing
+            }
+          } catch (_) {}
+          activeId = ''
+        }
+        const questions = R.drawPack().map((q) => ({
+          id: crypto.randomBytes(16).toString('hex'),
+          cards: q.cards,
+          remaining: q.remaining,
+          status: 'open',
+        }))
+        if (!questions.length) throw new Error('暂时无法生成整副题目，请重试')
+        const id = crypto.randomBytes(16).toString('hex')
+        const created = {
+          uid,
+          status: 'open',
+          createdAt: now,
+          expiresAt: now + OPEN_BATCH_TTL,
+          questions,
+        }
+        await tx.collection('tf24_question_batches').doc(id).set({ data: created })
+        await tx.collection('tf24_users').doc(uid).update({ data: { activeBatchId: id } })
+        return { ...created, id }
+      })
+      return { ok: true, data: publicBatch(batch) }
+    }
+    if (action === 'syncBatch') {
+      const results = Array.isArray(event.results) ? event.results.slice(0, 13) : []
+      const settled = []
+      for (const item of results) {
+        try {
+          settled.push({ questionId: item.questionId, ...(await settleQueuedRound(uid, item, now)) })
+        } catch (e) {
+          settled.push({ questionId: item.questionId, settled: false, error: e.message })
+        }
+      }
+      return { ok: true, data: { settled } }
+    }
     if (action === 'history') {
       const condition = { uid }
       if (event.cursor) condition._id = $.gt(String(event.cursor))

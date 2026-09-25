@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fix/round-settlement-flow
+      - feat/batch-prefetch-offline-sync
     paths:
       - .github/workflows/cloudbase-deploy.yml
       - cloudfunctions/tf24/**
@@ -20,7 +21,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/round-settlement-flow'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/round-settlement-flow' || github.ref == 'refs/heads/feat/batch-prefetch-offline-sync'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

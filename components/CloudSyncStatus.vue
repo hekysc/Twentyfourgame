@@ -18,10 +18,15 @@ import { getCloudSyncStatus, retryCloudSync } from '../utils/online.js'
 const props = defineProps({
   online: { type: Boolean, default: undefined },
   busy: { type: Boolean, default: false },
+  quiet: { type: Boolean, default: false },
 })
 const status = ref(getCloudSyncStatus())
 const online = computed(() => props.online ?? isOnline())
-const displayStatus = computed(() => (props.busy ? 'syncing' : status.value.status))
+const displayStatus = computed(() => {
+  if (props.busy) return 'syncing'
+  if (props.quiet && status.value.status === 'syncing') return 'synced'
+  return status.value.status
+})
 const label = computed(() => {
   if (displayStatus.value === 'syncing') return '同步中'
   if (displayStatus.value === 'error') return status.value.retryable ? '同步失败 · 点击重试' : '同步失败'
