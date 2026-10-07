@@ -64,6 +64,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify game and online rules
         run: npm test
+      - name: Set build timestamp
+        run: echo "TF24_BUILD_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
       - name: Build mp-weixin
         run: npm run build:mp-weixin
       - name: Verify build output

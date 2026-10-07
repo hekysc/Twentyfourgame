@@ -10,40 +10,58 @@
       <view class="mode-card">
         <view class="section-head">
           <text class="card-title">在线挑战</text>
-          <text class="account-count">本机 {{ recentAccounts.length }} 个帐号</text>
+          <text v-if="accountState === 'bound'" class="account-count">微信已绑定</text>
         </view>
-        <view v-if="recentAccounts.length" class="account-list">
-          <view
-            v-for="account in recentAccounts"
-            :key="account.id"
-            class="account-row"
-            :class="{ selected: selectedAccountId === account.id }"
-            @tap="selectedAccountId = account.id"
-          >
-            <image v-if="account.avatar" class="account-avatar" :src="account.avatar" mode="aspectFill" />
-            <view v-else class="account-avatar avatar-fallback">{{ (account.name || '玩').slice(0, 1) }}</view>
+        <view v-if="accountState === 'checking'" class="account-empty">
+          <text class="copy">正在确认当前微信身份…</text>
+        </view>
+        <view v-else-if="accountState === 'error'" class="account-empty">
+          <text class="empty-title">暂时无法确认帐号状态</text>
+          <text class="copy">联网后可重新检查；也可直接开始本地练习。</text>
+        </view>
+        <view v-else-if="accountState === 'bound' && linkedAccount" class="account-list">
+          <view class="account-row selected">
+            <image v-if="linkedAccount.avatar" class="account-avatar" :src="linkedAccount.avatar" mode="aspectFill" />
+            <view v-else class="account-avatar avatar-fallback">{{ (linkedAccount.name || '玩').slice(0, 1) }}</view>
             <view class="account-info">
-              <text class="account-name">{{ account.name || '微信玩家' }}</text>
-              <text class="account-last">最近使用　{{ accountSubtitle(account) }}</text>
+              <text class="account-name">{{ linkedAccount.name || '微信玩家' }}</text>
+              <text class="account-last">当前微信身份已关联</text>
             </view>
             <view class="account-radio"></view>
           </view>
         </view>
         <view v-else class="account-empty">
-          <text class="empty-title">本机还没有已登录帐号</text>
-          <text class="copy">新建帐号后会显示在这里，之后可直接选择。</text>
+          <text class="empty-title">首次使用在线挑战</text>
+          <text class="copy">新建帐号后，可在帐号页面修改用户名和头像。</text>
         </view>
-        <text class="account-hint">帐号由绑定的微信身份认证，不需要密码。选择后会校验当前微信身份；若不匹配，请切换到对应微信帐号。</text>
+        <text v-if="accountState === 'bound'" class="account-hint">此微信身份已关联唯一在线帐号，使用该微信登录即可恢复资料和答题记录。</text>
+        <text v-else-if="accountState === 'unbound'" class="account-hint">帐号由当前微信身份认证，不需要密码。</text>
         <button
+          v-if="accountState === 'bound'"
           class="primary"
           :loading="busy"
-          :disabled="busy || !selectedAccountId"
+          :disabled="busy"
           @tap="enterSelectedAccount"
         >
-          选择帐号并继续
+          登录
         </button>
-        <button class="secondary" :disabled="busy" @tap="openProfile">
-          ＋　新建在线帐号
+        <button
+          v-else-if="accountState === 'unbound'"
+          class="secondary"
+          :loading="busy"
+          :disabled="busy"
+          @tap="openProfile"
+        >
+          ＋　新建帐号
+        </button>
+        <button
+          v-else-if="accountState === 'error'"
+          class="secondary"
+          :loading="busy"
+          :disabled="busy"
+          @tap="refreshLoginPage"
+        >
+          重新检查
         </button>
         <text v-if="error" class="error">{{ error }}</text>
       </view>
@@ -69,12 +87,13 @@
       </view>
 
       <text class="foot">在线成绩从微信身份登录后开始累计。本地练习数据与在线帐号相互独立。</text>
+      <text class="build-meta">v{{ appVersion }} · 构建时间 {{ buildTime }}</text>
     </view>
 
     <view v-if="profileOpen" class="modal-mask">
       <view class="profile-modal">
         <text class="modal-title">确认在线帐号资料</text>
-        <text class="modal-copy">填写帐号资料后，确认时会核对当前微信身份是否已关联帐号。选择微信头像和昵称，或自行设置。</text>
+        <text class="modal-copy">填写资料创建帐号后，可在“我的资料”修改用户名和头像。确认时会核对当前微信身份是否已关联帐号。</text>
         <button
           class="avatar-picker"
           open-type="chooseAvatar"
@@ -110,36 +129,45 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, readStats } from '../../utils/store.js'
-import { loginOnline, checkOnlineAccount, cacheOnlineAccount, createOnlineAccount, saveProfile, enterPractice, getRecentOnlineAccounts } from '../../utils/online.js'
+import { loginOnline, checkOnlineAccount, createOnlineAccount, saveProfile, enterPractice } from '../../utils/online.js'
 ensureInit()
 const busy = ref(false),
   error = ref(''),
   practiceStats = ref(readStats())
-const recentAccounts = ref(getRecentOnlineAccounts())
-const selectedAccountId = ref(recentAccounts.value[0]?.id || '')
-function refreshLoginPage() {
+const accountState = ref('checking')
+const linkedAccount = ref(null)
+const selectedAccountId = ref('')
+const appVersion = __TF24_APP_VERSION__
+function formatBuildTime(value) {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return '未知'
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+const buildTime = formatBuildTime(__TF24_BUILD_TIME__)
+async function refreshLoginPage() {
   practiceStats.value = readStats()
-  recentAccounts.value = getRecentOnlineAccounts()
-  if (!recentAccounts.value.some((account) => account.id === selectedAccountId.value))
-    selectedAccountId.value = recentAccounts.value[0]?.id || ''
+  accountState.value = 'checking'
+  error.value = ''
+  try {
+    const status = await checkOnlineAccount()
+    if (status.linked && status.user) {
+      linkedAccount.value = status.user
+      selectedAccountId.value = status.user.id
+      accountState.value = 'bound'
+    } else {
+      linkedAccount.value = null
+      selectedAccountId.value = ''
+      accountState.value = 'unbound'
+    }
+  } catch (e) {
+    linkedAccount.value = null
+    selectedAccountId.value = ''
+    accountState.value = 'error'
+    error.value = e.message || '无法确认微信帐号状态，请联网后重试'
+  }
 }
 onShow(refreshLoginPage)
-function formatLastUsed(value) {
-  const date = new Date(Number(value) || 0)
-  if (!Number.isFinite(date.getTime()) || !value) return '尚未使用'
-  const now = new Date()
-  if (date.toDateString() === now.toDateString())
-    return '今天 ' + String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0')
-  return (date.getMonth() + 1) + '月' + date.getDate() + '日'
-}
-function accountSubtitle(account) {
-  const normalize = (value) => String(value || '').normalize('NFKC').trim().toLowerCase()
-  const sameName = recentAccounts.value.filter((item) => normalize(item.name) === normalize(account.name))
-  const recent = formatLastUsed(account.lastUsedAt)
-  return sameName.length > 1
-    ? '微信帐号 · ' + account.id.slice(-4).toUpperCase() + ' · ' + recent
-    : recent
-}
 const practiceTotal = computed(() => Number(practiceStats.value?.totals?.total) || 0)
 const practiceRate = computed(() => {
   const total = practiceTotal.value
@@ -168,18 +196,9 @@ async function enterSelectedAccount() {
   error.value = ''
   try {
     const user = await loginOnline()
-    recentAccounts.value = getRecentOnlineAccounts()
     if (user.id !== expectedId) {
       enterPractice()
       error.value = '当前微信身份与所选帐号不匹配。请切换到绑定该帐号的微信身份后重试。'
-      return
-    }
-    if (user.name === '微信玩家') {
-      profileName.value = user.name
-      profileAvatar.value = user.avatar || ''
-      originalName.value = profileName.value
-      originalAvatar.value = profileAvatar.value
-      profileOpen.value = true
       return
     }
     uni.reLaunch({ url: '/pages/index/index' })
@@ -190,16 +209,16 @@ async function enterSelectedAccount() {
   }
 }
 async function openProfile() {
-  if (busy.value) return
+  if (busy.value || accountState.value !== 'unbound') return
   busy.value = true
   error.value = ''
   try {
     const status = await checkOnlineAccount()
     if (status.linked && status.user) {
-      cacheOnlineAccount(status.user)
-      recentAccounts.value = getRecentOnlineAccounts()
+      linkedAccount.value = status.user
       selectedAccountId.value = status.user.id
-      error.value = `当前微信身份已关联帐号“${status.user.name || '微信玩家'}”，不能新建。请选择该帐号继续。`
+      accountState.value = 'bound'
+      error.value = '当前微信身份已关联帐号，已切换为登录入口。'
       return
     }
     profileName.value = '微信玩家'
@@ -208,6 +227,7 @@ async function openProfile() {
     originalAvatar.value = ''
     profileOpen.value = true
   } catch (e) {
+    accountState.value = 'error'
     error.value = e.message || '无法核对微信帐号状态，请联网后重试'
   } finally {
     busy.value = false
@@ -250,17 +270,17 @@ async function confirmLogin() {
       }
     }
     profileOpen.value = false
-    recentAccounts.value = getRecentOnlineAccounts()
     uni.reLaunch({ url: '/pages/index/index' })
   } catch (e) {
     if (String(e.message || '').includes('已经关联在线帐号')) {
       try {
         const status = await checkOnlineAccount()
         if (status.linked && status.user) {
-          cacheOnlineAccount(status.user)
-          recentAccounts.value = getRecentOnlineAccounts()
+          linkedAccount.value = status.user
           selectedAccountId.value = status.user.id
-          error.value = `当前微信身份已关联帐号“${status.user.name || '微信玩家'}”，不能新建。请选择该帐号继续。`
+          accountState.value = 'bound'
+          profileOpen.value = false
+          error.value = '当前微信身份已关联帐号，已切换为登录入口。'
         } else {
           error.value = e.message
         }
@@ -306,6 +326,14 @@ async function confirmLogin() {
   line-height: 1.8;
   font-size: 26rpx;
   white-space: pre-line;
+}
+.build-meta {
+  display: block;
+  margin: 34rpx 0 8rpx;
+  color: #a0a79f;
+  font-size: 20rpx;
+  line-height: 1.5;
+  text-align: center;
 }
 .section-head {
   display: flex;
