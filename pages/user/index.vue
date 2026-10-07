@@ -5,7 +5,7 @@
       ><text class="heading">{{ online ? '微信在线帐号' : '本地练习' }}</text>
       <text class="copy">{{
         online
-          ? '资料和游戏数据保存在云端。'
+          ? '资料和游戏数据保存在云端；用户名和头像可在此修改。'
           : '无需帐号，练习记录只保存在这台设备。'
       }}</text>
       <view v-if="online" class="card">
