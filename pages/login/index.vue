@@ -74,7 +74,7 @@
     <view v-if="profileOpen" class="modal-mask">
       <view class="profile-modal">
         <text class="modal-title">确认在线帐号资料</text>
-        <text class="modal-copy">此微信身份对应一个在线帐号。选择微信头像和昵称，或自行设置；之后可在“用户”页面修改。</text>
+        <text class="modal-copy">填写帐号资料后，确认时会核对当前微信身份是否已关联帐号。选择微信头像和昵称，或自行设置。</text>
         <button
           class="avatar-picker"
           open-type="chooseAvatar"
@@ -98,7 +98,7 @@
         <text class="privacy-copy">排行榜本人可见完整昵称，其他人只看到首字和 *，不显示头像。</text>
         <text v-if="error" class="modal-error">{{ error }}</text>
         <button class="primary confirm-button" :loading="busy" :disabled="busy" @tap="confirmLogin">
-          确认并登录
+          确认并创建
         </button>
         <button class="cancel-button" :disabled="busy" @tap="cancelProfile">暂不登录</button>
       </view>
@@ -110,7 +110,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, readStats } from '../../utils/store.js'
-import { loginOnline, saveProfile, enterPractice, getRecentOnlineAccounts } from '../../utils/online.js'
+import { loginOnline, createOnlineAccount, saveProfile, enterPractice, getRecentOnlineAccounts } from '../../utils/online.js'
 ensureInit()
 const busy = ref(false),
   error = ref(''),
@@ -189,30 +189,14 @@ async function enterSelectedAccount() {
     busy.value = false
   }
 }
-async function openProfile() {
+function openProfile() {
   if (busy.value) return
-  const knownIds = new Set(getRecentOnlineAccounts().map((account) => account.id))
-  busy.value = true
   error.value = ''
-  try {
-    const user = await loginOnline()
-    recentAccounts.value = getRecentOnlineAccounts()
-    if (knownIds.has(user.id)) {
-      selectedAccountId.value = user.id
-      enterPractice()
-      error.value = '这个微信身份已经关联在线帐号，请从上方选择该帐号进入。'
-      return
-    }
-    profileName.value = user.name || '微信玩家'
-    profileAvatar.value = user.avatar || ''
-    originalName.value = profileName.value
-    originalAvatar.value = profileAvatar.value
-    profileOpen.value = true
-  } catch (e) {
-    error.value = e.message || '登录失败，请重试'
-  } finally {
-    busy.value = false
-  }
+  profileName.value = '微信玩家'
+  profileAvatar.value = ''
+  originalName.value = profileName.value
+  originalAvatar.value = ''
+  profileOpen.value = true
 }
 function onChooseAvatar(e) {
   profileAvatar.value = e?.detail?.avatarUrl || ''
@@ -242,12 +226,19 @@ async function confirmLogin() {
   busy.value = true
   error.value = ''
   try {
-    if (name !== originalName.value || profileAvatar.value !== originalAvatar.value)
-      await saveProfile(name, profileAvatar.value)
+    await createOnlineAccount(name)
+    if (profileAvatar.value && profileAvatar.value !== originalAvatar.value) {
+      try {
+        await saveProfile(name, profileAvatar.value)
+      } catch (_) {
+        error.value = '帐号已创建，头像暂未保存，可进入后在用户页面修改。'
+      }
+    }
     profileOpen.value = false
+    recentAccounts.value = getRecentOnlineAccounts()
     uni.reLaunch({ url: '/pages/index/index' })
   } catch (e) {
-    error.value = e.message || '资料保存失败，请修改后重试'
+    error.value = e.message || '帐号创建失败，请重试'
   } finally {
     busy.value = false
   }

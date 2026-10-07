@@ -131,6 +131,18 @@ export async function loginOnline() {
   flushOnlineResults().catch(() => {})
   return snapshot.user
 }
+export async function createOnlineAccount(name) {
+  const snapshot = await cloudCall('createAccount', { name })
+  setOnlineIdentity(snapshot.user)
+  rememberOnlineAccount(snapshot.user)
+  epoch++
+  activeQuestion = null
+  deckOwner = ''
+  deckState = null
+  applySnapshot(snapshot, [])
+  flushOnlineResults().catch(() => {})
+  return snapshot.user
+}
 export async function refreshOnline() {
   if (!isOnline()) return
   const stamp = epoch,
