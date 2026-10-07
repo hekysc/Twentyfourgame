@@ -8,13 +8,44 @@
       <text class="intro">用加减乘除，让答案成为 24。</text>
 
       <view class="mode-card">
-        <text class="card-title">在线挑战</text>
-        <text class="copy">微信身份用于登录和找回帐号。每个微信身份对应一个在线帐号，无需密码；首次登录后可选择或自定义头像和昵称。</text>
-        <button class="primary" :loading="busy" :disabled="busy" @tap="openProfile">
-          微信登录
+        <view class="section-head">
+          <text class="card-title">在线挑战</text>
+          <text class="account-count">本机 {{ recentAccounts.length }} 个帐号</text>
+        </view>
+        <view v-if="recentAccounts.length" class="account-list">
+          <view
+            v-for="account in recentAccounts"
+            :key="account.id"
+            class="account-row"
+            :class="{ selected: selectedAccountId === account.id }"
+            @tap="selectedAccountId = account.id"
+          >
+            <image v-if="account.avatar" class="account-avatar" :src="account.avatar" mode="aspectFill" />
+            <view v-else class="account-avatar avatar-fallback">{{ (account.name || '玩').slice(0, 1) }}</view>
+            <view class="account-info">
+              <text class="account-name">{{ account.name || '微信玩家' }}</text>
+              <text class="account-last">最近使用　{{ formatLastUsed(account.lastUsedAt) }}</text>
+            </view>
+            <view class="account-radio"></view>
+          </view>
+        </view>
+        <view v-else class="account-empty">
+          <text class="empty-title">本机还没有已登录帐号</text>
+          <text class="copy">新建帐号后会显示在这里，之后可直接选择。</text>
+        </view>
+        <text class="account-hint">帐号由绑定的微信身份认证，不需要密码。选择后会校验当前微信身份；若不匹配，请切换到对应微信帐号。</text>
+        <button
+          class="primary"
+          :loading="busy"
+          :disabled="busy || !selectedAccountId"
+          @tap="enterSelectedAccount"
+        >
+          选择帐号并继续
+        </button>
+        <button class="secondary" :disabled="busy" @tap="openProfile">
+          ＋　新建在线帐号
         </button>
       </view>
-
       <view class="mode-card practice">
         <text class="card-title">本地练习</text>
         <text class="copy">无需帐号，无需联网。练习记录只留在本机。</text>
@@ -75,13 +106,31 @@
 </template>
 <script setup>
 import { computed, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, readStats } from '../../utils/store.js'
-import { loginOnline, saveProfile, enterPractice } from '../../utils/online.js'
+import { loginOnline, saveProfile, enterPractice, getRecentOnlineAccounts } from '../../utils/online.js'
 ensureInit()
 const busy = ref(false),
   error = ref(''),
   practiceStats = ref(readStats())
+const recentAccounts = ref(getRecentOnlineAccounts())
+const selectedAccountId = ref(recentAccounts.value[0]?.id || '')
+function refreshLoginPage() {
+  practiceStats.value = readStats()
+  recentAccounts.value = getRecentOnlineAccounts()
+  if (!recentAccounts.value.some((account) => account.id === selectedAccountId.value))
+    selectedAccountId.value = recentAccounts.value[0]?.id || ''
+}
+onShow(refreshLoginPage)
+function formatLastUsed(value) {
+  const date = new Date(Number(value) || 0)
+  if (!Number.isFinite(date.getTime()) || !value) return '尚未使用'
+  const now = new Date()
+  if (date.toDateString() === now.toDateString())
+    return '今天 ' + String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0')
+  return (date.getMonth() + 1) + '月' + date.getDate() + '日'
+}
 const practiceTotal = computed(() => Number(practiceStats.value?.totals?.total) || 0)
 const practiceRate = computed(() => {
   const total = practiceTotal.value
@@ -103,12 +152,48 @@ const profileOpen = ref(false),
   profileAvatar = ref(''),
   originalName = ref(''),
   originalAvatar = ref('')
-async function openProfile() {
-  if (busy.value) return
+async function enterSelectedAccount() {
+  if (busy.value || !selectedAccountId.value) return
+  const expectedId = selectedAccountId.value
   busy.value = true
   error.value = ''
   try {
     const user = await loginOnline()
+    recentAccounts.value = getRecentOnlineAccounts()
+    if (user.id !== expectedId) {
+      enterPractice()
+      error.value = '当前微信身份与所选帐号不匹配。请切换到绑定该帐号的微信身份后重试。'
+      return
+    }
+    if (user.name === '微信玩家') {
+      profileName.value = user.name
+      profileAvatar.value = user.avatar || ''
+      originalName.value = profileName.value
+      originalAvatar.value = profileAvatar.value
+      profileOpen.value = true
+      return
+    }
+    uni.reLaunch({ url: '/pages/index/index' })
+  } catch (e) {
+    error.value = e.message || '登录失败，请重试'
+  } finally {
+    busy.value = false
+  }
+}
+async function openProfile() {
+  if (busy.value) return
+  const knownIds = new Set(getRecentOnlineAccounts().map((account) => account.id))
+  busy.value = true
+  error.value = ''
+  try {
+    const user = await loginOnline()
+    recentAccounts.value = getRecentOnlineAccounts()
+    if (knownIds.has(user.id)) {
+      selectedAccountId.value = user.id
+      enterPractice()
+      error.value = '这个微信身份已经关联在线帐号，请从上方选择该帐号进入。'
+      return
+    }
     profileName.value = user.name || '微信玩家'
     profileAvatar.value = user.avatar || ''
     originalName.value = profileName.value
@@ -180,6 +265,101 @@ async function confirmLogin() {
   line-height: 1.8;
   font-size: 26rpx;
   white-space: pre-line;
+}
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.account-count {
+  color: #738077;
+  background: #eff1e8;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 21rpx;
+}
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 18rpx;
+  border: 1rpx solid #d9ded2;
+  border-radius: 20rpx;
+  background: #fffefa;
+}
+.account-row.selected {
+  border-color: #275c48;
+  box-shadow: 0 0 0 2rpx rgba(39, 92, 72, .08);
+}
+.account-avatar {
+  width: 88rpx;
+  height: 88rpx;
+  flex: 0 0 88rpx;
+  border-radius: 50%;
+}
+.avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(145deg, #82a899, #446f60);
+  font-size: 34rpx;
+  font-weight: 700;
+}
+.account-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-name {
+  color: #253c34;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+.account-last {
+  margin-top: 7rpx;
+  color: #738077;
+  font-size: 20rpx;
+}
+.account-radio {
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid #c5c9bf;
+  border-radius: 50%;
+}
+.account-row.selected .account-radio {
+  border: 8rpx solid #275c48;
+}
+.account-hint {
+  display: block;
+  margin-top: 18rpx;
+  color: #738077;
+  font-size: 21rpx;
+  line-height: 1.55;
+}
+.account-empty {
+  margin-top: 16rpx;
+  padding: 26rpx 18rpx;
+  border-radius: 18rpx;
+  background: #f5f3e9;
+  text-align: center;
+}
+.empty-title {
+  display: block;
+  color: #253c34;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+.secondary {
+  background: #e8ecdf;
+  color: #275c48;
 }
 .mode-card {
   margin-top: 36rpx;
