@@ -82,8 +82,9 @@
         >
           <image v-if="profileAvatar" class="profile-avatar" :src="profileAvatar" mode="aspectFill" />
           <view v-else class="profile-avatar-placeholder">头像</view>
-          <text class="avatar-caption">点击选择头像</text>
+          <text class="avatar-caption">点击选择微信头像</text>
         </button>
+        <button class="avatar-album-button" @tap="chooseAvatarFromAlbum">或从相册选择头像</button>
         <text class="field-label">昵称</text>
         <input
           class="nickname-input"
@@ -215,6 +216,16 @@ async function openProfile() {
 }
 function onChooseAvatar(e) {
   profileAvatar.value = e?.detail?.avatarUrl || ''
+}
+function chooseAvatarFromAlbum() {
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    sourceType: ['album'],
+    success: (result) => {
+      profileAvatar.value = result.tempFilePaths?.[0] || profileAvatar.value
+    },
+  })
 }
 function cancelProfile() {
   if (busy.value) return
@@ -490,6 +501,17 @@ button {
   background: #e8ecdf;
   font-size: 24rpx;
 }
+.avatar-album-button {
+  display: inline-block;
+  margin: 8rpx 0 0 132rpx;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #275c48;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+.avatar-album-button::after { border: none; }
 .avatar-caption, .field-label {
   color: #253c34;
   font-size: 25rpx;
