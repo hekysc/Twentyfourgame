@@ -131,6 +131,12 @@ export async function loginOnline() {
   flushOnlineResults().catch(() => {})
   return snapshot.user
 }
+export async function checkOnlineAccount() {
+  return cloudCall('accountStatus')
+}
+export function cacheOnlineAccount(user) {
+  rememberOnlineAccount(user)
+}
 export async function createOnlineAccount(name) {
   const snapshot = await cloudCall('createAccount', { name })
   setOnlineIdentity(snapshot.user)

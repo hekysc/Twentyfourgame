@@ -115,6 +115,20 @@ test('server rejects unauthenticated invocations', async () => {
   h.setUser('')
   assert.equal((await h.call({ action: 'login' })).ok, false)
 })
+test('account status lookup is read-only and reports an existing WeChat binding', async () => {
+  const h = harness()
+  const empty = await h.call({ action: 'accountStatus' })
+  assert.equal(empty.ok, true)
+  assert.equal(empty.data.linked, false)
+  assert.equal(empty.data.user, null)
+  assert.equal(Object.keys(h.tables().tf24_users || {}).length, 0)
+
+  await h.call({ action: 'login' })
+  const linked = await h.call({ action: 'accountStatus' })
+  assert.equal(linked.data.linked, true)
+  assert.equal(linked.data.user.id, h.uid())
+  assert.equal(linked.data.user.name, '微信玩家')
+})
 test('account creation checks the authenticated WeChat identity only on confirmation', async () => {
   const h = harness()
   assert.equal(Object.keys(h.tables().tf24_users || {}).length, 0)
