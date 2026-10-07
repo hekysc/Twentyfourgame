@@ -440,7 +440,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 36rpx;
+  padding: 24rpx;
   box-sizing: border-box;
   background: rgba(28, 40, 34, .48);
 }
@@ -512,13 +512,16 @@ button {
 .nickname-input {
   box-sizing: border-box;
   width: 100%;
+  height: 88rpx;
   margin-top: 12rpx;
-  padding: 20rpx 22rpx;
+  padding: 18rpx 14rpx;
   border: 1rpx solid #d9ded2;
   border-radius: 14rpx;
   color: #253c34;
   background: #f7f6ef;
-  font-size: 27rpx;
+  font-size: 24rpx;
+  line-height: 48rpx;
+  white-space: nowrap;
 }
 .privacy-copy { margin-top: 14rpx; font-size: 21rpx; }
 .modal-error { display: block; margin-top: 14rpx; color: #a34036; font-size: 23rpx; }
