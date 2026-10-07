@@ -292,7 +292,7 @@ exports.main = async (event) => {
     if (action === 'profile') {
       const name = String(event.name || '').trim()
       if (!name || [...name].length > 20) throw new Error('昵称需为1至20个字符')
-      if (normalizeNickname(name) !== normalizeNickname(p.name) && await nicknameAlreadyUsed(name, uid))
+      if (normalizeNickname(name) !== normalizeNickname('微信玩家') && await nicknameAlreadyUsed(name, uid))
         throw new Error('这个昵称已被使用，请换一个')
       const avatar = String(event.avatar || '')
       if (
