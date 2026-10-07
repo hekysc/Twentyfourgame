@@ -115,6 +115,27 @@ test('server rejects unauthenticated invocations', async () => {
   h.setUser('')
   assert.equal((await h.call({ action: 'login' })).ok, false)
 })
+test('account creation checks the authenticated WeChat identity only on confirmation', async () => {
+  const h = harness()
+  assert.equal(Object.keys(h.tables().tf24_users || {}).length, 0)
+  const created = await h.call({ action: 'createAccount', name: '新玩家' })
+  assert.equal(created.ok, true)
+  assert.equal(created.data.user.name, '新玩家')
+  assert.equal(h.tables().tf24_users[h.uid()].name, '新玩家')
+  assert.equal(h.tables().tf24_stats[h.uid() + '_all'].total, 0)
+
+  const duplicate = await h.call({ action: 'createAccount', name: '另一个名字' })
+  assert.equal(duplicate.ok, false)
+  assert.match(duplicate.error, /已经关联在线帐号/)
+  assert.equal(h.tables().tf24_users[h.uid()].name, '新玩家')
+  assert.equal(Object.keys(h.tables().tf24_users).length, 1)
+})
+test('failed account creation does not leave an empty user record', async () => {
+  const h = harness()
+  const invalid = await h.call({ action: 'createAccount', name: '' })
+  assert.equal(invalid.ok, false)
+  assert.equal(Object.keys(h.tables().tf24_users || {}).length, 0)
+})
 test('profile rejects nicknames already used by another WeChat account', async () => {
   const h = harness()
   await h.call({ action: 'login' })

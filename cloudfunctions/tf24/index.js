@@ -204,6 +204,52 @@ exports.main = async (event) => {
         },
       }
     }
+    if (action === 'createAccount') {
+      if (await get('tf24_users', uid))
+        throw new Error('这个微信身份已经关联在线帐号，请从上方选择该帐号进入。')
+      const name = String(event.name || '').trim()
+      if (!name || [...name].length > 20) throw new Error('昵称需为1至20个字符')
+      if (normalizeNickname(name) !== normalizeNickname('微信玩家') && await nicknameAlreadyUsed(name, uid))
+        throw new Error('这个昵称已被使用，请换一个')
+      const review = await cloud.openapi.security.msgSecCheck({
+        openid: ctx.OPENID,
+        scene: 1,
+        version: 2,
+        content: name,
+      })
+      if (review.result?.suggest !== 'pass')
+        throw new Error('昵称未通过内容检查，请修改')
+      const user = {
+        name,
+        avatar: '',
+        createdAt: now,
+        prefs: sanitizePrefs(),
+        book: { active: {}, ledger: {} },
+        deck: [],
+        activeBatchId: '',
+      }
+      await db.runTransaction(async (tx) => {
+        try {
+          await txget(tx, 'tf24_users', uid)
+          throw new Error('这个微信身份已经关联在线帐号，请从上方选择该帐号进入。')
+        } catch (e) {
+          if (e.message?.includes('已经关联在线帐号')) throw e
+        }
+        await tx.collection('tf24_users').doc(uid).set({ data: user })
+        await tx.collection('tf24_stats').doc(`${uid}_all`).set({
+          data: R.emptyAggregate(uid, 'all'),
+        })
+      })
+      return {
+        ok: true,
+        data: {
+          user: { id: uid, name: user.name, avatar: user.avatar, color: '#dce9df' },
+          prefs: user.prefs,
+          book: user.book,
+          total: R.emptyAggregate(uid, 'all'),
+        },
+      }
+    }
     const p = await get('tf24_users', uid)
     if (!p) throw new Error('请先登录')
     if (action === 'prefetch') {
