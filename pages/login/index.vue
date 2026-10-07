@@ -137,8 +137,8 @@ function accountSubtitle(account) {
   const sameName = recentAccounts.value.filter((item) => normalize(item.name) === normalize(account.name))
   const recent = formatLastUsed(account.lastUsedAt)
   return sameName.length > 1
-    ? '微信帐号 · ' + account.id.slice(-4).toUpperCase() + ' · 最近使用 ' + recent
-    : '最近使用　' + recent
+    ? '微信帐号 · ' + account.id.slice(-4).toUpperCase() + ' · ' + recent
+    : recent
 }
 const practiceTotal = computed(() => Number(practiceStats.value?.totals?.total) || 0)
 const practiceRate = computed(() => {
