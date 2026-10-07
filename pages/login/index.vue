@@ -24,7 +24,7 @@
             <view v-else class="account-avatar avatar-fallback">{{ (account.name || '玩').slice(0, 1) }}</view>
             <view class="account-info">
               <text class="account-name">{{ account.name || '微信玩家' }}</text>
-              <text class="account-last">最近使用　{{ formatLastUsed(account.lastUsedAt) }}</text>
+              <text class="account-last">最近使用　{{ accountSubtitle(account) }}</text>
             </view>
             <view class="account-radio"></view>
           </view>
@@ -45,6 +45,7 @@
         <button class="secondary" :disabled="busy" @tap="openProfile">
           ＋　新建在线帐号
         </button>
+        <text v-if="error" class="error">{{ error }}</text>
       </view>
       <view class="mode-card practice">
         <text class="card-title">本地练习</text>
@@ -67,7 +68,6 @@
         <button :disabled="busy" @tap="practice">开始本地练习</button>
       </view>
 
-      <text v-if="error" class="error">{{ error }}</text>
       <text class="foot">在线成绩从微信身份登录后开始累计。本地练习数据与在线帐号相互独立。</text>
     </view>
 
@@ -130,6 +130,14 @@ function formatLastUsed(value) {
   if (date.toDateString() === now.toDateString())
     return '今天 ' + String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0')
   return (date.getMonth() + 1) + '月' + date.getDate() + '日'
+}
+function accountSubtitle(account) {
+  const normalize = (value) => String(value || '').normalize('NFKC').trim().toLowerCase()
+  const sameName = recentAccounts.value.filter((item) => normalize(item.name) === normalize(account.name))
+  const recent = formatLastUsed(account.lastUsedAt)
+  return sameName.length > 1
+    ? '微信帐号 · ' + account.id.slice(-4).toUpperCase() + ' · 最近使用 ' + recent
+    : '最近使用　' + recent
 }
 const practiceTotal = computed(() => Number(practiceStats.value?.totals?.total) || 0)
 const practiceRate = computed(() => {
