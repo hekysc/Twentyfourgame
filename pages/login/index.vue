@@ -110,7 +110,7 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppNavBar from '../../components/AppNavBar.vue'
 import { ensureInit, readStats } from '../../utils/store.js'
-import { loginOnline, createOnlineAccount, saveProfile, enterPractice, getRecentOnlineAccounts } from '../../utils/online.js'
+import { loginOnline, checkOnlineAccount, cacheOnlineAccount, createOnlineAccount, saveProfile, enterPractice, getRecentOnlineAccounts } from '../../utils/online.js'
 ensureInit()
 const busy = ref(false),
   error = ref(''),
@@ -189,14 +189,29 @@ async function enterSelectedAccount() {
     busy.value = false
   }
 }
-function openProfile() {
+async function openProfile() {
   if (busy.value) return
+  busy.value = true
   error.value = ''
-  profileName.value = '微信玩家'
-  profileAvatar.value = ''
-  originalName.value = profileName.value
-  originalAvatar.value = ''
-  profileOpen.value = true
+  try {
+    const status = await checkOnlineAccount()
+    if (status.linked && status.user) {
+      cacheOnlineAccount(status.user)
+      recentAccounts.value = getRecentOnlineAccounts()
+      selectedAccountId.value = status.user.id
+      error.value = `当前微信身份已关联帐号“${status.user.name || '微信玩家'}”，不能新建。请选择该帐号继续。`
+      return
+    }
+    profileName.value = '微信玩家'
+    profileAvatar.value = ''
+    originalName.value = profileName.value
+    originalAvatar.value = ''
+    profileOpen.value = true
+  } catch (e) {
+    error.value = e.message || '无法核对微信帐号状态，请联网后重试'
+  } finally {
+    busy.value = false
+  }
 }
 function onChooseAvatar(e) {
   profileAvatar.value = e?.detail?.avatarUrl || ''
@@ -238,7 +253,23 @@ async function confirmLogin() {
     recentAccounts.value = getRecentOnlineAccounts()
     uni.reLaunch({ url: '/pages/index/index' })
   } catch (e) {
-    error.value = e.message || '帐号创建失败，请重试'
+    if (String(e.message || '').includes('已经关联在线帐号')) {
+      try {
+        const status = await checkOnlineAccount()
+        if (status.linked && status.user) {
+          cacheOnlineAccount(status.user)
+          recentAccounts.value = getRecentOnlineAccounts()
+          selectedAccountId.value = status.user.id
+          error.value = `当前微信身份已关联帐号“${status.user.name || '微信玩家'}”，不能新建。请选择该帐号继续。`
+        } else {
+          error.value = e.message
+        }
+      } catch (_) {
+        error.value = e.message
+      }
+    } else {
+      error.value = e.message || '帐号创建失败，请重试'
+    }
   } finally {
     busy.value = false
   }

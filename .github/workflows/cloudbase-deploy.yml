@@ -8,6 +8,7 @@ on:
       - feat/batch-prefetch-offline-sync
       - feat/wechat-account-candidates
       - feat/deferred-account-create
+      - fix/login-account-precheck
     paths:
       - .github/workflows/cloudbase-deploy.yml
       - cloudfunctions/tf24/**
@@ -23,7 +24,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/round-settlement-flow' || github.ref == 'refs/heads/feat/batch-prefetch-offline-sync' || github.ref == 'refs/heads/feat/wechat-account-candidates' || github.ref == 'refs/heads/feat/deferred-account-create'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix/round-settlement-flow' || github.ref == 'refs/heads/feat/batch-prefetch-offline-sync' || github.ref == 'refs/heads/feat/wechat-account-candidates' || github.ref == 'refs/heads/feat/deferred-account-create' || github.ref == 'refs/heads/fix/login-account-precheck'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

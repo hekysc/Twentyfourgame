@@ -191,6 +191,18 @@ exports.main = async (event) => {
       .slice(0, 32)
     const action = event.action,
       now = Date.now()
+    if (action === 'accountStatus') {
+      const existing = await get('tf24_users', uid)
+      return {
+        ok: true,
+        data: {
+          linked: !!existing,
+          user: existing
+            ? { id: uid, name: existing.name, avatar: existing.avatar, color: '#dce9df' }
+            : null,
+        },
+      }
+    }
     if (action === 'login' || action === 'snapshot') {
       const p = await profile(uid),
         total = await get('tf24_stats', `${uid}_all`)
