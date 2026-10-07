@@ -11,6 +11,9 @@ const clean = (obj) => {
   const { _id, ...rest } = obj
   return rest
 }
+function normalizeNickname(value) {
+  return String(value || '').normalize('NFKC').trim().toLowerCase()
+}
 async function get(coll, id) {
   const r = await db.collection(coll).where({ _id: id }).limit(1).get()
   return r.data[0] || null
@@ -52,21 +55,23 @@ async function profile(uid) {
   await ensure('tf24_stats', `${uid}_all`, R.emptyAggregate(uid, 'all'))
   return get('tf24_users', uid)
 }
-async function scan(coll, condition) {
+async function scan(coll, condition, fields) {
   const out = []
   let cursor = ''
   for (;;) {
     const where = cursor ? { ...condition, _id: $.gt(cursor) } : condition
-    const { data } = await db
-      .collection(coll)
-      .where(where)
-      .orderBy('_id', 'asc')
-      .limit(100)
-      .get()
+    let query = db.collection(coll).where(where)
+    if (fields) query = query.field(fields)
+    const { data } = await query.orderBy('_id', 'asc').limit(100).get()
     out.push(...data)
     if (data.length < 100) return out
     cursor = data[data.length - 1]._id
   }
+}
+async function nicknameAlreadyUsed(name, uid) {
+  const key = normalizeNickname(name)
+  const users = await scan('tf24_users', {}, { name: true })
+  return users.some((user) => user._id !== uid && normalizeNickname(user.name) === key)
 }
 async function cleanExpiredBatches(uid, now) {
   const { data = [] } = await db
@@ -287,6 +292,8 @@ exports.main = async (event) => {
     if (action === 'profile') {
       const name = String(event.name || '').trim()
       if (!name || [...name].length > 20) throw new Error('昵称需为1至20个字符')
+      if (normalizeNickname(name) !== normalizeNickname('微信玩家') && await nicknameAlreadyUsed(name, uid))
+        throw new Error('这个昵称已被使用，请换一个')
       const avatar = String(event.avatar || '')
       if (
         avatar &&

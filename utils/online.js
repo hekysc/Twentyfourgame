@@ -22,6 +22,25 @@ let initialized = false,
   resultRetryDelay = 3000,
   activeSyncRequests = 0,
   syncStatus = { status: 'synced', retryable: false }
+
+const RECENT_ACCOUNTS_KEY = 'tf24_recent_online_accounts_v1'
+export function getRecentOnlineAccounts() {
+  const cached = readJSON(RECENT_ACCOUNTS_KEY, [])
+  return Array.isArray(cached)
+    ? cached.filter((item) => item && typeof item.id === 'string' && item.id)
+    : []
+}
+function rememberOnlineAccount(user) {
+  if (!user?.id) return
+  const entry = {
+    id: String(user.id),
+    name: String(user.name || '微信玩家'),
+    avatar: String(user.avatar || ''),
+    lastUsedAt: Date.now(),
+  }
+  const accounts = getRecentOnlineAccounts().filter((item) => item.id !== entry.id)
+  writeJSON(RECENT_ACCOUNTS_KEY, [entry, ...accounts].slice(0, 12))
+}
 function publishSyncStatus(status, retryable = false) {
   syncStatus = { status, retryable }
   try { uni.$emit('tf24:sync-status', { ...syncStatus }) } catch (_) {}
@@ -103,6 +122,7 @@ export async function loginOnline() {
     cursor = page.cursor
   } while (cursor)
   setOnlineIdentity(snapshot.user)
+  rememberOnlineAccount(snapshot.user)
   epoch++
   activeQuestion = null
   deckOwner = ''
@@ -124,6 +144,7 @@ export async function refreshOnline() {
   } while (cursor)
   if (stamp !== epoch) return
   setOnlineIdentity(snapshot.user)
+  rememberOnlineAccount(snapshot.user)
   activeQuestion = null
   deckOwner = ''
   deckState = null
@@ -312,6 +333,7 @@ export async function saveProfile(name, avatarPath) {
   }
   const user = await cloudCall('profile', { name, avatar })
   setOnlineIdentity(user)
+  rememberOnlineAccount(user)
   clearTabCache()
   return user
 }

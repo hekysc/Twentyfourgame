@@ -20,6 +20,9 @@ function harness() {
       where(condition) {
         let limit = 100
         return {
+          field() {
+            return this
+          },
           orderBy() {
             return this
           },
@@ -83,6 +86,7 @@ function harness() {
     init() {},
     database: () => db,
     getWXContext: () => ctx,
+    openapi: { security: { msgSecCheck: async () => ({ result: { suggest: 'pass' } }) } },
     DYNAMIC_CURRENT_ENV: 'env',
   }
   const sandbox = {
@@ -110,6 +114,17 @@ test('server rejects unauthenticated invocations', async () => {
   const h = harness()
   h.setUser('')
   assert.equal((await h.call({ action: 'login' })).ok, false)
+})
+test('profile rejects nicknames already used by another WeChat account', async () => {
+  const h = harness()
+  await h.call({ action: 'login' })
+  assert.equal((await h.call({ action: 'profile', name: 'Yancong', avatar: '' })).ok, true)
+  h.setUser('another-wechat-user')
+  await h.call({ action: 'login' })
+  const duplicate = await h.call({ action: 'profile', name: ' ＹＡＮＣＯＮＧ ', avatar: '' })
+  assert.equal(duplicate.ok, false)
+  assert.match(duplicate.error, /昵称已被使用/)
+  assert.equal((await h.call({ action: 'profile', name: '森林玩家', avatar: '' })).ok, true)
 })
 test('duplicate finish is idempotent; server ignores forged score, time and owner', async () => {
   const h = harness()
